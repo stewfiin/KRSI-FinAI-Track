@@ -95,11 +95,15 @@ class LLMTransactionExtraction(BaseModel):
     )
     wallet_name: Optional[str] = Field(
         None,
-        description="Nama dompet/rekening paling cocok dari daftar dompet yang disediakan",
+        description="Nama dompet/rekening asal paling cocok dari daftar dompet yang disediakan",
+    )
+    destination_wallet_name: Optional[str] = Field(
+        None,
+        description="Nama dompet/rekening tujuan jika tipe transaksi adalah transfer (misal: 'gopay')",
     )
     description: Optional[str] = Field(
         None,
-        description="Keterangan singkat barang/jasa yang dibeli atau sumber dana",
+        description="Keterangan singkat transaksi (contoh: 'Transfer 100rb dari Tunai ke Gopay', 'Beli kopi', 'Uang saku')",
     )
 
 

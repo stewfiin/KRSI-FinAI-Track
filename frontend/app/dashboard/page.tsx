@@ -498,11 +498,15 @@ export default function DashboardPage() {
                   <div
                     className="flex h-9 w-9 items-center justify-center rounded-xl font-bold text-xs"
                     style={{
-                      backgroundColor: `${tx.category_color || "#3B82F6"}20`,
-                      color: tx.category_color || "#3B82F6",
+                      backgroundColor: tx.type === "transfer" ? "#3B82F620" : `${tx.category_color || "#3B82F6"}20`,
+                      color: tx.type === "transfer" ? "#60A5FA" : (tx.category_color || "#3B82F6"),
                     }}
                   >
-                    {tx.category_name?.slice(0, 2).toUpperCase() || "TX"}
+                    {tx.type === "transfer" ? (
+                      <ArrowRightLeft className="h-4 w-4" />
+                    ) : (
+                      tx.category_name?.slice(0, 2).toUpperCase() || "TX"
+                    )}
                   </div>
                   <div>
                     <div className="flex items-center gap-1.5">
@@ -526,7 +530,7 @@ export default function DashboardPage() {
                       : "text-blue-400"
                   }`}
                 >
-                  {tx.type === "income" ? "+" : tx.type === "expense" ? "-" : ""}
+                  {tx.type === "income" ? "+" : tx.type === "expense" ? "-" : "↔ "}
                   {formatIDR(tx.amount)}
                 </span>
               </div>

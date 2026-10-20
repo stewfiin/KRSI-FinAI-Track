@@ -184,12 +184,41 @@ class AIService:
                     summary_lines.append(f"❌ Nominal Rp{tx_data.amount:,.0f} gagal dicatat: Kategori tidak sesuai.")
                     continue
 
+                dest_wallet_id = None
+                matched_dest_wallet = None
+                if tx_data.type == TransactionType.TRANSFER:
+                    if tx_data.destination_wallet_name:
+                        matched_dest_wallet = AIService._match_wallet(tx_data.destination_wallet_name, wallets)
+                    if not matched_dest_wallet or matched_dest_wallet.id == matched_wallet.id:
+                        other_w = [w for w in wallets if w.id != matched_wallet.id]
+                        if other_w:
+                            matched_dest_wallet = other_w[0]
+
+                    if not matched_dest_wallet:
+                        summary_lines.append(f"❌ Transfer Rp{tx_data.amount:,.0f} gagal dicatat: Anda membutuhkan minimal 2 dompet aktif untuk transfer saldo.")
+                        continue
+                    dest_wallet_id = matched_dest_wallet.id
+
+                # Format deskripsi transaksi yang ringkas & rapi
+                if tx_data.type == TransactionType.TRANSFER and matched_dest_wallet:
+                    amt = tx_data.amount
+                    if amt >= 1000000 and amt % 1000000 == 0:
+                        amt_lbl = f"{int(amt // 1000000)}jt"
+                    elif amt >= 1000 and amt % 1000 == 0:
+                        amt_lbl = f"{int(amt // 1000)}rb"
+                    else:
+                        amt_lbl = f"Rp{int(amt):,}".replace(",", ".")
+                    final_desc = f"Transfer {amt_lbl} dari {matched_wallet.name} ke {matched_dest_wallet.name}"
+                else:
+                    final_desc = tx_data.description or clean_msg
+
                 tx_create_payload = TransactionCreate(
                     wallet_id=matched_wallet.id,
+                    destination_wallet_id=dest_wallet_id,
                     category_id=matched_category.id,
                     amount=tx_data.amount,
                     type=tx_data.type,
-                    description=tx_data.description or clean_msg,
+                    description=final_desc,
                     transaction_date=date.today(),
                     source=source,
                 )
@@ -202,12 +231,17 @@ class AIService:
                 if tx_result.budget_alert:
                     alerts.append(f"*{tx_result.budget_alert.message}*")
 
-                tipe_icon = "📈" if tx_data.type == TransactionType.INCOME else ("📉" if tx_data.type == TransactionType.EXPENSE else "🔄")
-                tipe_str = "Pemasukan" if tx_data.type == TransactionType.INCOME else ("Pengeluaran" if tx_data.type == TransactionType.EXPENSE else "Transfer")
-                item_desc = f" ({tx_data.description})" if tx_data.description and tx_data.description != clean_msg else ""
-                summary_lines.append(
-                    f"{tipe_icon} **{tipe_str}** sebesar **Rp{tx_data.amount:,.0f}** untuk kategori **{matched_category.name}**{item_desc} menggunakan dompet **{matched_wallet.name}**"
-                )
+                if tx_data.type == TransactionType.TRANSFER and matched_dest_wallet:
+                    summary_lines.append(
+                        f"🔄 **Transfer** sebesar **Rp{tx_data.amount:,.0f}** dari dompet **{matched_wallet.name}** ke dompet **{matched_dest_wallet.name}**"
+                    )
+                else:
+                    tipe_icon = "📈" if tx_data.type == TransactionType.INCOME else "📉"
+                    tipe_str = "Pemasukan" if tx_data.type == TransactionType.INCOME else "Pengeluaran"
+                    item_desc = f" ({final_desc})" if final_desc and final_desc.lower() != clean_msg.lower() else ""
+                    summary_lines.append(
+                        f"{tipe_icon} **{tipe_str}** sebesar **Rp{tx_data.amount:,.0f}** untuk kategori **{matched_category.name}**{item_desc} menggunakan dompet **{matched_wallet.name}**"
+                    )
 
             tx_list_responses = recorded_txs
             if recorded_txs:
@@ -413,14 +447,16 @@ Analisis pesan bahasa Indonesia dari pengguna secara teliti dan akurat:
      * amount: nominal angka uang (contoh: '5rb' -> 5000, '10rb' -> 10000, '25rb' -> 25000, '50k' -> 50000, '100rb' -> 100000, '1.5jt' -> 1500000, 'dua puluh ribu' -> 20000).
      * type:
        - 'income' jika konteksnya adalah uang masuk atau pemberian uang saku/nafkah/hadiah dari keluarga atau pihak lain (contoh: dapat/dapet uang saku, sangu, ibu kasih, bapak ngasih, bapak 10rb, dikasih mama, terima gaji, bonus, dapat hadiah, cair, untung penjualan, piutang dibayar, dll). Jika ada penyebutan anggota keluarga memberi uang ("ibu kasih 10rb", "bapak 10rb", "dikasih mama 20rb"), ini adalah PEMASUKAN dengan kategori 'Uang Saku'.
-       - 'expense' jika konteksnya uang keluar / belanja / biaya / beli (contoh: beli kopi, makan siang, jajan, mainan, bayar tagihan, pulsa, bensin, belanja baju, dll).
-       - 'transfer' jika memindahkan saldo antar dompet.
+       - 'expense' jika konteksnya uang keluar / belanja / biaya / beli (contoh: beli kopi, makan siang, jajan, mainan, bayar tagihan, pulsa, bensin, belanja baju, parfum, dll).
+       - 'transfer' jika memindahkan saldo antar dompet, top up e-wallet, atau tarik tunai (contoh: "transfer 100rb dari tunai ke gopay", "saya mindahin uang tunai 100rb ke dompay gopay", "top up gopay 50rb dari tunai", "mindahin 50rb ke gopay").
      * category_name: pilih nama kategori yang paling relevan dari daftar: {category_names}
        - PERHATIAN KERAS: Jika type = 'income', WAJIB pilih kategori pemasukan (seperti 'Uang Saku', 'Gaji', 'Bonus & Freelance', 'Investasi', atau 'Lain-lain'). JANGAN PERNAH memilih kategori pengeluaran seperti 'Makanan & Minuman' untuk uang masuk!
        - Jika transaksi berasal dari orang tua / keluarga (ibu, bapak, ayah, mama, ortu) atau uang saku / sangu, pilih kategori 'Uang Saku'.
-       - Jika type = 'expense', pilih kategori pengeluaran yang tepat ('Makanan & Minuman', 'Transportasi', 'Belanja', 'Tagihan & Utilitas', 'Hiburan', 'Kesehatan', dll). Mainan, pakaian, gadget masuk ke 'Belanja'.
-     * wallet_name: pilih dari {wallet_names} (default ke 'Tunai' jika tidak disebutkan).
-     * description: deskripsi singkat transaksi (misal: "Ibu kasih", "Bapak kasih", "Beli mainan").
+       - Jika type = 'expense', pilih kategori pengeluaran yang tepat ('Makanan & Minuman', 'Transportasi', 'Belanja', 'Tagihan & Utilitas', 'Hiburan', 'Kesehatan', dll). Mainan, pakaian, gadget, parfum masuk ke 'Belanja'.
+       - Jika type = 'transfer', pilih kategori 'Lain-lain'.
+     * wallet_name: dompet asal / pengirim dari {wallet_names} (default ke 'Tunai' jika tidak disebutkan).
+     * destination_wallet_name: khusus transfer, dompet tujuan / penerima dari {wallet_names}.
+     * description: deskripsi singkat transaksi yang ringkas dan padat (misal: "Transfer 100rb dari Tunai ke Gopay", "Ibu kasih 10rb", "Beli mainan 10rb", "Belanja parfum 200rb"). JANGAN sertakan kalimat panjang percakapan pengguna.
    - Jika hanya ada 1 transaksi, isi juga `transaction_data` dengan data yang sama persis.
 
 2. Jika pengguna BERTANYA TENTANG DATA KEUANGAN / SALDO / ANGGARAN:
@@ -505,7 +541,91 @@ Analisis pesan bahasa Indonesia dari pengguna secara teliti dan akurat:
             if not amt:
                 return None
 
-            # Deteksi kata kunci keluarga / pemberi uang
+            # Format nominal ringkas (100rb, 1jt, dll)
+            if amt >= 1000000 and amt % 1000000 == 0:
+                amt_label = f"{int(amt // 1000000)}jt"
+            elif amt >= 1000 and amt % 1000 == 0:
+                amt_label = f"{int(amt // 1000)}rb"
+            else:
+                amt_label = f"Rp{int(amt):,}".replace(",", ".")
+
+            # 1. Deteksi Transfer Antar Dompet / Top Up Saldo
+            transfer_keywords = [
+                "transfer", "tf", "mindahin", "pindahin", "pindah", "kirim uang",
+                "top up", "topup", "isi saldo", "tarik tunai"
+            ]
+            is_transfer = any(re.search(r"\b" + tk + r"\b", cl) for tk in transfer_keywords) or any(
+                tk in cl for tk in ["mindahin", "pindahin", "top up", "topup", "tarik tunai", "isi saldo"]
+            )
+
+            if is_transfer:
+                source_w = None
+                dest_w = None
+
+                topup_match = re.search(r"\b(?:top\s*up|isi\s+saldo|isi)\b\s+(?:dompet\s+|dompay\s+|rekening\s+)?([a-zA-Z0-9_-]+)", cl)
+                if topup_match:
+                    target_word = topup_match.group(1).lower()
+                    for w in wallet_names:
+                        if w.lower() in target_word or target_word in w.lower():
+                            dest_w = w
+                            break
+
+                ke_match = re.search(r"\bke\b\s+(?:dompet\s+|dompay\s+|rekening\s+)?([a-zA-Z0-9_-]+)", cl)
+                if ke_match:
+                    target_word = ke_match.group(1).lower()
+                    for w in wallet_names:
+                        if w.lower() in target_word or target_word in w.lower():
+                            dest_w = w
+                            break
+
+                dari_match = re.search(r"\b(?:dari|pakai|menggunakan|lewat)\b\s+(?:dompet\s+|dompay\s+|rekening\s+)?([a-zA-Z0-9_-]+)", cl)
+                if dari_match:
+                    source_word = dari_match.group(1).lower()
+                    for w in wallet_names:
+                        if w.lower() in source_word or source_word in w.lower():
+                            source_w = w
+                            break
+
+                if not source_w or not dest_w:
+                    found_wallets = []
+                    for w in wallet_names:
+                        idx = cl.find(w.lower())
+                        if idx != -1:
+                            found_wallets.append((idx, w))
+                    found_wallets.sort(key=lambda x: x[0])
+
+                    if not source_w and not dest_w and len(found_wallets) >= 2:
+                        ke_pos = cl.find(" ke ")
+                        if ke_pos != -1:
+                            source_candidates = [w for idx, w in found_wallets if idx < ke_pos]
+                            dest_candidates = [w for idx, w in found_wallets if idx > ke_pos]
+                            if source_candidates and dest_candidates:
+                                source_w = source_candidates[-1]
+                                dest_w = dest_candidates[0]
+                        else:
+                            source_w = found_wallets[0][1]
+                            dest_w = found_wallets[1][1]
+                    elif dest_w and not source_w:
+                        other = [w for w in wallet_names if w.lower() != dest_w.lower()]
+                        source_w = other[0] if other else None
+                    elif source_w and not dest_w:
+                        other = [w for w in wallet_names if w.lower() != source_w.lower()]
+                        dest_w = other[0] if other else None
+
+                src_name = source_w.capitalize() if source_w else (wallet_names[0] if wallet_names else "Tunai")
+                dst_name = dest_w.capitalize() if dest_w else (wallet_names[1] if len(wallet_names) > 1 else "E-Wallet")
+                desc = f"Transfer {amt_label} dari {src_name} ke {dst_name}"
+
+                return LLMTransactionExtraction(
+                    amount=amt,
+                    type=TransactionType.TRANSFER,
+                    category_name="Lain-lain",
+                    wallet_name=source_w or (wallet_names[0] if wallet_names else "Tunai"),
+                    destination_wallet_name=dest_w or (wallet_names[1] if len(wallet_names) > 1 else None),
+                    description=desc,
+                )
+
+            # 2. Deteksi kata kunci keluarga / pemberi uang
             family_words = [
                 "ibu", "bapak", "ayah", "mama", "papa", "ortu", "orang tua", "om", "tante",
                 "paman", "nenek", "kakek", "kakak", "abang", "mas", "mbak", "umi", "abi"
@@ -558,7 +678,7 @@ Analisis pesan bahasa Indonesia dari pengguna secara teliti dan akurat:
                     matched_c = "Makanan & Minuman"
                 elif any(w in cl for w in ["bensin", "ojol", "grab", "gojek", "parkir", "tol", "transport"]):
                     matched_c = "Transportasi"
-                elif any(w in cl for w in ["baju", "sepatu", "mainan", "game", "belanja", "shopee", "tokopedia", "beli"]):
+                elif any(w in cl for w in ["baju", "sepatu", "mainan", "game", "belanja", "shopee", "tokopedia", "beli", "parfum"]):
                     matched_c = "Belanja"
                 elif any(w in cl for w in ["listrik", "air", "wifi", "pulsa", "tagihan", "kost", "kontrakan"]):
                     matched_c = "Tagihan & Utilitas"
@@ -569,7 +689,14 @@ Analisis pesan bahasa Indonesia dari pengguna secara teliti dan akurat:
                 else:
                     matched_c = "Belanja" if "beli" in cl else "Makanan & Minuman"
 
-            desc = cl.capitalize()
+            clean_desc = re.sub(
+                r"^(?:tadi\s+|saya\s+|aku\s+|tolong\s+|catat\s+|catatkan\s+|uang\s+nya\s+saya\s+|uangnya\s+saya\s+)",
+                "",
+                cl,
+                flags=re.IGNORECASE,
+            ).strip()
+            desc = clean_desc.capitalize() if clean_desc else cl.capitalize()
+
             return LLMTransactionExtraction(
                 amount=amt,
                 type=tx_t,
