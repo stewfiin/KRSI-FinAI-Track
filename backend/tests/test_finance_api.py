@@ -101,7 +101,7 @@ def test_finance_workflow():
     # 8. Dashboard Summary
     status, summary = request("/api/v1/dashboard/summary", "GET", token=token)
     assert status == 200
-    assert summary["monthly_income"] >= 1000000
+    assert float(summary["monthly_income"]) >= 1000000
 
     print("Finance workflow integration test completed successfully.")
 
