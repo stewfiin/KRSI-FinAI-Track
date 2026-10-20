@@ -11,6 +11,7 @@ greenlet>=3.0.3
 
 # Configuration & Settings
 pydantic-settings>=2.3.0
+email-validator>=2.0.0
 
 # Authentication & Security
 python-jose[cryptography]>=3.3.0
