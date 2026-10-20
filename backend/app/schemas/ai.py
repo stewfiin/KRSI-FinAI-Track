@@ -29,7 +29,11 @@ class AIChatResponse(BaseModel):
     )
     transaction: Optional[TransactionResponse] = Field(
         default=None,
-        description="Data transaksi jika AI berhasil mencatat transaksi baru",
+        description="Data transaksi jika AI berhasil mencatat transaksi tunggal baru",
+    )
+    transactions: Optional[List[TransactionResponse]] = Field(
+        default=None,
+        description="Daftar transaksi jika AI mencatat banyak transaksi sekaligus",
     )
     budget_alert: Optional[BudgetAlert] = Field(
         default=None,
@@ -121,7 +125,14 @@ class LLMIntentDecision(BaseModel):
         ...,
         description="Klasifikasi niat user: 'transaction' jika user ingin mencatat mutasi uang, 'query' jika user menanyakan informasi/saldo/pengeluaran, 'general' jika sapaan atau percakapan biasa",
     )
-    transaction_data: Optional[LLMTransactionExtraction] = None
+    transaction_data: Optional[LLMTransactionExtraction] = Field(
+        default=None,
+        description="Data transaksi tunggal",
+    )
+    transactions: Optional[List[LLMTransactionExtraction]] = Field(
+        default=None,
+        description="Daftar transaksi jika pengguna menyebutkan satu atau beberapa transaksi sekaligus dalam satu kalimat (contoh: 'beli kopi 5rb, dapet uang saku 10rb, makan siang 15rb')",
+    )
     query_data: Optional[LLMQueryExtraction] = None
     general_reply: Optional[str] = Field(
         None,

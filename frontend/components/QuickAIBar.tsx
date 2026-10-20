@@ -169,7 +169,7 @@ export function QuickAIBar({ onSuccess }: QuickAIBarProps) {
               value={text}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSendText()}
-              placeholder="Ketik pengeluaran / tanya saldo (misal: 'Beli kopi 25rb Tunai')..."
+              placeholder="Ketik transaksi masuk/keluar (misal: 'beli kopi 5rb, dapet uang saku 10rb')..."
               disabled={isLoading}
               className="flex-1 bg-transparent px-2 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none disabled:opacity-50"
             />

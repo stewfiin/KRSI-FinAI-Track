@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -14,9 +15,14 @@ import {
 import { useAuthStore } from "@/lib/store";
 
 export function Navbar() {
+  const [mounted, setMounted] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
   const { user, clearAuth } = useAuthStore();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const isAuthPage = pathname.startsWith("/login");
   if (isAuthPage) return null;
@@ -55,7 +61,7 @@ export function Navbar() {
           </Link>
 
           <div className="flex items-center gap-3">
-            {user && (
+            {mounted && user && (
               <div className="hidden sm:flex flex-col text-right">
                 <span className="text-xs font-semibold text-slate-200">{user.name}</span>
                 <span className="text-[10px] text-slate-400">{user.email}</span>

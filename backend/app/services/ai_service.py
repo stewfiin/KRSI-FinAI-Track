@@ -1,3 +1,4 @@
+import asyncio
 import io
 import re
 import uuid
@@ -43,7 +44,7 @@ class AIService:
         if not settings.GEMINI_API_KEY:
             return None
         return ChatGoogleGenerativeAI(
-            model="gemini-2.5-flash",
+            model="gemini-flash-latest",
             google_api_key=settings.GEMINI_API_KEY,
             temperature=temperature,
         )
@@ -149,22 +150,36 @@ class AIService:
 
         reply_text = ""
         tx_response: Optional[TransactionResponse] = None
+        tx_list_responses: List[TransactionResponse] = []
         budget_alert = None
         extracted_meta = decision.model_dump(mode="json")
 
-        # 4. Tangani Berdasarkan Niat (Intent)
-        if decision.intent == "transaction" and decision.transaction_data and decision.transaction_data.amount:
-            # === AKSI: PENCATATAN TRANSAKSI OTOMATIS ===
-            tx_data = decision.transaction_data
-            matched_wallet = AIService._match_wallet(tx_data.wallet_name, wallets)
-            matched_category = AIService._match_category(tx_data.category_name, categories, tx_data.type)
+        # Kumpulkan daftar transaksi (bisa 1 atau banyak item)
+        tx_items: List[LLMTransactionExtraction] = []
+        if decision.intent == "transaction":
+            if decision.transactions and len(decision.transactions) > 0:
+                tx_items = [t for t in decision.transactions if t.amount]
+            elif decision.transaction_data and decision.transaction_data.amount:
+                tx_items = [decision.transaction_data]
 
-            if not matched_wallet:
-                reply_text = "Saya memahami nominal transaksi Anda, namun Anda belum memiliki dompet aktif untuk mencatatnya."
-            elif not matched_category:
-                reply_text = "Saya memahami nominal transaksi Anda, namun tidak menemukan kategori yang sesuai."
-            else:
-                # Panggil TransactionService secara atomic
+        # 4. Tangani Berdasarkan Niat (Intent)
+        if decision.intent == "transaction" and tx_items:
+            # === AKSI: PENCATATAN TRANSAKSI OTOMATIS (MENDUKUNG SINGLE / BANYAK TRANSAKSI SEKALIGUS) ===
+            recorded_txs: List[TransactionResponse] = []
+            alerts: List[str] = []
+            summary_lines: List[str] = []
+
+            for tx_data in tx_items:
+                matched_wallet = AIService._match_wallet(tx_data.wallet_name, wallets)
+                matched_category = AIService._match_category(tx_data.category_name, categories, tx_data.type)
+
+                if not matched_wallet:
+                    summary_lines.append(f"❌ Nominal Rp{tx_data.amount:,.0f} gagal dicatat: Anda belum memiliki dompet aktif.")
+                    continue
+                if not matched_category:
+                    summary_lines.append(f"❌ Nominal Rp{tx_data.amount:,.0f} gagal dicatat: Kategori tidak sesuai.")
+                    continue
+
                 tx_create_payload = TransactionCreate(
                     wallet_id=matched_wallet.id,
                     category_id=matched_category.id,
@@ -179,15 +194,33 @@ class AIService:
                     user_id=user_id,
                     payload=tx_create_payload,
                 )
-                tx_response = tx_result.transaction
-                budget_alert = tx_result.budget_alert
+                recorded_txs.append(tx_result.transaction)
+                if tx_result.budget_alert:
+                    alerts.append(f"*{tx_result.budget_alert.message}*")
 
-                tipe_str = "pengeluaran" if tx_data.type == TransactionType.EXPENSE else ("pemasukan" if tx_data.type == TransactionType.INCOME else "transfer")
-                reply_text = f"✅ Berhasil mencatat {tipe_str} sebesar **Rp{tx_data.amount:,.0f}** untuk kategori **{matched_category.name}** menggunakan dompet **{matched_wallet.name}**."
+                tipe_icon = "📈" if tx_data.type == TransactionType.INCOME else ("📉" if tx_data.type == TransactionType.EXPENSE else "🔄")
+                tipe_str = "Pemasukan" if tx_data.type == TransactionType.INCOME else ("Pengeluaran" if tx_data.type == TransactionType.EXPENSE else "Transfer")
+                item_desc = f" ({tx_data.description})" if tx_data.description and tx_data.description != clean_msg else ""
+                summary_lines.append(
+                    f"{tipe_icon} **{tipe_str}** sebesar **Rp{tx_data.amount:,.0f}** untuk kategori **{matched_category.name}**{item_desc} menggunakan dompet **{matched_wallet.name}**"
+                )
 
-                # Sisipkan alert jika mendekati atau melebihi anggaran
-                if budget_alert:
-                    reply_text += f"\n\n⚠️ *{budget_alert.message}*"
+            tx_list_responses = recorded_txs
+            if recorded_txs:
+                if len(recorded_txs) == 1:
+                    tx_response = recorded_txs[0]
+                    reply_text = f"✅ Berhasil mencatat {summary_lines[0]}."
+                else:
+                    tx_response = recorded_txs[0]
+                    reply_text = (
+                        f"✅ Berhasil mencatat **{len(recorded_txs)} transaksi** sekaligus:\n"
+                        + "\n".join([f"• {line}" for line in summary_lines])
+                    )
+
+                if alerts:
+                    reply_text += "\n\n⚠️ " + "\n⚠️ ".join(alerts)
+            else:
+                reply_text = "Maaf, transaksi tidak dapat diproses karena tidak ditemukan dompet aktif atau kategori yang sesuai."
 
         elif decision.intent == "query" and decision.query_data:
             # === AKSI: Q&A DATA KEUANGAN PRIBADI ===
@@ -227,6 +260,7 @@ class AIService:
             reply=reply_text,
             extracted_data=extracted_meta,
             transaction=tx_response,
+            transactions=tx_list_responses if len(tx_list_responses) > 1 else None,
             budget_alert=budget_alert,
         )
 
@@ -359,16 +393,26 @@ class AIService:
             return AIService._heuristic_fallback_classifier(message, wallet_names, category_names)
 
         system_instruction = f"""
-Kamu adalah AI Parsing Engine untuk aplikasi keuangan 'FinAI Track'.
-Analisis pesan bahasa Indonesia dari pengguna secara cermat:
+Kamu adalah AI Parsing Engine cerdas untuk aplikasi keuangan 'FinAI Track'.
+Analisis pesan bahasa Indonesia dari pengguna secara teliti dan akurat:
 
-1. Jika pengguna berniat MENCATAT PENGELUARAN/PEMASUKAN/MUTASI:
+1. Jika pengguna berniat MENCATAT TRANSAKSI (Pengeluaran, Pemasukan, atau Pemindahan Saldo):
    - Tetapkan intent = "transaction"
-   - Ekstrak amount (konversi ekspresi seperti '25rb' -> 25000, '50k' -> 50000, '1.5jt' -> 1500000, 'dua puluh ribu' -> 20000).
-   - Tentukan type ('expense', 'income', atau 'transfer'). Default adalah 'expense'.
-   - Pilih category_name yang paling relevan dari daftar: {category_names}
-   - Pilih wallet_name yang paling relevan dari daftar: {wallet_names} (default ke 'Tunai' jika tidak disebutkan).
-   - Ekstrak description singkat barang/jasa yang dibeli.
+   - CATATAN PENTING: Pengguna dapat menyebutkan SATU atau LEBIH transaksi sekaligus dalam satu kalimat!
+     Contoh: "beli kopi 5rb, dapet uang saku 10rb, makan siang 15rb" -> terdapat 3 transaksi!
+   - Ekstrak seluruh transaksi ke dalam daftar `transactions`:
+     Untuk setiap item transaksi:
+     * amount: nominal angka uang (contoh: '5rb' -> 5000, '10rb' -> 10000, '25rb' -> 25000, '50k' -> 50000, '100rb' -> 100000, '1.5jt' -> 1500000, 'dua puluh ribu' -> 20000).
+     * type:
+       - 'income' jika konteksnya adalah uang masuk (contoh kata kunci: dapat/dapet uang saku, terima gaji, bonus, dapat hadiah, cair, dikasih orang tua, untung penjualan, piutang dibayar, dll).
+       - 'expense' jika konteksnya uang keluar / belanja / biaya (contoh: beli kopi, makan siang, jajan, bayar tagihan, pulsa, bensin, belanja baju, dll).
+       - 'transfer' jika memindahkan saldo antar dompet.
+     * category_name: pilih nama kategori yang paling relevan dari daftar: {category_names}
+       - PERHATIAN KERAS: Jika type = 'income', WAJIB pilih kategori pemasukan (seperti 'Uang Saku', 'Gaji', 'Bonus & Freelance', 'Investasi', atau 'Lain-lain'). JANGAN PERNAH memilih kategori pengeluaran seperti 'Makanan & Minuman' untuk uang masuk!
+       - Jika type = 'expense', pilih kategori pengeluaran yang tepat ('Makanan & Minuman', 'Transportasi', 'Belanja', 'Tagihan & Utilitas', 'Hiburan', 'Kesehatan', dll).
+     * wallet_name: pilih dari {wallet_names} (default ke 'Tunai' jika tidak disebutkan).
+     * description: deskripsi singkat barang/jasa atau sumber penerimaan uang.
+   - Jika hanya ada 1 transaksi, isi juga `transaction_data` dengan data yang sama persis.
 
 2. Jika pengguna BERTANYA TENTANG DATA KEUANGAN / SALDO / ANGGARAN:
    - Tetapkan intent = "query"
@@ -386,11 +430,15 @@ Analisis pesan bahasa Indonesia dari pengguna secara cermat:
 """
         structured_llm = llm.with_structured_output(LLMIntentDecision)
         try:
-            result = await structured_llm.ainvoke(
-                [
-                    SystemMessage(content=system_instruction),
-                    HumanMessage(content=message),
-                ]
+            result = await asyncio.wait_for(
+                asyncio.to_thread(
+                    structured_llm.invoke,
+                    [
+                        SystemMessage(content=system_instruction),
+                        HumanMessage(content=message),
+                    ],
+                ),
+                timeout=5.0,
             )
             return result
         except Exception:
@@ -403,7 +451,7 @@ Analisis pesan bahasa Indonesia dari pengguna secara cermat:
         wallet_names: List[str],
         category_names: List[str],
     ) -> LLMIntentDecision:
-        """Pencocokan aturan berbasis Regex & Kata Kunci sebagai fallback andal."""
+        """Pencocokan aturan berbasis Regex & Kata Kunci sebagai fallback andal untuk single & multi transaksi."""
         lower = message.lower()
 
         # Deteksi pertanyaan (Query)
@@ -424,55 +472,109 @@ Analisis pesan bahasa Indonesia dari pengguna secara cermat:
                 query_data=LLMQueryExtraction(query_type=q_type, time_frame="this_month"),
             )
 
-        # Deteksi transaksi (Ekstraksi Angka Nominal)
-        match_jt = re.search(r"(\d+(?:[.,]\d+)?)\s*(?:jt|juta)", lower)
-        match_rb = re.search(r"(\d+(?:[.,]\d+)?)\s*(?:rb|ribu|k)", lower)
-        match_num = re.search(r"(?:rp\.?\s*)?(\d{4,9})", lower)
+        # Helper untuk ekstrak 1 klausa transaksi
+        def parse_single_clause(clause: str) -> Optional[LLMTransactionExtraction]:
+            cl = clause.strip()
+            if not cl:
+                return None
 
-        amount = None
-        if match_jt:
-            val = float(match_jt.group(1).replace(",", "."))
-            amount = Decimal(str(int(val * 1000000)))
-        elif match_rb:
-            val = float(match_rb.group(1).replace(",", "."))
-            amount = Decimal(str(int(val * 1000)))
-        elif match_num:
-            amount = Decimal(match_num.group(1))
+            match_jt = re.search(r"(\d+(?:[.,]\d+)?)\s*(?:jt|juta)", cl)
+            match_rb = re.search(r"(\d+(?:[.,]\d+)?)\s*(?:rb|ribu|k)", cl)
+            match_num = re.search(r"(?:rp\.?\s*)?(\d{4,9})", cl)
 
-        if amount:
-            # Tentukan tipe transaksi
-            tx_type = TransactionType.EXPENSE
-            if any((w in lower for w in ["gaji", "terima", "dapat", "bonus", "pemasukan"])):
-                tx_type = TransactionType.INCOME
+            amt = None
+            if match_jt:
+                val = float(match_jt.group(1).replace(",", "."))
+                amt = Decimal(str(int(val * 1000000)))
+            elif match_rb:
+                val = float(match_rb.group(1).replace(",", "."))
+                amt = Decimal(str(int(val * 1000)))
+            elif match_num:
+                amt = Decimal(match_num.group(1))
+
+            if not amt:
+                return None
+
+            # Tentukan tipe transaksi (Pemasukan vs Pengeluaran)
+            income_keywords = [
+                "gaji", "terima", "dapat", "dapet", "bonus", "pemasukan", "saku", "uang saku",
+                "cair", "dikasih", "diberi", "tf masuk", "transfer masuk", "penjualan", "upah",
+                "untung", "angpao", "hadiah", "hibah", "infaq terima", "kiriman"
+            ]
+            if any(ik in cl for ik in income_keywords):
+                tx_t = TransactionType.INCOME
+            else:
+                tx_t = TransactionType.EXPENSE
 
             # Cocokkan dompet
             matched_w = None
             for w in wallet_names:
-                if w.lower() in lower:
+                if w.lower() in cl:
                     matched_w = w
                     break
 
             # Cocokkan kategori
             matched_c = None
-            for c in category_names:
-                if c.lower() in lower:
-                    matched_c = c
-                    break
+            if tx_t == TransactionType.INCOME:
+                if "saku" in cl:
+                    matched_c = "Uang Saku"
+                elif "gaji" in cl:
+                    matched_c = "Gaji"
+                elif "bonus" in cl or "freelance" in cl:
+                    matched_c = "Bonus & Freelance"
+                elif "investasi" in cl or "dividen" in cl:
+                    matched_c = "Investasi"
+                else:
+                    matched_c = "Lain-lain"
+            else:
+                if any(w in cl for w in ["kopi", "makan", "minum", "restoran", "kafe", "food", "sarapan", "lunch", "dinner", "jajan", "nasi", "ayam", "mie", "boba"]):
+                    matched_c = "Makanan & Minuman"
+                elif any(w in cl for w in ["bensin", "ojol", "grab", "gojek", "parkir", "tol", "transport"]):
+                    matched_c = "Transportasi"
+                elif any(w in cl for w in ["baju", "sepatu", "belanja", "shopee", "tokopedia", "beli"]):
+                    matched_c = "Belanja"
+                elif any(w in cl for w in ["listrik", "air", "wifi", "pulsa", "tagihan", "kost", "kontrakan"]):
+                    matched_c = "Tagihan & Utilitas"
+                elif any(w in cl for w in ["nonton", "bioskop", "game", "hiburan", "spotify", "netflix"]):
+                    matched_c = "Hiburan"
+                elif any(w in cl for w in ["obat", "dokter", "klinik", "apotek", "kesehatan"]):
+                    matched_c = "Kesehatan"
+                else:
+                    matched_c = "Makanan & Minuman"
 
+            desc = cl.capitalize()
+            return LLMTransactionExtraction(
+                amount=amt,
+                type=tx_t,
+                category_name=matched_c,
+                wallet_name=matched_w,
+                description=desc,
+            )
+
+        # Coba pecah berdasarkan koma, kata hubung 'dan', 'terus', 'lalu', atau baris baru
+        clauses = re.split(r"[,;\n]|\b(?:dan|terus|lalu|kemudian)\b", lower)
+        parsed_items: List[LLMTransactionExtraction] = []
+        for clause in clauses:
+            item = parse_single_clause(clause)
+            if item:
+                parsed_items.append(item)
+
+        if not parsed_items:
+            # Coba parse pesan penuh secara langsung
+            single = parse_single_clause(lower)
+            if single:
+                parsed_items.append(single)
+
+        if parsed_items:
             return LLMIntentDecision(
                 intent="transaction",
-                transaction_data=LLMTransactionExtraction(
-                    amount=amount,
-                    type=tx_type,
-                    category_name=matched_c,
-                    wallet_name=matched_w,
-                    description=message,
-                ),
+                transaction_data=parsed_items[0],
+                transactions=parsed_items,
             )
 
         return LLMIntentDecision(
             intent="general",
-            general_reply="Halo! Saya FinAI. Catat pengeluaran Anda cukup dengan mengetik seperti: 'Makan siang 25rb pakai BCA' atau rekam suara Anda.",
+            general_reply="Halo! Saya FinAI Track. Anda bisa mencatat pemasukan & pengeluaran sekaligus cukup dengan mengetik: 'beli kopi 5rb, dapet uang saku 10rb, makan siang 15rb' atau rekam suara Anda.",
         )
 
     @staticmethod
@@ -489,12 +591,23 @@ Analisis pesan bahasa Indonesia dari pengguna secara cermat:
     def _match_category(name: Optional[str], categories: List[Category], tx_type: TransactionType) -> Optional[Category]:
         if not categories:
             return None
-        cats_of_type = [c for c in categories if c.type.value == tx_type.value] or categories
+        cats_of_type = [c for c in categories if c.type.value == tx_type.value]
+        if not cats_of_type:
+            cats_of_type = categories
+
         if not name:
             return cats_of_type[0]
+
         name_lower = name.lower()
         matched = next((c for c in cats_of_type if c.name.lower() in name_lower or name_lower in c.name.lower()), None)
-        return matched or cats_of_type[0]
+        if matched:
+            return matched
+
+        # Jika nama tidak cocok, pilih default yang sesuai dengan jenis transaksi (bukan Makanan untuk Income)
+        if tx_type == TransactionType.INCOME:
+            return next((c for c in cats_of_type if "saku" in c.name.lower() or "gaji" in c.name.lower() or "lain" in c.name.lower()), cats_of_type[0])
+        else:
+            return next((c for c in cats_of_type if "makan" in c.name.lower() or "lain" in c.name.lower()), cats_of_type[0])
 
     # ==========================================================================
     # Helper Methods: Financial Query Execution
@@ -627,7 +740,8 @@ Aturan:
 """
         structured_llm = llm.with_structured_output(LLMBudgetPlan)
         try:
-            plan = await structured_llm.ainvoke(
+            plan = await asyncio.to_thread(
+                structured_llm.invoke,
                 [
                     SystemMessage(content=system_instruction),
                     HumanMessage(content=f"Rancang anggaran bulanan dengan preferensi ini: {user_prompt}"),

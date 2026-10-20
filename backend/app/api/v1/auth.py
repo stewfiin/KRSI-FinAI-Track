@@ -33,6 +33,7 @@ DEFAULT_CATEGORIES = [
     # Kategori Pemasukan (Income)
     {"name": "Gaji", "type": CategoryType.INCOME, "icon": "briefcase", "color": "#10B981"},
     {"name": "Bonus & Freelance", "type": CategoryType.INCOME, "icon": "gift", "color": "#06B6D4"},
+    {"name": "Uang Saku", "type": CategoryType.INCOME, "icon": "coins", "color": "#84CC16"},
     {"name": "Investasi", "type": CategoryType.INCOME, "icon": "trending-up", "color": "#14B8A6"},
     {"name": "Lain-lain", "type": CategoryType.INCOME, "icon": "plus-circle", "color": "#6B7280"},
 ]
