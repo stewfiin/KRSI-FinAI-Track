@@ -1,0 +1,473 @@
+"use client";
+
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import {
+  Settings as SettingsIcon,
+  Bot,
+  Wallet as WalletIcon,
+  Tag,
+  CheckCircle2,
+  ExternalLink,
+  Plus,
+  Trash2,
+  Loader2,
+  Copy,
+  Clock,
+  LogOut,
+} from "lucide-react";
+import { api } from "@/lib/api";
+import { useAuthStore } from "@/lib/store";
+import { useRouter } from "next/navigation";
+
+export default function SettingsPage() {
+  const router = useRouter();
+  const { user, clearAuth } = useAuthStore();
+
+  // Telegram Integration State
+  const [isOtpModalOpen, setIsOtpModalOpen] = useState(false);
+  const [pairingCode, setPairingCode] = useState<string | null>(null);
+  const [isGeneratingOtp, setIsGeneratingOtp] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  // New Wallet Modal State
+  const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
+  const [walletName, setWalletName] = useState("");
+  const [walletType, setWalletType] = useState<"cash" | "bank" | "ewallet">("bank");
+  const [walletBalance, setWalletBalance] = useState("0");
+
+  // New Category Modal State
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [catName, setCatName] = useState("");
+  const [catType, setCatType] = useState<"expense" | "income">("expense");
+
+  // 1. Fetch Telegram Status
+  const {
+    data: tgStatus,
+    isLoading: isTgLoading,
+    refetch: refetchTg,
+  } = useQuery({
+    queryKey: ["telegram-status"],
+    queryFn: async () => (await api.get("/api/v1/telegram/status")).data,
+  });
+
+  // 2. Fetch Wallets
+  const {
+    data: wallets,
+    isLoading: isWalletsLoading,
+    refetch: refetchWallets,
+  } = useQuery({
+    queryKey: ["wallets"],
+    queryFn: async () => (await api.get("/api/v1/wallets")).data,
+  });
+
+  // 3. Fetch Categories
+  const {
+    data: categories,
+    isLoading: isCategoriesLoading,
+    refetch: refetchCategories,
+  } = useQuery({
+    queryKey: ["categories"],
+    queryFn: async () => (await api.get("/api/v1/categories")).data,
+  });
+
+  // Action: Generate Telegram OTP Code
+  const handleGenerateTelegramOtp = async () => {
+    setIsGeneratingOtp(true);
+    try {
+      const res = await api.post("/api/v1/telegram/pairing-code");
+      setPairingCode(res.data.pairing_code);
+      setIsOtpModalOpen(true);
+    } catch (err: any) {
+      alert(err.response?.data?.detail || "Gagal membuat kode OTP.");
+    } finally {
+      setIsGeneratingOtp(false);
+    }
+  };
+
+  // Action: Unlink Telegram
+  const handleUnlinkTelegram = async () => {
+    if (!confirm("Putus tautan bot Telegram dari akun Anda?")) return;
+    try {
+      await api.delete("/api/v1/telegram/unlink");
+      refetchTg();
+    } catch (err) {
+      alert("Gagal memutus tautan Telegram.");
+    }
+  };
+
+  // Action: Create Wallet
+  const handleCreateWallet = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!walletName.trim()) return;
+    try {
+      await api.post("/api/v1/wallets", {
+        name: walletName.trim(),
+        type: walletType,
+        balance: parseFloat(walletBalance) || 0,
+      });
+      setIsWalletModalOpen(false);
+      setWalletName("");
+      setWalletBalance("0");
+      refetchWallets();
+    } catch (err: any) {
+      alert(err.response?.data?.detail || "Gagal menambah dompet.");
+    }
+  };
+
+  // Action: Create Category
+  const handleCreateCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!catName.trim()) return;
+    try {
+      await api.post("/api/v1/categories", {
+        name: catName.trim(),
+        type: catType,
+      });
+      setIsCategoryModalOpen(false);
+      setCatName("");
+      refetchCategories();
+    } catch (err: any) {
+      alert(err.response?.data?.detail || "Gagal menambah kategori.");
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+          <SettingsIcon className="h-5 w-5 text-blue-400" />
+          Pengaturan & Integrasi
+        </h1>
+        <p className="text-xs text-slate-400">
+          Kelola profil pengguna, integrasi bot Telegram, dompet, dan kategori.
+        </p>
+      </div>
+
+      {/* ===================================================================== */}
+      {/* KARTU 1: INTEGRASI BOT TELEGRAM */}
+      {/* ===================================================================== */}
+      <div className="rounded-3xl border border-sky-500/20 bg-gradient-to-br from-surface to-surface-card p-6 shadow-xl relative overflow-hidden">
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-500/15 text-sky-400 border border-sky-500/30">
+              <Bot className="h-6 w-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold text-white">Bot Telegram FinAI</h3>
+                {tgStatus?.is_linked ? (
+                  <span className="flex items-center gap-1 rounded-md bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-bold text-emerald-400">
+                    <CheckCircle2 className="h-3 w-3" />
+                    TERHUBUNG
+                  </span>
+                ) : (
+                  <span className="rounded-md bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 text-[10px] font-bold text-amber-400">
+                    BELUM TERHUBUNG
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {tgStatus?.is_linked
+                  ? `Akun Anda terhubung dengan Chat ID: ${tgStatus.telegram_chat_id}. Kirim teks atau Voice Note ke bot kapan saja!`
+                  : "Catat pengeluaran lewat chat & voice note di Telegram sambil beraktivitas."}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {tgStatus?.is_linked ? (
+              <>
+                <a
+                  href="https://t.me/FinAi_track_bot"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-1.5 rounded-xl bg-sky-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-sky-500 transition shadow-lg shadow-sky-500/20"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Buka Chat Bot
+                </a>
+                <button
+                  type="button"
+                  onClick={handleUnlinkTelegram}
+                  className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2.5 text-xs font-semibold text-red-400 hover:bg-red-500/20 transition"
+                >
+                  Putus
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={handleGenerateTelegramOtp}
+                disabled={isGeneratingOtp}
+                className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 px-5 py-2.5 text-xs font-bold text-white shadow-lg shadow-sky-500/25 hover:from-sky-400 hover:to-blue-500 transition disabled:opacity-50"
+              >
+                {isGeneratingOtp ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
+                Hubungkan ke Telegram
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ===================================================================== */}
+      {/* KARTU 2: MANAJEMEN DOMPET */}
+      {/* ===================================================================== */}
+      <div className="rounded-3xl border border-surface-border bg-surface p-6 shadow-xl space-y-4">
+        <div className="flex items-center justify-between border-b border-surface-border pb-3">
+          <div className="flex items-center gap-2">
+            <WalletIcon className="h-4 w-4 text-blue-400" />
+            <h3 className="text-sm font-bold text-white">Daftar Dompet / Rekening</h3>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsWalletModalOpen(true)}
+            className="flex items-center gap-1 text-xs font-semibold text-blue-400 hover:text-blue-300"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Tambah Dompet
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {wallets?.map((w: any) => (
+            <div
+              key={w.id}
+              className="rounded-2xl border border-surface-border bg-surface-card p-3.5 flex items-center justify-between"
+            >
+              <div>
+                <span className="text-xs font-semibold text-white block">{w.name}</span>
+                <span className="text-[10px] text-slate-400 uppercase">{w.type}</span>
+              </div>
+              <span className="text-xs font-bold text-slate-200">
+                Rp{parseFloat(w.balance).toLocaleString("id-ID")}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ===================================================================== */}
+      {/* KARTU 3: MANAJEMEN KATEGORI */}
+      {/* ===================================================================== */}
+      <div className="rounded-3xl border border-surface-border bg-surface p-6 shadow-xl space-y-4">
+        <div className="flex items-center justify-between border-b border-surface-border pb-3">
+          <div className="flex items-center gap-2">
+            <Tag className="h-4 w-4 text-emerald-400" />
+            <h3 className="text-sm font-bold text-white">Kategori Pemasukan & Pengeluaran</h3>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsCategoryModalOpen(true)}
+            className="flex items-center gap-1 text-xs font-semibold text-emerald-400 hover:text-emerald-300"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Tambah Kategori
+          </button>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {categories?.map((c: any) => (
+            <span
+              key={c.id}
+              className="rounded-xl border border-surface-border bg-surface-card px-3 py-1.5 text-xs text-slate-300 flex items-center gap-1.5"
+            >
+              <span
+                className="h-2 w-2 rounded-full"
+                style={{ backgroundColor: c.color || (c.type === "expense" ? "#EF4444" : "#10B981") }}
+              />
+              {c.name}
+              <span className="text-[10px] text-slate-500 uppercase ml-1">({c.type})</span>
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* ===================================================================== */}
+      {/* MODAL 1: OTP KODE TELEGRAM */}
+      {/* ===================================================================== */}
+      {isOtpModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm rounded-3xl border border-sky-500/30 bg-surface p-6 text-center shadow-2xl space-y-5">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-500/20 text-sky-400">
+              <Bot className="h-7 w-7" />
+            </div>
+
+            <div>
+              <h3 className="text-lg font-bold text-white">Tautkan ke Bot Telegram</h3>
+              <p className="text-xs text-slate-400 mt-1">
+                Kirim kode 6 digit berikut ke bot <strong>@FinAi_track_bot</strong> di Telegram.
+              </p>
+            </div>
+
+            {/* OTP Code Display Box */}
+            <div className="flex items-center justify-center gap-3 rounded-2xl border border-sky-500/40 bg-sky-500/10 py-3 px-4">
+              <span className="text-3xl font-extrabold tracking-widest text-sky-400 font-mono">
+                {pairingCode}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(pairingCode || "");
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }}
+                className="rounded-lg bg-sky-500/20 p-2 text-sky-300 hover:text-white transition"
+                title="Salin Kode"
+              >
+                {copied ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              </button>
+            </div>
+
+            <div className="flex items-center justify-center gap-1.5 text-[11px] text-amber-400 font-medium">
+              <Clock className="h-3.5 w-3.5" />
+              <span>Kode ini berlaku selama 5 menit.</span>
+            </div>
+
+            <div className="space-y-2 pt-2">
+              <a
+                href={`https://t.me/FinAi_track_bot?start=${pairingCode}`}
+                target="_blank"
+                rel="noreferrer"
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-sky-600 py-2.5 text-xs font-bold text-white shadow-lg shadow-sky-500/25 hover:bg-sky-500 transition"
+              >
+                <ExternalLink className="h-4 w-4" />
+                Buka Bot Telegram Langsung
+              </a>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsOtpModalOpen(false);
+                  refetchTg();
+                }}
+                className="w-full rounded-xl bg-surface-card py-2 text-xs font-semibold text-slate-400 hover:text-white"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* MODAL 2: TAMBAH DOMPET */}
+      {/* ===================================================================== */}
+      {isWalletModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm rounded-3xl border border-surface-border bg-surface p-6 shadow-2xl">
+            <h3 className="text-base font-bold text-white mb-4">Tambah Dompet / Rekening</h3>
+            <form onSubmit={handleCreateWallet} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">Nama Dompet</label>
+                <input
+                  type="text"
+                  required
+                  value={walletName}
+                  onChange={(e) => setWalletName(e.target.value)}
+                  placeholder="Misal: Bank Mandiri / GoPay"
+                  className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">Tipe</label>
+                <select
+                  value={walletType}
+                  onChange={(e: any) => setWalletType(e.target.value)}
+                  className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs text-white focus:outline-none"
+                >
+                  <option value="cash">Tunai (Cash)</option>
+                  <option value="bank">Bank</option>
+                  <option value="ewallet">E-Wallet</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">Saldo Awal (Rp)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={walletBalance}
+                  onChange={(e) => setWalletBalance(e.target.value)}
+                  placeholder="0"
+                  className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsWalletModalOpen(false)}
+                  className="flex-1 rounded-xl bg-surface-card py-2 text-xs font-semibold text-slate-400 hover:text-white"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 rounded-xl bg-blue-600 py-2 text-xs font-semibold text-white hover:bg-blue-500"
+                >
+                  Simpan
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* MODAL 3: TAMBAH KATEGORI */}
+      {/* ===================================================================== */}
+      {isCategoryModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm rounded-3xl border border-surface-border bg-surface p-6 shadow-2xl">
+            <h3 className="text-base font-bold text-white mb-4">Tambah Kategori</h3>
+            <form onSubmit={handleCreateCategory} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">Nama Kategori</label>
+                <input
+                  type="text"
+                  required
+                  value={catName}
+                  onChange={(e) => setCatName(e.target.value)}
+                  placeholder="Misal: Tagihan Listrik"
+                  className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">Tipe</label>
+                <select
+                  value={catType}
+                  onChange={(e: any) => setCatType(e.target.value)}
+                  className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs text-white focus:outline-none"
+                >
+                  <option value="expense">Pengeluaran (Expense)</option>
+                  <option value="income">Pemasukan (Income)</option>
+                </select>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsCategoryModalOpen(false)}
+                  className="flex-1 rounded-xl bg-surface-card py-2 text-xs font-semibold text-slate-400 hover:text-white"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 rounded-xl bg-emerald-600 py-2 text-xs font-semibold text-white hover:bg-emerald-500"
+                >
+                  Simpan
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
