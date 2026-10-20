@@ -404,18 +404,23 @@ Analisis pesan bahasa Indonesia dari pengguna secara teliti dan akurat:
    - Tetapkan intent = "transaction"
    - CATATAN PENTING: Pengguna dapat menyebutkan SATU atau LEBIH transaksi sekaligus dalam satu kalimat!
      Contoh: "beli kopi 5rb, dapet uang saku 10rb, makan siang 15rb" -> terdapat 3 transaksi!
+     Contoh: "ibu kasih 10rb, bapak 10rb lalu saya beli mainan 10rb" -> terdapat 3 transaksi:
+       1) "ibu kasih 10rb" -> type: "income", category_name: "Uang Saku", amount: 10000
+       2) "bapak 10rb" -> type: "income", category_name: "Uang Saku", amount: 10000
+       3) "saya beli mainan 10rb" -> type: "expense", category_name: "Belanja", amount: 10000
    - Ekstrak seluruh transaksi ke dalam daftar `transactions`:
      Untuk setiap item transaksi:
      * amount: nominal angka uang (contoh: '5rb' -> 5000, '10rb' -> 10000, '25rb' -> 25000, '50k' -> 50000, '100rb' -> 100000, '1.5jt' -> 1500000, 'dua puluh ribu' -> 20000).
      * type:
-       - 'income' jika konteksnya adalah uang masuk (contoh kata kunci: dapat/dapet uang saku, terima gaji, bonus, dapat hadiah, cair, dikasih orang tua, untung penjualan, piutang dibayar, dll).
-       - 'expense' jika konteksnya uang keluar / belanja / biaya (contoh: beli kopi, makan siang, jajan, bayar tagihan, pulsa, bensin, belanja baju, dll).
+       - 'income' jika konteksnya adalah uang masuk atau pemberian uang saku/nafkah/hadiah dari keluarga atau pihak lain (contoh: dapat/dapet uang saku, sangu, ibu kasih, bapak ngasih, bapak 10rb, dikasih mama, terima gaji, bonus, dapat hadiah, cair, untung penjualan, piutang dibayar, dll). Jika ada penyebutan anggota keluarga memberi uang ("ibu kasih 10rb", "bapak 10rb", "dikasih mama 20rb"), ini adalah PEMASUKAN dengan kategori 'Uang Saku'.
+       - 'expense' jika konteksnya uang keluar / belanja / biaya / beli (contoh: beli kopi, makan siang, jajan, mainan, bayar tagihan, pulsa, bensin, belanja baju, dll).
        - 'transfer' jika memindahkan saldo antar dompet.
      * category_name: pilih nama kategori yang paling relevan dari daftar: {category_names}
        - PERHATIAN KERAS: Jika type = 'income', WAJIB pilih kategori pemasukan (seperti 'Uang Saku', 'Gaji', 'Bonus & Freelance', 'Investasi', atau 'Lain-lain'). JANGAN PERNAH memilih kategori pengeluaran seperti 'Makanan & Minuman' untuk uang masuk!
-       - Jika type = 'expense', pilih kategori pengeluaran yang tepat ('Makanan & Minuman', 'Transportasi', 'Belanja', 'Tagihan & Utilitas', 'Hiburan', 'Kesehatan', dll).
+       - Jika transaksi berasal dari orang tua / keluarga (ibu, bapak, ayah, mama, ortu) atau uang saku / sangu, pilih kategori 'Uang Saku'.
+       - Jika type = 'expense', pilih kategori pengeluaran yang tepat ('Makanan & Minuman', 'Transportasi', 'Belanja', 'Tagihan & Utilitas', 'Hiburan', 'Kesehatan', dll). Mainan, pakaian, gadget masuk ke 'Belanja'.
      * wallet_name: pilih dari {wallet_names} (default ke 'Tunai' jika tidak disebutkan).
-     * description: deskripsi singkat barang/jasa atau sumber penerimaan uang.
+     * description: deskripsi singkat transaksi (misal: "Ibu kasih", "Bapak kasih", "Beli mainan").
    - Jika hanya ada 1 transaksi, isi juga `transaction_data` dengan data yang sama persis.
 
 2. Jika pengguna BERTANYA TENTANG DATA KEUANGAN / SALDO / ANGGARAN:
@@ -484,7 +489,7 @@ Analisis pesan bahasa Indonesia dari pengguna secara teliti dan akurat:
 
             match_jt = re.search(r"(\d+(?:[.,]\d+)?)\s*(?:jt|juta)", cl)
             match_rb = re.search(r"(\d+(?:[.,]\d+)?)\s*(?:rb|ribu|k)", cl)
-            match_num = re.search(r"(?:rp\.?\s*)?(\d{4,9})", cl)
+            match_num = re.search(r"(?:rp\.?\s*)?(\d{1,3}(?:\.\d{3})+|\d{4,9})", cl)
 
             amt = None
             if match_jt:
@@ -494,18 +499,36 @@ Analisis pesan bahasa Indonesia dari pengguna secara teliti dan akurat:
                 val = float(match_rb.group(1).replace(",", "."))
                 amt = Decimal(str(int(val * 1000)))
             elif match_num:
-                amt = Decimal(match_num.group(1))
+                raw_n = match_num.group(1).replace(".", "")
+                amt = Decimal(raw_n)
 
             if not amt:
                 return None
 
-            # Tentukan tipe transaksi (Pemasukan vs Pengeluaran)
-            income_keywords = [
-                "gaji", "terima", "dapat", "dapet", "bonus", "pemasukan", "saku", "uang saku",
-                "cair", "dikasih", "diberi", "tf masuk", "transfer masuk", "penjualan", "upah",
-                "untung", "angpao", "hadiah", "hibah", "infaq terima", "kiriman"
+            # Deteksi kata kunci keluarga / pemberi uang
+            family_words = [
+                "ibu", "bapak", "ayah", "mama", "papa", "ortu", "orang tua", "om", "tante",
+                "paman", "nenek", "kakek", "kakak", "abang", "mas", "mbak", "umi", "abi"
             ]
-            if any(ik in cl for ik in income_keywords):
+            spending_words = [
+                "beli", "bayar", "jajan", "ongkos", "belanja", "checkout", "co", "sewa",
+                "tagihan", "pulsa", "bensin", "parkir", "traktir", "pesan", "order"
+            ]
+
+            # Kata kunci eksplisit pemasukan
+            income_keywords = [
+                "gaji", "terima", "dapat", "dapet", "bonus", "pemasukan", "saku", "uang saku", "sangu",
+                "cair", "dikasih", "kasih", "ngasih", "diberi", "memberi", "tf masuk", "transfer masuk",
+                "penjualan", "upah", "untung", "angpao", "hadiah", "hibah", "infaq terima", "kiriman",
+                "transferan", "dikirimi", "dikirim", "uang jajan"
+            ]
+
+            has_family = any(re.search(r"\b" + fw + r"\b", cl) for fw in family_words)
+            has_spending = any(re.search(r"\b" + sw + r"\b", cl) for sw in spending_words)
+            has_income_kw = any(ik in cl for ik in income_keywords)
+
+            # Jika klausa menyebutkan keluarga tanpa kata belanja ("ibu kasih 10rb", "bapak 10rb", "dikasih ibu") -> INCOME
+            if (has_family and not has_spending) or has_income_kw:
                 tx_t = TransactionType.INCOME
             else:
                 tx_t = TransactionType.EXPENSE
@@ -520,31 +543,31 @@ Analisis pesan bahasa Indonesia dari pengguna secara teliti dan akurat:
             # Cocokkan kategori
             matched_c = None
             if tx_t == TransactionType.INCOME:
-                if "saku" in cl:
+                if has_family or any(k in cl for k in ["saku", "sangu", "jajan", "kasih", "ngasih", "dikasih"]):
                     matched_c = "Uang Saku"
-                elif "gaji" in cl:
+                elif "gaji" in cl or "salary" in cl:
                     matched_c = "Gaji"
-                elif "bonus" in cl or "freelance" in cl:
+                elif any(k in cl for k in ["bonus", "freelance", "proyek", "side job"]):
                     matched_c = "Bonus & Freelance"
-                elif "investasi" in cl or "dividen" in cl:
+                elif any(k in cl for k in ["investasi", "dividen", "saham", "crypto"]):
                     matched_c = "Investasi"
                 else:
-                    matched_c = "Lain-lain"
+                    matched_c = "Uang Saku" if "Uang Saku" in category_names else "Lain-lain"
             else:
                 if any(w in cl for w in ["kopi", "makan", "minum", "restoran", "kafe", "food", "sarapan", "lunch", "dinner", "jajan", "nasi", "ayam", "mie", "boba"]):
                     matched_c = "Makanan & Minuman"
                 elif any(w in cl for w in ["bensin", "ojol", "grab", "gojek", "parkir", "tol", "transport"]):
                     matched_c = "Transportasi"
-                elif any(w in cl for w in ["baju", "sepatu", "belanja", "shopee", "tokopedia", "beli"]):
+                elif any(w in cl for w in ["baju", "sepatu", "mainan", "game", "belanja", "shopee", "tokopedia", "beli"]):
                     matched_c = "Belanja"
                 elif any(w in cl for w in ["listrik", "air", "wifi", "pulsa", "tagihan", "kost", "kontrakan"]):
                     matched_c = "Tagihan & Utilitas"
-                elif any(w in cl for w in ["nonton", "bioskop", "game", "hiburan", "spotify", "netflix"]):
+                elif any(w in cl for w in ["nonton", "bioskop", "hiburan", "spotify", "netflix"]):
                     matched_c = "Hiburan"
                 elif any(w in cl for w in ["obat", "dokter", "klinik", "apotek", "kesehatan"]):
                     matched_c = "Kesehatan"
                 else:
-                    matched_c = "Makanan & Minuman"
+                    matched_c = "Belanja" if "beli" in cl else "Makanan & Minuman"
 
             desc = cl.capitalize()
             return LLMTransactionExtraction(

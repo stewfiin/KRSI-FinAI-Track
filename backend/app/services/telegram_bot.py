@@ -266,13 +266,16 @@ async def start_telegram_bot():
         logger.info("TELEGRAM_BOT_TOKEN belum disetel. Layanan bot Telegram dilewati.")
         return
 
+    if telegram_dp is None:
+        telegram_dp = Dispatcher()
+        telegram_dp.include_router(bot_router)
+
     async def _polling_worker():
         global telegram_bot, telegram_dp
         while True:
             try:
-                telegram_bot = Bot(token=token.strip())
-                telegram_dp = Dispatcher()
-                telegram_dp.include_router(bot_router)
+                if telegram_bot is None:
+                    telegram_bot = Bot(token=token.strip())
 
                 # Hapus webhook sebelumnya agar tidak bentrok dengan polling
                 await telegram_bot.delete_webhook(drop_pending_updates=True)
@@ -288,6 +291,12 @@ async def start_telegram_bot():
             except Exception as e:
                 print(f"⚠️ [FinAI Bot] Gagal inisialisasi ({e}), mencoba kembali dalam 5 detik...", flush=True)
                 logger.warning(f"Koneksi Telegram bot gagal ({e}), retry dalam 5 detik...")
+                if telegram_bot:
+                    try:
+                        await telegram_bot.session.close()
+                    except Exception:
+                        pass
+                    telegram_bot = None
                 await asyncio.sleep(5)
 
     polling_task = asyncio.create_task(_polling_worker())
