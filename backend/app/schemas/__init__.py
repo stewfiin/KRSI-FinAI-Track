@@ -32,6 +32,18 @@ from app.schemas.dashboard import (
     DailyCashflow,
     BudgetSummaryItem,
 )
+from app.schemas.ai import (
+    AIChatRequest,
+    AIChatResponse,
+    AIVoiceResponse,
+    AIBudgetRequest,
+    AIBudgetResponse,
+    BudgetAllocationItem,
+)
+from app.schemas.telegram import (
+    TelegramPairingCodeResponse,
+    TelegramStatusResponse,
+)
 
 __all__ = [
     "UserRegisterRequest",
@@ -56,4 +68,12 @@ __all__ = [
     "CategoryExpenseBreakdown",
     "DailyCashflow",
     "BudgetSummaryItem",
+    "AIChatRequest",
+    "AIChatResponse",
+    "AIVoiceResponse",
+    "AIBudgetRequest",
+    "AIBudgetResponse",
+    "BudgetAllocationItem",
+    "TelegramPairingCodeResponse",
+    "TelegramStatusResponse",
 ]
