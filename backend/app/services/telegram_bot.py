@@ -207,7 +207,10 @@ async def handle_voice_message(message: Message):
             f"🎙️ *Transkripsi Suara:*\n_{transcript}_\n\n"
             f"{chat_res.reply}"
         )
-        await message.reply(response_text, parse_mode="Markdown")
+        try:
+            await message.reply(response_text, parse_mode="Markdown")
+        except Exception:
+            await message.reply(response_text)
 
 
 @bot_router.message(F.text)
@@ -244,7 +247,10 @@ async def handle_text_message(message: Message):
             source=TransactionSource.TELEGRAM_BOT,
         )
 
-        await message.reply(chat_res.reply, parse_mode="Markdown")
+        try:
+            await message.reply(chat_res.reply, parse_mode="Markdown")
+        except Exception:
+            await message.reply(chat_res.reply)
 
 
 # ==============================================================================
@@ -252,7 +258,7 @@ async def handle_text_message(message: Message):
 # ==============================================================================
 
 async def start_telegram_bot():
-    """Memulai bot Telegram di background task jika token tersedia."""
+    """Memulai bot Telegram di background task dengan auto-reconnect tahan banting."""
     global telegram_bot, telegram_dp, polling_task
 
     token = settings.TELEGRAM_BOT_TOKEN
@@ -260,23 +266,31 @@ async def start_telegram_bot():
         logger.info("TELEGRAM_BOT_TOKEN belum disetel. Layanan bot Telegram dilewati.")
         return
 
-    try:
-        telegram_bot = Bot(token=token.strip())
-        telegram_dp = Dispatcher()
-        telegram_dp.include_router(bot_router)
+    async def _polling_worker():
+        global telegram_bot, telegram_dp
+        while True:
+            try:
+                telegram_bot = Bot(token=token.strip())
+                telegram_dp = Dispatcher()
+                telegram_dp.include_router(bot_router)
 
-        # Hapus webhook sebelumnya agar tidak bentrok dengan polling
-        await telegram_bot.delete_webhook(drop_pending_updates=True)
+                # Hapus webhook sebelumnya agar tidak bentrok dengan polling
+                await telegram_bot.delete_webhook(drop_pending_updates=True)
 
-        bot_info = await telegram_bot.get_me()
-        print(f"🚀 [FinAI Bot] Berhasil aktif & polling: @{bot_info.username} (ID: {bot_info.id})", flush=True)
-        logger.info(f"Bot Telegram berhasil aktif: @{bot_info.username} (ID: {bot_info.id})")
+                bot_info = await telegram_bot.get_me()
+                print(f"🚀 [FinAI Bot] Berhasil aktif & polling: @{bot_info.username} (ID: {bot_info.id})", flush=True)
+                logger.info(f"Bot Telegram berhasil aktif: @{bot_info.username} (ID: {bot_info.id})")
 
-        # Jalankan polling secara asynchronous tanpa memblokir server FastAPI
-        polling_task = asyncio.create_task(telegram_dp.start_polling(telegram_bot))
-    except Exception as e:
-        print(f"❌ [FinAI Bot] Gagal start Telegram Bot: {e}", flush=True)
-        logger.error(f"Gagal menginisialisasi Bot Telegram: {e}")
+                await telegram_dp.start_polling(telegram_bot)
+                break
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                print(f"⚠️ [FinAI Bot] Gagal inisialisasi ({e}), mencoba kembali dalam 5 detik...", flush=True)
+                logger.warning(f"Koneksi Telegram bot gagal ({e}), retry dalam 5 detik...")
+                await asyncio.sleep(5)
+
+    polling_task = asyncio.create_task(_polling_worker())
 
 
 async def stop_telegram_bot():

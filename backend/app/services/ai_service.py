@@ -47,6 +47,7 @@ class AIService:
             model="gemini-flash-latest",
             google_api_key=settings.GEMINI_API_KEY,
             temperature=temperature,
+            request_timeout=3.0,
         )
 
     # ==========================================================================
@@ -120,17 +121,7 @@ class AIService:
         """
         clean_msg = message.strip()
 
-        # 1. Simpan pesan User ke riwayat chat log
-        user_log = AIChatLog(
-            user_id=user_id,
-            platform=platform,
-            role=ChatRole.USER,
-            message=clean_msg,
-        )
-        session.add(user_log)
-        await session.flush()
-
-        # 2. Ambil daftar dompet dan kategori milik user
+        # 1. Ambil daftar dompet dan kategori milik user
         wallets_query = select(Wallet).where(Wallet.user_id == user_id)
         wallets = (await session.exec(wallets_query)).all()
         wallet_names = [w.name for w in wallets]
@@ -141,12 +132,25 @@ class AIService:
         categories = (await session.exec(categories_query)).all()
         category_names = [c.name for c in categories]
 
-        # 3. Klasifikasi Intent menggunakan Gemini Structured Outputs
-        decision = await AIService._classify_intent_with_llm(
+        # 2. Klasifikasi Intent: Jalankan Heuristic Cepat Terlebih Dahulu (< 1 ms)!
+        decision = AIService._heuristic_fallback_classifier(clean_msg, wallet_names, category_names)
+
+        # Jika bukan transaksi atau pertanyaan yang jelas dari pola heuristik, baru konsultasi ke LLM Gemini
+        if decision.intent == "general":
+            decision = await AIService._classify_intent_with_llm(
+                message=clean_msg,
+                wallet_names=wallet_names,
+                category_names=category_names,
+            )
+
+        # 3. Simpan pesan User ke riwayat chat log (tanpa flush prematur agar koneksi DB tidak terkunci)
+        user_log = AIChatLog(
+            user_id=user_id,
+            platform=platform,
+            role=ChatRole.USER,
             message=clean_msg,
-            wallet_names=wallet_names,
-            category_names=category_names,
         )
+        session.add(user_log)
 
         reply_text = ""
         tx_response: Optional[TransactionResponse] = None
