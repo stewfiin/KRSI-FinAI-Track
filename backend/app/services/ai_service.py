@@ -18,7 +18,7 @@ from app.core.config import settings
 from app.models.ai_chat_log import AIChatLog
 from app.models.budget import Budget
 from app.models.category import Category
-from app.models.enums import CategoryType, ChatPlatform, ChatRole, TransactionSource, TransactionType
+from app.models.enums import CategoryType, ChatPlatform, ChatRole, TransactionSource, TransactionType, WalletType
 from app.models.transaction import Transaction
 from app.models.wallet import Wallet
 from app.schemas.ai import (
@@ -32,6 +32,7 @@ from app.schemas.ai import (
     LLMIntentDecision,
     LLMQueryExtraction,
     LLMTransactionExtraction,
+    LLMWalletCreation,
 )
 from app.schemas.transaction import TransactionCreate, TransactionResponse
 from app.services.transaction_service import TransactionService
@@ -210,7 +211,8 @@ class AIService:
                         amt_lbl = f"Rp{int(amt):,}".replace(",", ".")
                     final_desc = f"Transfer {amt_lbl} dari {matched_wallet.name} ke {matched_dest_wallet.name}"
                 else:
-                    final_desc = tx_data.description or clean_msg
+                    raw_desc = tx_data.description or clean_msg
+                    final_desc = AIService._clean_transaction_description(raw_desc, wallet_names, tx_data.type)
 
                 tx_create_payload = TransactionCreate(
                     wallet_id=matched_wallet.id,
@@ -259,6 +261,48 @@ class AIService:
                     reply_text += "\n\n⚠️ " + "\n⚠️ ".join(alerts)
             else:
                 reply_text = "Maaf, transaksi tidak dapat diproses karena tidak ditemukan dompet aktif atau kategori yang sesuai."
+
+        elif decision.intent == "create_wallet" and decision.wallet_creation_data:
+            # === AKSI: PENAMBAHAN DOMPET / REKENING BARU ===
+            w_data = decision.wallet_creation_data
+            wallet_name = w_data.name.strip()
+
+            # Cek apakah dompet dengan nama ini sudah pernah dibuat (case-insensitive)
+            existing_wallet = next(
+                (w for w in wallets if w.name.strip().lower() == wallet_name.lower()),
+                None,
+            )
+            if existing_wallet:
+                reply_text = (
+                    f"⚠️ Dompet **{existing_wallet.name}** sudah ada di akun Anda dengan saldo saat ini "
+                    f"**Rp{existing_wallet.balance:,.0f}**.\n\n"
+                    f"Jika ingin menambah atau memindahkan saldo, Anda bisa mencatat pemasukan atau transfer saldo antar dompet."
+                )
+            else:
+                new_wallet = Wallet(
+                    user_id=user_id,
+                    name=wallet_name,
+                    type=w_data.type,
+                    balance=w_data.initial_balance or Decimal("0.00"),
+                )
+                session.add(new_wallet)
+                await session.flush()
+                await session.refresh(new_wallet)
+
+                type_label = {
+                    WalletType.CASH: "Tunai 💵",
+                    WalletType.BANK: "Rekening Bank 🏦",
+                    WalletType.EWALLET: "E-Wallet 📱",
+                }.get(new_wallet.type, "Dompet")
+
+                bal_str = f"Rp{new_wallet.balance:,.0f}" if new_wallet.balance else "Rp0"
+                reply_text = (
+                    f"🎉 **Dompet Baru Berhasil Dibuat!**\n\n"
+                    f"• **Nama Dompet:** {new_wallet.name}\n"
+                    f"• **Tipe:** {type_label}\n"
+                    f"• **Saldo Awal:** {bal_str}\n\n"
+                    f"Sekarang Anda dapat mencatat transaksi atau mentransfer saldo menggunakan dompet **{new_wallet.name}**! ✨"
+                )
 
         elif decision.intent == "query" and decision.query_data:
             # === AKSI: Q&A DATA KEUANGAN PRIBADI ===
@@ -456,10 +500,23 @@ Analisis pesan bahasa Indonesia dari pengguna secara teliti dan akurat:
        - Jika type = 'transfer', pilih kategori 'Lain-lain'.
      * wallet_name: dompet asal / pengirim dari {wallet_names} (default ke 'Tunai' jika tidak disebutkan).
      * destination_wallet_name: khusus transfer, dompet tujuan / penerima dari {wallet_names}.
-     * description: deskripsi singkat transaksi yang ringkas dan padat (misal: "Transfer 100rb dari Tunai ke Gopay", "Ibu kasih 10rb", "Beli mainan 10rb", "Belanja parfum 200rb"). JANGAN sertakan kalimat panjang percakapan pengguna.
+     * description: deskripsi singkat transaksi yang ringkas dan padat.
+       PERHATIAN KERAS: JANGAN mencantumkan nama dompet atau metode pembayaran di description!
+       Keterangan dompet sudah otomatis dicatat pada atribut wallet_name.
+       Contoh: jika user chat "kopi 50rb dari dompet gopay", description adalah "Kopi 50rb" (BUKAN "Kopi 50rb dari dompet gopay").
+       Contoh: "beli bensin 20rb pakai tunai" -> description: "Beli bensin 20rb".
+       Contoh: "makan siang 25rb lewat bca" -> description: "Makan siang 25rb".
+       KECUALI untuk transfer antar dompet, format deskripsi: "Transfer <nominal> dari <asal> ke <tujuan>".
    - Jika hanya ada 1 transaksi, isi juga `transaction_data` dengan data yang sama persis.
 
-2. Jika pengguna BERTANYA TENTANG DATA KEUANGAN / SALDO / ANGGARAN:
+2. Jika pengguna berniat MENAMBAH / MEMBUAT DOMPET ATAU REKENING BARU:
+   - Tetapkan intent = "create_wallet"
+   - Ekstrak ke `wallet_creation_data`:
+     * name: nama dompet atau rekening (contoh: "BCA", "Bank Jago", "OVO", "GoPay", "Tunai Cadangan")
+     * type: 'bank' jika rekening bank, 'ewallet' jika dompet digital (gopay, ovo, dana, shopeepay, linkaja), atau 'cash' jika uang tunai.
+     * initial_balance: nominal saldo awal angka (contoh: '1jt' -> 1000000, '50rb' -> 50000, default 0 jika tidak ada).
+
+3. Jika pengguna BERTANYA TENTANG DATA KEUANGAN / SALDO / ANGGARAN:
    - Tetapkan intent = "query"
    - Tentukan query_type:
      * 'balance_check' jika menanyakan sisa uang / saldo (misal: "Saldo BCA berapa?", "Total uangku berapa?")
@@ -469,7 +526,7 @@ Analisis pesan bahasa Indonesia dari pengguna secara teliti dan akurat:
      * 'budget_status' jika menanyakan kondisi anggaran (misal: "Budget makan masih aman?")
      * 'general_summary' jika meminta ringkasan menyeluruh keuangan.
 
-3. Jika pesan adalah sapaan umum atau pertanyaan non-keuangan:
+4. Jika pesan adalah sapaan umum atau pertanyaan non-keuangan:
    - Tetapkan intent = "general"
    - Buatkan pesan general_reply yang ramah dan membantu.
 """
@@ -499,7 +556,79 @@ Analisis pesan bahasa Indonesia dari pengguna secara teliti dan akurat:
         """Pencocokan aturan berbasis Regex & Kata Kunci sebagai fallback andal untuk single & multi transaksi."""
         lower = message.lower()
 
-        # Deteksi pertanyaan (Query)
+        # 1. Deteksi Buat / Tambah Dompet Baru
+        wallet_creation_triggers = [
+            "/tambah_dompet", "/tambahdompet", "tambah_dompet",
+            "tambah dompet", "buat dompet", "bikin dompet",
+            "tambah rekening", "buat rekening", "bikin rekening",
+            "tambah akun", "buka rekening", "tambah ewallet", "tambah e-wallet",
+        ]
+        if any(trig in lower for trig in wallet_creation_triggers):
+            amt = Decimal("0.00")
+            match_jt = re.search(r"(\d+(?:[.,]\d+)?)\s*(?:jt|juta)", lower)
+            match_rb = re.search(r"(\d+(?:[.,]\d+)?)\s*(?:rb|ribu|k)", lower)
+            match_num = re.search(r"(?:rp\.?\s*)?(\d{1,3}(?:\.\d{3})+|\d{4,9})", lower)
+            if match_jt:
+                val = float(match_jt.group(1).replace(",", "."))
+                amt = Decimal(str(int(val * 1000000)))
+            elif match_rb:
+                val = float(match_rb.group(1).replace(",", "."))
+                amt = Decimal(str(int(val * 1000)))
+            elif match_num:
+                raw_n = match_num.group(1).replace(".", "")
+                amt = Decimal(raw_n)
+
+            bank_names = ["bca", "mandiri", "bri", "bni", "cimb", "jago", "seabank", "permata", "btn", "bsi", "panin", "jenius", "bank", "rekening"]
+            ewallet_names = ["gopay", "ovo", "dana", "shopeepay", "shopee pay", "linkaja", "ewallet", "e-wallet"]
+
+            if any(bn in lower for bn in bank_names):
+                w_type = WalletType.BANK
+            elif any(en in lower for en in ewallet_names):
+                w_type = WalletType.EWALLET
+            else:
+                w_type = WalletType.CASH
+
+            # Bersihkan nama dompet dari kata perintah, imbuhan saldo, dan nominal
+            cleaned_name = re.sub(
+                r"^(?:/tambah_dompet|/tambahdompet|tambah_dompet|tambah\s+dompet|buat\s+dompet|bikin\s+dompet|tambah\s+rekening|buat\s+rekening|bikin\s+rekening|buka\s+rekening|tambah\s+akun|tambah\s+ewallet|tambah\s+e-wallet)\s*",
+                "",
+                message,
+                flags=re.IGNORECASE,
+            ).strip()
+
+            cleaned_name = re.sub(r"^(?:baru|akun|tipe\s+\w+|rekening|dompet)\s+", "", cleaned_name, flags=re.IGNORECASE)
+            cleaned_name = re.sub(
+                r"(?:dengan\s+)?(?:saldo\s+(?:awal\s+)?)?(?:sebesar\s+)?(?:rp\.?\s*)?(?:\d+(?:[.,]\d+)?\s*(?:jt|juta|rb|ribu|k)|\d{1,3}(?:\.\d{3})+|\d+)",
+                "",
+                cleaned_name,
+                flags=re.IGNORECASE,
+            )
+            cleaned_name = re.sub(r"\b(?:saldo|awal|sebesar|dengan|tipe|e-wallet|ewallet|bank)\b", "", cleaned_name, flags=re.IGNORECASE).strip()
+            cleaned_name = re.sub(r"\s+", " ", cleaned_name).strip(" :-,.")
+
+            if not cleaned_name:
+                for bn in ["BCA", "Mandiri", "BRI", "BNI", "Bank Jago", "SeaBank", "CIMB Niaga", "Permata"]:
+                    if bn.lower() in lower:
+                        cleaned_name = bn
+                        break
+                if not cleaned_name:
+                    for en in ["GoPay", "OVO", "DANA", "ShopeePay", "LinkAja"]:
+                        if en.lower() in lower:
+                            cleaned_name = en
+                            break
+                if not cleaned_name:
+                    cleaned_name = "Dompet Baru"
+
+            return LLMIntentDecision(
+                intent="create_wallet",
+                wallet_creation_data=LLMWalletCreation(
+                    name=cleaned_name,
+                    type=w_type,
+                    initial_balance=amt,
+                ),
+            )
+
+        # 2. Deteksi pertanyaan (Query)
         query_keywords = ["berapa", "apakah", "gimana", "bagaimana", "sisa saldo", "total", "cek", "aman tidak", "aman ga"]
         if any((kw in lower for kw in query_keywords)) and not re.search(r"\b(tadi|beli|bayar|transfer)\b", lower):
             q_type = "general_summary"
@@ -689,13 +818,9 @@ Analisis pesan bahasa Indonesia dari pengguna secara teliti dan akurat:
                 else:
                     matched_c = "Belanja" if "beli" in cl else "Makanan & Minuman"
 
-            clean_desc = re.sub(
-                r"^(?:tadi\s+|saya\s+|aku\s+|tolong\s+|catat\s+|catatkan\s+|uang\s+nya\s+saya\s+|uangnya\s+saya\s+)",
-                "",
-                cl,
-                flags=re.IGNORECASE,
-            ).strip()
-            desc = clean_desc.capitalize() if clean_desc else cl.capitalize()
+            desc = AIService._clean_transaction_description(cl, wallet_names, tx_t)
+            if not desc:
+                desc = cl.capitalize()
 
             return LLMTransactionExtraction(
                 amount=amt,
@@ -730,6 +855,63 @@ Analisis pesan bahasa Indonesia dari pengguna secara teliti dan akurat:
             intent="general",
             general_reply="Halo! Saya FinAI Track. Anda bisa mencatat pemasukan & pengeluaran sekaligus cukup dengan mengetik: 'beli kopi 5rb, dapet uang saku 10rb, makan siang 15rb' atau rekam suara Anda.",
         )
+
+    @staticmethod
+    def _clean_transaction_description(
+        raw_desc: str,
+        wallet_names: List[str],
+        tx_type: TransactionType = TransactionType.EXPENSE,
+    ) -> str:
+        """Membersihkan frasa dompet/metode pembayaran dan kata pengisi percakapan agar deskripsi transaksi ringkas."""
+        if not raw_desc:
+            return ""
+        d = raw_desc.strip()
+
+        # 1. Hapus conversational prefixes
+        d = re.sub(
+            r"^(?:tadi\s+|saya\s+|aku\s+|tolong\s+|catat\s+|catatkan\s+|uang\s+nya\s+saya\s+|uangnya\s+saya\s+|uangnya\s+buat\s+|uang\s+buat\s+)",
+            "",
+            d,
+            flags=re.IGNORECASE,
+        )
+
+        # 2. Hapus frase dompet / metode pembayaran (e.g. 'dari dompet gopay', 'pakai tunai', 'lewat bca', 'via ovo', 'ke dompet gopay')
+        w_escaped = [re.escape(w.lower()) for w in wallet_names if w]
+        common_wallets = ["tunai", "cash", "gopay", "ovo", "dana", "bca", "bri", "bni", "mandiri", "shopeepay", "seabank", "jago", "jenius"]
+        all_wallets = list(set(w_escaped + common_wallets))
+        wallet_pattern = "|".join(all_wallets)
+
+        # Pola preposisi dompet: (dari|ke|pakai|pake|lewat|via|menggunakan|dg|dengan) (dompet|dompay|rekening|akun)? (nama_dompet)
+        d = re.sub(
+            r"\b(?:dari|ke|pakai|pake|lewat|via|menggunakan|dg|dengan)\s+(?:dompet\s+|dompay\s+|rekening\s+|akun\s+)?(?:" + wallet_pattern + r")\b",
+            "",
+            d,
+            flags=re.IGNORECASE,
+        )
+
+        # Pola uang masuk/cair ke dompet: (masuk\s+ke|masuk|ditransfer\s+ke|cair\s+ke) (dompet)? (nama_dompet)
+        d = re.sub(
+            r"\b(?:masuk\s+ke|masuk|ditransfer\s+ke|cair\s+ke)\s+(?:dompet\s+|dompay\s+|rekening\s+|akun\s+)?(?:" + wallet_pattern + r")\b",
+            "",
+            d,
+            flags=re.IGNORECASE,
+        )
+
+        # Pola generik: (dari|ke|pakai|pake|lewat|via|menggunakan|dg|dengan) (dompet|dompay|rekening|akun) <kata_apapun>
+        d = re.sub(
+            r"\b(?:dari|ke|pakai|pake|lewat|via|menggunakan|dg|dengan)\s+(?:dompet|dompay|rekening|akun)\s+\w+\b",
+            "",
+            d,
+            flags=re.IGNORECASE,
+        )
+
+        # 3. Hapus preposisi menggantung di akhir kalimat
+        d = re.sub(r"\s+\b(?:dari|ke|pakai|pake|lewat|via|dengan|dg|buat)\b\s*$", "", d, flags=re.IGNORECASE)
+
+        # 4. Normalisasi spasi ganda
+        d = re.sub(r"\s+", " ", d).strip()
+
+        return d.capitalize() if d else raw_desc.capitalize()
 
     @staticmethod
     def _match_wallet(name: Optional[str], wallets: List[Wallet]) -> Optional[Wallet]:

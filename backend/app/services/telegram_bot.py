@@ -147,6 +147,71 @@ async def handle_unlink(message: Message):
         await message.reply("✅ Tautan akun Telegram berhasil diputus.")
 
 
+@bot_router.message(Command("help"))
+async def handle_help_command(message: Message):
+    """Menangani perintah /help."""
+    help_text = (
+        "💡 **Panduan Penggunaan FinAI Track Bot**\n\n"
+        "Anda dapat mencatat keuangan langsung via chat kasual, rekaman suara, atau perintah cepat:\n\n"
+        "📝 **Pencatatan Keuangan:**\n"
+        "• _'Beli kopi 50rb pakai GoPay'_\n"
+        "• _'Ibu kasih 500rb, bapak 100rb, beli bensin 30rb'_\n"
+        "• _'Transfer 100rb dari Tunai ke GoPay'_\n\n"
+        "👛 **Tambah Dompet / Rekening:**\n"
+        "• Chat langsung: _'Tambah dompet baru BCA saldo 1jt'_\n"
+        "• Perintah bot: `/tambah_dompet <nama> [saldo]`\n"
+        "  Contoh: `/tambah_dompet OVO 50000`\n\n"
+        "📊 **Tanya Info Finansial:**\n"
+        "• _'Berapa sisa saldo dompet saya?'_\n"
+        "• _'Berapa total pengeluaranku bulan ini?'_\n\n"
+        "⚙️ **Perintah Akun:**\n"
+        "• `/link <kode_otp>` - Hubungkan akun dari Web\n"
+        "• `/unlink` - Putus tautan akun\n"
+        "• `/help` - Tampilkan panduan ini"
+    )
+    await message.reply(help_text, parse_mode="Markdown")
+
+
+@bot_router.message(Command("tambah_dompet", "tambahdompet"))
+async def handle_tambah_dompet(message: Message):
+    """Menangani perintah /tambah_dompet <nama> [saldo]."""
+    raw_text = (message.text or "").strip()
+    parts = raw_text.split(maxsplit=1)
+    prompt_msg = f"tambah dompet {parts[1]}" if len(parts) > 1 else "tambah dompet"
+
+    async with async_session_maker() as session:
+        # 1. Validasi Akun Terhubung
+        stmt = select(User).where(User.telegram_chat_id == message.chat.id)
+        user = (await session.exec(stmt)).first()
+        if not user:
+            await message.reply(
+                "⚠️ **Akun Anda belum terhubung.**\n\n"
+                "Silakan buka Web FinAI Track, klik **Hubungkan ke Telegram** di menu Pengaturan, "
+                "lalu kirim perintah:\n"
+                "`/link <kode_otp_6_digit>`",
+                parse_mode="Markdown",
+            )
+            return
+
+        # 2. Indikator mengetik
+        if message.bot:
+            await message.bot.send_chat_action(chat_id=message.chat.id, action="typing")
+
+        # 3. Proses via AIService
+        chat_res = await AIService.process_chat_message(
+            session=session,
+            user_id=user.id,
+            message=prompt_msg,
+            platform=ChatPlatform.TELEGRAM,
+            source=TransactionSource.TELEGRAM_BOT,
+        )
+
+        try:
+            await message.reply(chat_res.reply, parse_mode="Markdown")
+        except Exception:
+            await message.reply(chat_res.reply)
+
+
 @bot_router.message(F.voice | F.audio)
 async def handle_voice_message(message: Message):
     """Menangani pesan Voice Note: unduh audio -> transcribe -> process AI -> balas ke Telegram."""

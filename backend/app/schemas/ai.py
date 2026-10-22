@@ -3,7 +3,7 @@ from decimal import Decimal
 from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, Field
 
-from app.models.enums import ChatPlatform, TransactionType
+from app.models.enums import ChatPlatform, TransactionType, WalletType
 from app.schemas.budget import BudgetAlert
 from app.schemas.transaction import TransactionResponse
 
@@ -107,6 +107,12 @@ class LLMTransactionExtraction(BaseModel):
     )
 
 
+class LLMWalletCreation(BaseModel):
+    name: str = Field(..., description="Nama dompet/rekening (contoh: BCA, OVO, Bank Mandiri, Tunai Cadangan)")
+    type: WalletType = Field(default=WalletType.CASH, description="Tipe dompet: cash (tunai), bank (rekening bank), atau ewallet (dompet digital)")
+    initial_balance: Decimal = Field(default=Decimal("0.00"), description="Saldo awal dompet jika disebutkan")
+
+
 class LLMQueryExtraction(BaseModel):
     query_type: Literal[
         "balance_check",
@@ -125,9 +131,9 @@ class LLMQueryExtraction(BaseModel):
 
 
 class LLMIntentDecision(BaseModel):
-    intent: Literal["transaction", "query", "general"] = Field(
+    intent: Literal["transaction", "create_wallet", "query", "general"] = Field(
         ...,
-        description="Klasifikasi niat user: 'transaction' jika user ingin mencatat mutasi uang, 'query' jika user menanyakan informasi/saldo/pengeluaran, 'general' jika sapaan atau percakapan biasa",
+        description="Klasifikasi niat user: 'transaction' jika user ingin mencatat mutasi uang, 'create_wallet' jika user ingin menambah dompet baru, 'query' jika user menanyakan informasi/saldo/pengeluaran, 'general' jika sapaan atau percakapan biasa",
     )
     transaction_data: Optional[LLMTransactionExtraction] = Field(
         default=None,
@@ -136,6 +142,10 @@ class LLMIntentDecision(BaseModel):
     transactions: Optional[List[LLMTransactionExtraction]] = Field(
         default=None,
         description="Daftar transaksi jika pengguna menyebutkan satu atau beberapa transaksi sekaligus dalam satu kalimat (contoh: 'beli kopi 5rb, dapet uang saku 10rb, makan siang 15rb')",
+    )
+    wallet_creation_data: Optional[LLMWalletCreation] = Field(
+        default=None,
+        description="Data pembuatan dompet baru jika intent = 'create_wallet'",
     )
     query_data: Optional[LLMQueryExtraction] = None
     general_reply: Optional[str] = Field(
