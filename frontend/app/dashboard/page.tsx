@@ -313,173 +313,197 @@ export default function DashboardPage() {
       </div>
 
       {/* 5. Visualisasi Grafik (Donut Category & 7-Days Cashflow Bar) */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Donut Chart: Pengeluaran per Kategori */}
-        <div className="rounded-2xl border border-surface-border bg-surface p-5 shadow-lg">
-          <h3 className="text-sm font-bold text-slate-200">Komposisi Pengeluaran Bulan Ini</h3>
-          <p className="text-xs text-slate-400">Proporsi kategori belanja terbesar</p>
+      {(() => {
+        const categoryChartData = (summary?.category_breakdown || []).map((cat: any) => ({
+          ...cat,
+          total_amount: Number(cat.total_amount ?? cat.total_spent ?? 0),
+          total_spent: Number(cat.total_amount ?? cat.total_spent ?? 0),
+        }));
 
-          {mounted && summary?.category_breakdown && summary.category_breakdown.length > 0 ? (
-            <div className="mt-4 flex flex-col items-center sm:flex-row sm:justify-between">
-              <div className="h-48 w-48">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={summary.category_breakdown}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={50}
-                      outerRadius={75}
-                      paddingAngle={4}
-                      dataKey="total_spent"
-                    >
-                      {summary.category_breakdown.map((entry: any, index: number) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={entry.category_color || DONUT_COLORS[index % DONUT_COLORS.length]}
+        const cashflowChartData = (summary?.daily_cashflow || summary?.recent_7_days_cashflow || []).map((item: any) => ({
+          ...item,
+          day: item.day || item.day_name || item.date,
+          income: Number(item.income ?? 0),
+          expense: Number(item.expense ?? 0),
+        }));
+
+        const hasCashflowActivity = cashflowChartData.some((d: any) => d.income > 0 || d.expense > 0);
+
+        return (
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            {/* Donut Chart: Pengeluaran per Kategori */}
+            <div className="rounded-2xl border border-surface-border bg-surface p-5 shadow-lg">
+              <h3 className="text-sm font-bold text-slate-200">Komposisi Pengeluaran Bulan Ini</h3>
+              <p className="text-xs text-slate-400">Proporsi kategori belanja terbesar</p>
+
+              {mounted && categoryChartData.length > 0 ? (
+                <div className="mt-4 flex flex-col items-center sm:flex-row sm:justify-between">
+                  <div className="h-48 w-48 flex-shrink-0">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={categoryChartData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={50}
+                          outerRadius={75}
+                          paddingAngle={4}
+                          dataKey="total_amount"
+                          nameKey="category_name"
+                        >
+                          {categoryChartData.map((entry: any, index: number) => (
+                            <Cell
+                              key={`cell-${index}`}
+                              fill={entry.category_color || DONUT_COLORS[index % DONUT_COLORS.length]}
+                            />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          formatter={(value: any) => [
+                            `Rp${parseFloat(value).toLocaleString("id-ID")}`,
+                            "Total",
+                          ]}
+                          contentStyle={{
+                            backgroundColor: "#1E293B",
+                            borderColor: "#334155",
+                            borderRadius: "12px",
+                            fontSize: "12px",
+                          }}
                         />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      formatter={(value: any) => [
-                        `Rp${parseFloat(value).toLocaleString("id-ID")}`,
-                        "Total",
-                      ]}
-                      contentStyle={{
-                        backgroundColor: "#1E293B",
-                        borderColor: "#334155",
-                        borderRadius: "12px",
-                        fontSize: "12px",
-                      }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
 
-              {/* Legend List */}
-              <div className="mt-4 w-full flex-1 space-y-1.5 sm:mt-0 sm:pl-4">
-                {summary.category_breakdown.slice(0, 5).map((cat: any, i: number) => (
-                  <div key={cat.category_id} className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2 truncate">
-                      <span
-                        className="h-2.5 w-2.5 rounded-full flex-shrink-0"
-                        style={{
-                          backgroundColor:
-                            cat.category_color || DONUT_COLORS[i % DONUT_COLORS.length],
+                  {/* Legend List */}
+                  <div className="mt-4 w-full flex-1 space-y-1.5 sm:mt-0 sm:pl-4">
+                    {categoryChartData.slice(0, 5).map((cat: any, i: number) => (
+                      <div key={cat.category_id} className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2 truncate">
+                          <span
+                            className="h-2.5 w-2.5 rounded-full flex-shrink-0"
+                            style={{
+                              backgroundColor:
+                                cat.category_color || DONUT_COLORS[i % DONUT_COLORS.length],
+                            }}
+                          />
+                          <span className="text-slate-300 truncate">{cat.category_name}</span>
+                        </div>
+                        <span className="font-semibold text-white ml-2">
+                          {cat.percentage.toFixed(0)}%
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex h-48 items-center justify-center text-xs text-slate-500">
+                  Belum ada data pengeluaran bulan ini.
+                </div>
+              )}
+            </div>
+
+            {/* Bar Chart: Arus Kas 7 Hari Terakhir */}
+            <div className="rounded-2xl border border-surface-border bg-surface p-5 shadow-lg">
+              <h3 className="text-sm font-bold text-slate-200">Arus Kas 7 Hari Terakhir</h3>
+              <p className="text-xs text-slate-400">Pemasukan vs Pengeluaran harian</p>
+
+              {mounted && cashflowChartData.length > 0 && hasCashflowActivity ? (
+                <div className="mt-4 h-48 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={cashflowChartData}>
+                      <XAxis
+                        dataKey="day"
+                        stroke="#64748B"
+                        fontSize={11}
+                        tickLine={false}
+                        axisLine={false}
+                      />
+                      <YAxis
+                        stroke="#64748B"
+                        fontSize={10}
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={(val) => `Rp${(val / 1000).toFixed(0)}k`}
+                      />
+                      <Tooltip
+                        formatter={(val: any) => [
+                          `Rp${parseFloat(val).toLocaleString("id-ID")}`,
+                          "",
+                        ]}
+                        contentStyle={{
+                          backgroundColor: "#1E293B",
+                          borderColor: "#334155",
+                          borderRadius: "12px",
+                          fontSize: "12px",
                         }}
                       />
-                      <span className="text-slate-300 truncate">{cat.category_name}</span>
-                    </div>
-                    <span className="font-semibold text-white ml-2">
-                      {cat.percentage.toFixed(0)}%
-                    </span>
-                  </div>
-                ))}
-              </div>
+                      <Bar dataKey="income" name="Pemasukan" fill="#10B981" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="expense" name="Pengeluaran" fill="#EF4444" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="flex h-48 items-center justify-center text-xs text-slate-500">
+                  Belum ada riwayat transaksi dalam 7 hari terakhir.
+                </div>
+              )}
             </div>
-          ) : (
-            <div className="flex h-48 items-center justify-center text-xs text-slate-500">
-              Belum ada data pengeluaran bulan ini.
-            </div>
-          )}
-        </div>
-
-        {/* Bar Chart: Arus Kas 7 Hari Terakhir */}
-        <div className="rounded-2xl border border-surface-border bg-surface p-5 shadow-lg">
-          <h3 className="text-sm font-bold text-slate-200">Arus Kas 7 Hari Terakhir</h3>
-          <p className="text-xs text-slate-400">Pemasukan vs Pengeluaran harian</p>
-
-          {mounted && summary?.daily_cashflow && summary.daily_cashflow.length > 0 ? (
-            <div className="mt-4 h-48 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={summary.daily_cashflow}>
-                  <XAxis
-                    dataKey="day"
-                    stroke="#64748B"
-                    fontSize={11}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <YAxis
-                    stroke="#64748B"
-                    fontSize={10}
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={(val) => `Rp${(val / 1000).toFixed(0)}k`}
-                  />
-                  <Tooltip
-                    formatter={(val: any) => [
-                      `Rp${parseFloat(val).toLocaleString("id-ID")}`,
-                      "",
-                    ]}
-                    contentStyle={{
-                      backgroundColor: "#1E293B",
-                      borderColor: "#334155",
-                      borderRadius: "12px",
-                      fontSize: "12px",
-                    }}
-                  />
-                  <Bar dataKey="income" name="Pemasukan" fill="#10B981" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="expense" name="Pengeluaran" fill="#EF4444" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <div className="flex h-48 items-center justify-center text-xs text-slate-500">
-              Belum ada riwayat transaksi dalam 7 hari terakhir.
-            </div>
-          )}
-        </div>
-      </div>
+          </div>
+        );
+      })()}
 
       {/* 6. Peringatan Status Anggaran (Budget Progress Bars) */}
-      {summary?.budgets && summary.budgets.length > 0 && (
-        <div className="rounded-2xl border border-surface-border bg-surface p-5 shadow-lg">
-          <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-200">Pemantauan Batas Anggaran</h3>
-            <span className="text-xs text-slate-400">Bulan Ini</span>
+      {(() => {
+        const budgetStatusesList = summary?.budget_statuses || summary?.budgets || [];
+        if (!budgetStatusesList || budgetStatusesList.length === 0) return null;
+        return (
+          <div className="rounded-2xl border border-surface-border bg-surface p-5 shadow-lg">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-200">Pemantauan Batas Anggaran</h3>
+              <span className="text-xs text-slate-400">Bulan Ini</span>
+            </div>
+
+            <div className="space-y-4">
+              {budgetStatusesList.map((b: any) => (
+                <div key={b.category_id || b.id} className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-slate-200">{b.category_name}</span>
+                    <span
+                      className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${
+                        b.status === "overbudget"
+                          ? "bg-red-500/20 text-red-400"
+                          : b.status === "waspada"
+                          ? "bg-amber-500/20 text-amber-400"
+                          : "bg-emerald-500/20 text-emerald-400"
+                      }`}
+                    >
+                      {b.status.toUpperCase()} ({b.percentage_used}%)
+                    </span>
+                  </div>
+
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-surface-border">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        b.status === "overbudget"
+                          ? "bg-red-500"
+                          : b.status === "waspada"
+                          ? "bg-amber-500"
+                          : "bg-emerald-500"
+                      }`}
+                      style={{ width: `${Math.min(b.percentage_used, 100)}%` }}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between text-[11px] text-slate-400">
+                    <span>Terpakai: {formatIDR(b.spent_amount)}</span>
+                    <span>Batas: {formatIDR(b.amount_limit)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
-
-          <div className="space-y-4">
-            {summary.budgets.map((b: any) => (
-              <div key={b.id} className="space-y-1.5">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-semibold text-slate-200">{b.category_name}</span>
-                  <span
-                    className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${
-                      b.status === "overbudget"
-                        ? "bg-red-500/20 text-red-400"
-                        : b.status === "waspada"
-                        ? "bg-amber-500/20 text-amber-400"
-                        : "bg-emerald-500/20 text-emerald-400"
-                    }`}
-                  >
-                    {b.status.toUpperCase()} ({b.percentage_used}%)
-                  </span>
-                </div>
-
-                <div className="h-2 w-full overflow-hidden rounded-full bg-surface-border">
-                  <div
-                    className={`h-full rounded-full transition-all ${
-                      b.status === "overbudget"
-                        ? "bg-red-500"
-                        : b.status === "waspada"
-                        ? "bg-amber-500"
-                        : "bg-emerald-500"
-                    }`}
-                    style={{ width: `${Math.min(b.percentage_used, 100)}%` }}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between text-[11px] text-slate-400">
-                  <span>Terpakai: {formatIDR(b.spent_amount)}</span>
-                  <span>Batas: {formatIDR(b.amount_limit)}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* 7. Transaksi Terkini */}
       <div className="rounded-2xl border border-surface-border bg-surface p-5 shadow-lg">

@@ -454,6 +454,7 @@ class TransactionService:
                     category_color=cat_color,
                     category_icon=cat_icon,
                     total_amount=cat_total,
+                    total_spent=cat_total,
                     percentage=round(pct, 1),
                 )
             )
@@ -497,6 +498,7 @@ class TransactionService:
                 DailyCashflow(
                     date=curr_d.strftime("%Y-%m-%d"),
                     day_name=day_names[curr_d.weekday()],
+                    day=day_names[curr_d.weekday()],
                     income=vals["income"],
                     expense=vals["expense"],
                 )
@@ -555,6 +557,8 @@ class TransactionService:
             net_cashflow=net_cashflow,
             category_breakdown=category_breakdown,
             recent_7_days_cashflow=recent_7_days,
+            daily_cashflow=recent_7_days,
             recent_transactions=recent_transactions,
             budget_statuses=budget_statuses,
+            budgets=budget_statuses,
         )

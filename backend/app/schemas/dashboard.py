@@ -12,12 +12,14 @@ class CategoryExpenseBreakdown(BaseModel):
     category_color: Optional[str] = None
     category_icon: Optional[str] = None
     total_amount: Decimal
+    total_spent: Optional[Decimal] = None
     percentage: float
 
 
 class DailyCashflow(BaseModel):
     date: str  # Format YYYY-MM-DD
     day_name: str  # Misal: "Sen", "Sel", dst.
+    day: Optional[str] = None
     income: Decimal
     expense: Decimal
 
@@ -40,6 +42,8 @@ class DashboardSummaryResponse(BaseModel):
     net_cashflow: Decimal
     category_breakdown: List[CategoryExpenseBreakdown]
     recent_7_days_cashflow: List[DailyCashflow]
+    daily_cashflow: Optional[List[DailyCashflow]] = None
     recent_transactions: List[TransactionResponse]
     budget_statuses: List[BudgetSummaryItem]
+    budgets: Optional[List[BudgetSummaryItem]] = None
 
