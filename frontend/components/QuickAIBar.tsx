@@ -139,24 +139,24 @@ export function QuickAIBar({ onSuccess }: QuickAIBarProps) {
   return (
     <div className="w-full space-y-2">
       {/* Container Input Quick AI */}
-      <div className="relative flex items-center rounded-2xl border border-surface-border bg-surface-card p-1.5 shadow-lg transition-all focus-within:border-blue-500/50 focus-within:ring-2 focus-within:ring-blue-500/20">
-        <div className="pl-3 pr-2 text-blue-400">
+      <div className="relative flex items-center rounded-2xl border border-surface-border bg-surface p-1.5 shadow-sm transition-all focus-within:border-terracotta focus-within:ring-2 focus-within:ring-terracotta/25">
+        <div className="pl-3 pr-2 text-terracotta">
           <Sparkles className="h-5 w-5 animate-pulse" />
         </div>
 
         {isRecording ? (
           <div className="flex flex-1 items-center gap-3 px-2 py-1">
             <span className="relative flex h-3 w-3">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75"></span>
-              <span className="relative inline-flex h-3 w-3 rounded-full bg-red-500"></span>
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-terracotta opacity-75"></span>
+              <span className="relative inline-flex h-3 w-3 rounded-full bg-terracotta"></span>
             </span>
-            <span className="text-sm font-medium text-red-400">
+            <span className="text-sm font-medium text-terracotta">
               Merekam suara... {formatTimer(recordSeconds)}
             </span>
             <div className="flex-1" />
             <button
               onClick={stopRecording}
-              className="flex items-center gap-1.5 rounded-xl bg-red-500/20 px-3 py-1.5 text-xs font-semibold text-red-400 hover:bg-red-500/30"
+              className="flex items-center gap-1.5 rounded-xl bg-terracotta/15 px-3 py-1.5 text-xs font-semibold text-terracotta hover:bg-terracotta/25"
             >
               <Square className="h-3.5 w-3.5 fill-current" />
               Selesai
@@ -171,7 +171,7 @@ export function QuickAIBar({ onSuccess }: QuickAIBarProps) {
               onKeyDown={(e) => e.key === "Enter" && handleSendText()}
               placeholder="Ketik transaksi masuk/keluar (misal: 'beli kopi 5rb, dapet uang saku 10rb')..."
               disabled={isLoading}
-              className="flex-1 bg-transparent px-2 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none disabled:opacity-50"
+              className="flex-1 bg-transparent px-2 py-2 text-sm text-espresso placeholder:text-espresso-muted/60 focus:outline-none disabled:opacity-50"
             />
 
             <div className="flex items-center gap-1.5">
@@ -180,7 +180,7 @@ export function QuickAIBar({ onSuccess }: QuickAIBarProps) {
                 onClick={startRecording}
                 disabled={isLoading}
                 title="Tekan untuk rekam suara"
-                className="flex h-9 w-9 items-center justify-center rounded-xl bg-surface-border text-slate-300 transition hover:bg-surface-border/80 hover:text-white"
+                className="flex h-9 w-9 items-center justify-center rounded-xl bg-cream-dark/60 text-espresso transition hover:bg-cream-dark hover:text-espresso"
               >
                 <Mic className="h-4 w-4" />
               </button>
@@ -189,7 +189,7 @@ export function QuickAIBar({ onSuccess }: QuickAIBarProps) {
                 type="button"
                 onClick={handleSendText}
                 disabled={!text.trim() || isLoading}
-                className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-white transition hover:bg-blue-500 disabled:opacity-40"
+                className="flex h-9 w-9 items-center justify-center rounded-xl bg-terracotta text-white shadow-sm shadow-terracotta/20 transition hover:bg-terracotta-hover disabled:opacity-40"
               >
                 {isLoading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -205,14 +205,14 @@ export function QuickAIBar({ onSuccess }: QuickAIBarProps) {
       {/* Feedback Toast / Alert Card */}
       {feedback && (
         <div
-          className={`flex flex-col gap-1 rounded-xl border p-3 text-xs leading-relaxed transition ${
+          className={`flex flex-col gap-1 rounded-xl border p-3 text-xs leading-relaxed transition shadow-sm ${
             feedback.type === "success"
-              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-              : "border-red-500/30 bg-red-500/10 text-red-300"
+              ? "border-income/30 bg-income/10 text-income font-medium"
+              : "border-expense/30 bg-expense/10 text-expense font-medium"
           }`}
         >
           <div className="flex items-center justify-between">
-            <span className="font-semibold flex items-center gap-1.5">
+            <span className="font-bold flex items-center gap-1.5">
               {feedback.type === "success" ? (
                 <CheckCircle2 className="h-3.5 w-3.5" />
               ) : (
@@ -222,15 +222,15 @@ export function QuickAIBar({ onSuccess }: QuickAIBarProps) {
             </span>
             <button
               onClick={() => setFeedback(null)}
-              className="text-slate-400 hover:text-white"
+              className="text-espresso-muted hover:text-espresso"
             >
               ✕
             </button>
           </div>
-          <p className="whitespace-pre-line">{feedback.message}</p>
+          <p className="whitespace-pre-line text-espresso">{feedback.message}</p>
           {feedback.alert && (
-            <div className="mt-1 flex items-center gap-1.5 rounded-lg border border-amber-500/30 bg-amber-500/20 p-2 text-amber-200">
-              <AlertTriangle className="h-4 w-4 flex-shrink-0 text-amber-400" />
+            <div className="mt-1 flex items-center gap-1.5 rounded-lg border border-amber/40 bg-amber/15 p-2 text-espresso">
+              <AlertTriangle className="h-4 w-4 flex-shrink-0 text-terracotta" />
               <span>{feedback.alert}</span>
             </div>
           )}

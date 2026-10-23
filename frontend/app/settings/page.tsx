@@ -136,11 +136,11 @@ export default function SettingsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-          <SettingsIcon className="h-5 w-5 text-blue-400" />
+        <h1 className="text-xl font-bold tracking-tight text-espresso flex items-center gap-2">
+          <SettingsIcon className="h-5 w-5 text-terracotta" />
           Pengaturan & Integrasi
         </h1>
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-espresso-muted">
           Kelola profil pengguna, integrasi bot Telegram, dompet, dan kategori.
         </p>
       </div>
@@ -148,27 +148,27 @@ export default function SettingsPage() {
       {/* ===================================================================== */}
       {/* KARTU 1: INTEGRASI BOT TELEGRAM */}
       {/* ===================================================================== */}
-      <div className="rounded-3xl border border-sky-500/20 bg-gradient-to-br from-surface to-surface-card p-6 shadow-xl relative overflow-hidden">
+      <div className="rounded-3xl border border-amber/40 bg-surface p-6 shadow-sm relative overflow-hidden">
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-500/15 text-sky-400 border border-sky-500/30">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber/20 text-terracotta border border-amber/30">
               <Bot className="h-6 w-6" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-bold text-white">Bot Telegram FinAI</h3>
+                <h3 className="text-base font-bold text-espresso">Bot Telegram FinAI</h3>
                 {tgStatus?.is_linked ? (
-                  <span className="flex items-center gap-1 rounded-md bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-bold text-emerald-400">
+                  <span className="flex items-center gap-1 rounded-md bg-income/15 border border-income/30 px-2 py-0.5 text-[10px] font-bold text-income">
                     <CheckCircle2 className="h-3 w-3" />
                     TERHUBUNG
                   </span>
                 ) : (
-                  <span className="rounded-md bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 text-[10px] font-bold text-amber-400">
+                  <span className="rounded-md bg-amber/20 border border-amber/40 px-2 py-0.5 text-[10px] font-bold text-terracotta">
                     BELUM TERHUBUNG
                   </span>
                 )}
               </div>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className="text-xs text-espresso-muted mt-0.5">
                 {tgStatus?.is_linked
                   ? `Akun Anda terhubung dengan Chat ID: ${tgStatus.telegram_chat_id}. Kirim teks atau Voice Note ke bot kapan saja!`
                   : "Catat pengeluaran lewat chat & voice note di Telegram sambil beraktivitas."}
@@ -183,7 +183,7 @@ export default function SettingsPage() {
                   href="https://t.me/FinAi_track_bot"
                   target="_blank"
                   rel="noreferrer"
-                  className="flex items-center gap-1.5 rounded-xl bg-sky-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-sky-500 transition shadow-lg shadow-sky-500/20"
+                  className="flex items-center gap-1.5 rounded-xl bg-terracotta px-4 py-2.5 text-xs font-semibold text-white hover:bg-terracotta-hover transition shadow-md shadow-terracotta/20"
                 >
                   <ExternalLink className="h-3.5 w-3.5" />
                   Buka Chat Bot
@@ -191,7 +191,7 @@ export default function SettingsPage() {
                 <button
                   type="button"
                   onClick={handleUnlinkTelegram}
-                  className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2.5 text-xs font-semibold text-red-400 hover:bg-red-500/20 transition"
+                  className="rounded-xl border border-terracotta/30 bg-terracotta/10 px-3 py-2.5 text-xs font-semibold text-terracotta hover:bg-terracotta/20 transition"
                 >
                   Putus
                 </button>
@@ -201,7 +201,7 @@ export default function SettingsPage() {
                 type="button"
                 onClick={handleGenerateTelegramOtp}
                 disabled={isGeneratingOtp}
-                className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 px-5 py-2.5 text-xs font-bold text-white shadow-lg shadow-sky-500/25 hover:from-sky-400 hover:to-blue-500 transition disabled:opacity-50"
+                className="flex items-center gap-2 rounded-xl bg-terracotta px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-terracotta/20 hover:bg-terracotta-hover transition disabled:opacity-50"
               >
                 {isGeneratingOtp ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
                 Hubungkan ke Telegram
@@ -214,16 +214,16 @@ export default function SettingsPage() {
       {/* ===================================================================== */}
       {/* KARTU 2: MANAJEMEN DOMPET */}
       {/* ===================================================================== */}
-      <div className="rounded-3xl border border-surface-border bg-surface p-6 shadow-xl space-y-4">
+      <div className="rounded-3xl border border-surface-border bg-surface p-6 shadow-sm space-y-4">
         <div className="flex items-center justify-between border-b border-surface-border pb-3">
           <div className="flex items-center gap-2">
-            <WalletIcon className="h-4 w-4 text-blue-400" />
-            <h3 className="text-sm font-bold text-white">Daftar Dompet / Rekening</h3>
+            <WalletIcon className="h-4 w-4 text-terracotta" />
+            <h3 className="text-sm font-bold text-espresso">Daftar Dompet / Rekening</h3>
           </div>
           <button
             type="button"
             onClick={() => setIsWalletModalOpen(true)}
-            className="flex items-center gap-1 text-xs font-semibold text-blue-400 hover:text-blue-300"
+            className="flex items-center gap-1 text-xs font-semibold text-terracotta hover:text-terracotta-hover"
           >
             <Plus className="h-3.5 w-3.5" />
             Tambah Dompet
@@ -237,10 +237,10 @@ export default function SettingsPage() {
               className="rounded-2xl border border-surface-border bg-surface-card p-3.5 flex items-center justify-between"
             >
               <div>
-                <span className="text-xs font-semibold text-white block">{w.name}</span>
-                <span className="text-[10px] text-slate-400 uppercase">{w.type}</span>
+                <span className="text-xs font-bold text-espresso block">{w.name}</span>
+                <span className="text-[10px] text-espresso-muted uppercase">{w.type}</span>
               </div>
-              <span className="text-xs font-bold text-slate-200">
+              <span className="text-xs font-bold text-espresso">
                 Rp{parseFloat(w.balance).toLocaleString("id-ID")}
               </span>
             </div>
@@ -251,16 +251,16 @@ export default function SettingsPage() {
       {/* ===================================================================== */}
       {/* KARTU 3: MANAJEMEN KATEGORI */}
       {/* ===================================================================== */}
-      <div className="rounded-3xl border border-surface-border bg-surface p-6 shadow-xl space-y-4">
+      <div className="rounded-3xl border border-surface-border bg-surface p-6 shadow-sm space-y-4">
         <div className="flex items-center justify-between border-b border-surface-border pb-3">
           <div className="flex items-center gap-2">
-            <Tag className="h-4 w-4 text-emerald-400" />
-            <h3 className="text-sm font-bold text-white">Kategori Pemasukan & Pengeluaran</h3>
+            <Tag className="h-4 w-4 text-income" />
+            <h3 className="text-sm font-bold text-espresso">Kategori Pemasukan & Pengeluaran</h3>
           </div>
           <button
             type="button"
             onClick={() => setIsCategoryModalOpen(true)}
-            className="flex items-center gap-1 text-xs font-semibold text-emerald-400 hover:text-emerald-300"
+            className="flex items-center gap-1 text-xs font-semibold text-income hover:text-income-hover"
           >
             <Plus className="h-3.5 w-3.5" />
             Tambah Kategori
@@ -271,14 +271,14 @@ export default function SettingsPage() {
           {categories?.map((c: any) => (
             <span
               key={c.id}
-              className="rounded-xl border border-surface-border bg-surface-card px-3 py-1.5 text-xs text-slate-300 flex items-center gap-1.5"
+              className="rounded-xl border border-surface-border bg-surface-card px-3 py-1.5 text-xs text-espresso font-medium flex items-center gap-1.5"
             >
               <span
                 className="h-2 w-2 rounded-full"
-                style={{ backgroundColor: c.color || (c.type === "expense" ? "#EF4444" : "#10B981") }}
+                style={{ backgroundColor: c.color || (c.type === "expense" ? "#D4621A" : "#588157") }}
               />
               {c.name}
-              <span className="text-[10px] text-slate-500 uppercase ml-1">({c.type})</span>
+              <span className="text-[10px] text-espresso-muted uppercase ml-1">({c.type})</span>
             </span>
           ))}
         </div>
@@ -288,22 +288,22 @@ export default function SettingsPage() {
       {/* MODAL 1: OTP KODE TELEGRAM */}
       {/* ===================================================================== */}
       {isOtpModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
-          <div className="w-full max-w-sm rounded-3xl border border-sky-500/30 bg-surface p-6 text-center shadow-2xl space-y-5">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-500/20 text-sky-400">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm rounded-3xl border border-amber/40 bg-surface p-6 text-center shadow-2xl space-y-5">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber/20 text-terracotta">
               <Bot className="h-7 w-7" />
             </div>
 
             <div>
-              <h3 className="text-lg font-bold text-white">Tautkan ke Bot Telegram</h3>
-              <p className="text-xs text-slate-400 mt-1">
+              <h3 className="text-lg font-bold text-espresso">Tautkan ke Bot Telegram</h3>
+              <p className="text-xs text-espresso-muted mt-1">
                 Kirim kode 6 digit berikut ke bot <strong>@FinAi_track_bot</strong> di Telegram.
               </p>
             </div>
 
             {/* OTP Code Display Box */}
-            <div className="flex items-center justify-center gap-3 rounded-2xl border border-sky-500/40 bg-sky-500/10 py-3 px-4">
-              <span className="text-3xl font-extrabold tracking-widest text-sky-400 font-mono">
+            <div className="flex items-center justify-center gap-3 rounded-2xl border border-amber/40 bg-amber/15 py-3 px-4">
+              <span className="text-3xl font-extrabold tracking-widest text-terracotta font-mono">
                 {pairingCode}
               </span>
               <button
@@ -313,14 +313,14 @@ export default function SettingsPage() {
                   setCopied(true);
                   setTimeout(() => setCopied(false), 2000);
                 }}
-                className="rounded-lg bg-sky-500/20 p-2 text-sky-300 hover:text-white transition"
+                className="rounded-lg bg-amber/20 p-2 text-terracotta hover:bg-amber/30 transition"
                 title="Salin Kode"
               >
                 {copied ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
               </button>
             </div>
 
-            <div className="flex items-center justify-center gap-1.5 text-[11px] text-amber-400 font-medium">
+            <div className="flex items-center justify-center gap-1.5 text-[11px] text-terracotta font-semibold">
               <Clock className="h-3.5 w-3.5" />
               <span>Kode ini berlaku selama 5 menit.</span>
             </div>
@@ -330,7 +330,7 @@ export default function SettingsPage() {
                 href={`https://t.me/FinAi_track_bot?start=${pairingCode}`}
                 target="_blank"
                 rel="noreferrer"
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-sky-600 py-2.5 text-xs font-bold text-white shadow-lg shadow-sky-500/25 hover:bg-sky-500 transition"
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-terracotta py-2.5 text-xs font-bold text-white shadow-md shadow-terracotta/20 hover:bg-terracotta-hover transition"
               >
                 <ExternalLink className="h-4 w-4" />
                 Buka Bot Telegram Langsung
@@ -342,7 +342,7 @@ export default function SettingsPage() {
                   setIsOtpModalOpen(false);
                   refetchTg();
                 }}
-                className="w-full rounded-xl bg-surface-card py-2 text-xs font-semibold text-slate-400 hover:text-white"
+                className="w-full rounded-xl bg-surface-card py-2 text-xs font-semibold text-espresso-muted hover:text-espresso"
               >
                 Tutup
               </button>
@@ -355,28 +355,28 @@ export default function SettingsPage() {
       {/* MODAL 2: TAMBAH DOMPET */}
       {/* ===================================================================== */}
       {isWalletModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="w-full max-w-sm rounded-3xl border border-surface-border bg-surface p-6 shadow-2xl">
-            <h3 className="text-base font-bold text-white mb-4">Tambah Dompet / Rekening</h3>
+            <h3 className="text-base font-bold text-espresso mb-4">Tambah Dompet / Rekening</h3>
             <form onSubmit={handleCreateWallet} className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">Nama Dompet</label>
+                <label className="block text-xs font-semibold text-espresso mb-1">Nama Dompet</label>
                 <input
                   type="text"
                   required
                   value={walletName}
                   onChange={(e) => setWalletName(e.target.value)}
                   placeholder="Misal: Bank Mandiri / GoPay"
-                  className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                  className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs text-espresso placeholder:text-espresso-muted/40 focus:outline-none focus:border-terracotta"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">Tipe</label>
+                <label className="block text-xs font-semibold text-espresso mb-1">Tipe</label>
                 <select
                   value={walletType}
                   onChange={(e: any) => setWalletType(e.target.value)}
-                  className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs text-white focus:outline-none"
+                  className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs font-medium text-espresso focus:outline-none"
                 >
                   <option value="cash">Tunai (Cash)</option>
                   <option value="bank">Bank</option>
@@ -385,14 +385,14 @@ export default function SettingsPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">Saldo Awal (Rp)</label>
+                <label className="block text-xs font-semibold text-espresso mb-1">Saldo Awal (Rp)</label>
                 <input
                   type="number"
                   min="0"
                   value={walletBalance}
                   onChange={(e) => setWalletBalance(e.target.value)}
                   placeholder="0"
-                  className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                  className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs font-semibold text-espresso focus:outline-none focus:border-terracotta"
                 />
               </div>
 
@@ -400,13 +400,13 @@ export default function SettingsPage() {
                 <button
                   type="button"
                   onClick={() => setIsWalletModalOpen(false)}
-                  className="flex-1 rounded-xl bg-surface-card py-2 text-xs font-semibold text-slate-400 hover:text-white"
+                  className="flex-1 rounded-xl bg-surface-card py-2 text-xs font-semibold text-espresso-muted hover:text-espresso"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 rounded-xl bg-blue-600 py-2 text-xs font-semibold text-white hover:bg-blue-500"
+                  className="flex-1 rounded-xl bg-terracotta py-2 text-xs font-semibold text-white hover:bg-terracotta-hover"
                 >
                   Simpan
                 </button>
@@ -420,28 +420,28 @@ export default function SettingsPage() {
       {/* MODAL 3: TAMBAH KATEGORI */}
       {/* ===================================================================== */}
       {isCategoryModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="w-full max-w-sm rounded-3xl border border-surface-border bg-surface p-6 shadow-2xl">
-            <h3 className="text-base font-bold text-white mb-4">Tambah Kategori</h3>
+            <h3 className="text-base font-bold text-espresso mb-4">Tambah Kategori</h3>
             <form onSubmit={handleCreateCategory} className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">Nama Kategori</label>
+                <label className="block text-xs font-semibold text-espresso mb-1">Nama Kategori</label>
                 <input
                   type="text"
                   required
                   value={catName}
                   onChange={(e) => setCatName(e.target.value)}
                   placeholder="Misal: Tagihan Listrik"
-                  className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                  className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs text-espresso placeholder:text-espresso-muted/40 focus:outline-none focus:border-income"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">Tipe</label>
+                <label className="block text-xs font-semibold text-espresso mb-1">Tipe</label>
                 <select
                   value={catType}
                   onChange={(e: any) => setCatType(e.target.value)}
-                  className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs text-white focus:outline-none"
+                  className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs font-medium text-espresso focus:outline-none"
                 >
                   <option value="expense">Pengeluaran (Expense)</option>
                   <option value="income">Pemasukan (Income)</option>
@@ -452,13 +452,13 @@ export default function SettingsPage() {
                 <button
                   type="button"
                   onClick={() => setIsCategoryModalOpen(false)}
-                  className="flex-1 rounded-xl bg-surface-card py-2 text-xs font-semibold text-slate-400 hover:text-white"
+                  className="flex-1 rounded-xl bg-surface-card py-2 text-xs font-semibold text-espresso-muted hover:text-espresso"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 rounded-xl bg-emerald-600 py-2 text-xs font-semibold text-white hover:bg-emerald-500"
+                  className="flex-1 rounded-xl bg-income py-2 text-xs font-semibold text-white hover:bg-income-hover"
                 >
                   Simpan
                 </button>

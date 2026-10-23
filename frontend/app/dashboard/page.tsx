@@ -167,14 +167,14 @@ export default function DashboardPage() {
   };
 
   const DONUT_COLORS = [
-    "#EF4444",
-    "#F59E0B",
-    "#3B82F6",
-    "#8B5CF6",
-    "#EC4899",
-    "#10B981",
-    "#06B6D4",
-    "#6B7280",
+    "#D4621A", // Terracotta
+    "#F4AE52", // Amber
+    "#588157", // Sage Green
+    "#2A1A0E", // Espresso
+    "#C78229", // Deep Amber
+    "#993E0A", // Dark Terracotta
+    "#456944", // Deep Sage
+    "#6B584B", // Espresso Muted
   ];
 
   return (
@@ -185,23 +185,23 @@ export default function DashboardPage() {
       </div>
 
       {/* 2. Total Saldo & Financial Overview Card */}
-      <div className="relative overflow-hidden rounded-3xl border border-surface-border bg-gradient-to-br from-surface to-surface-card p-6 shadow-xl">
+      <div className="relative overflow-hidden rounded-3xl border border-surface-border bg-gradient-to-br from-surface to-surface-card p-6 shadow-md">
         <div className="relative z-10 flex flex-col justify-between gap-6 sm:flex-row sm:items-center">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold tracking-wider text-slate-400 uppercase">
+              <span className="text-xs font-semibold tracking-wider text-espresso-muted uppercase">
                 Total Saldo Gabungan
               </span>
               <button
                 type="button"
                 onClick={toggleBalanceHidden}
-                className="text-slate-400 hover:text-white transition"
+                className="text-espresso-muted hover:text-espresso transition"
                 title={isBalanceHidden ? "Tampilkan Saldo" : "Sembunyikan Saldo"}
               >
                 {isBalanceHidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
-            <h2 className="mt-2 text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
+            <h2 className="mt-2 text-3xl font-extrabold tracking-tight text-espresso sm:text-4xl">
               {formatIDR(summary?.total_balance)}
             </h2>
           </div>
@@ -212,13 +212,13 @@ export default function DashboardPage() {
               type="button"
               onClick={() => openTransactionModal("income")}
               title="Klik untuk catat pemasukan baru"
-              className="text-left rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-2.5 transition hover:bg-emerald-500/20 active:scale-95"
+              className="text-left rounded-2xl border border-income/30 bg-income-bg px-4 py-2.5 transition hover:bg-income/20 active:scale-95"
             >
-              <div className="flex items-center gap-1.5 text-xs text-emerald-400">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-income">
                 <TrendingUp className="h-3.5 w-3.5" />
                 <span>Pemasukan</span>
               </div>
-              <span className="mt-1 block text-sm font-bold text-emerald-300">
+              <span className="mt-1 block text-sm font-bold text-espresso">
                 {formatIDR(summary?.monthly_income)}
               </span>
             </button>
@@ -227,13 +227,13 @@ export default function DashboardPage() {
               type="button"
               onClick={() => openTransactionModal("expense")}
               title="Klik untuk catat pengeluaran baru"
-              className="text-left rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-2.5 transition hover:bg-red-500/20 active:scale-95"
+              className="text-left rounded-2xl border border-expense/30 bg-expense-bg px-4 py-2.5 transition hover:bg-expense/20 active:scale-95"
             >
-              <div className="flex items-center gap-1.5 text-xs text-red-400">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-expense">
                 <TrendingDown className="h-3.5 w-3.5" />
                 <span>Pengeluaran</span>
               </div>
-              <span className="mt-1 block text-sm font-bold text-red-300">
+              <span className="mt-1 block text-sm font-bold text-espresso">
                 {formatIDR(summary?.monthly_expense)}
               </span>
             </button>
@@ -241,7 +241,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Background glow decoration */}
-        <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
+        <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-amber/15 blur-3xl pointer-events-none" />
       </div>
 
       {/* 3. Tombol Aksi Cepat Terpadu (1 UI Langsung Masuk / Keluar / Transfer) */}
@@ -249,7 +249,7 @@ export default function DashboardPage() {
         <button
           type="button"
           onClick={() => openTransactionModal("income")}
-          className="flex items-center justify-center gap-2 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs font-semibold text-emerald-400 shadow-sm transition hover:bg-emerald-500/20 active:scale-95"
+          className="flex items-center justify-center gap-2 rounded-2xl border border-income/30 bg-income/10 p-3 text-xs font-bold text-income shadow-sm transition hover:bg-income/20 active:scale-95"
         >
           <TrendingUp className="h-4 w-4" />
           <span>+ Pemasukan</span>
@@ -258,7 +258,7 @@ export default function DashboardPage() {
         <button
           type="button"
           onClick={() => openTransactionModal("expense")}
-          className="flex items-center justify-center gap-2 rounded-2xl border border-red-500/30 bg-red-500/10 p-3 text-xs font-semibold text-red-400 shadow-sm transition hover:bg-red-500/20 active:scale-95"
+          className="flex items-center justify-center gap-2 rounded-2xl border border-expense/30 bg-expense/10 p-3 text-xs font-bold text-expense shadow-sm transition hover:bg-expense/20 active:scale-95"
         >
           <TrendingDown className="h-4 w-4" />
           <span>- Pengeluaran</span>
@@ -267,9 +267,9 @@ export default function DashboardPage() {
         <button
           type="button"
           onClick={() => openTransactionModal("transfer")}
-          className="flex items-center justify-center gap-2 rounded-2xl border border-blue-500/30 bg-blue-500/10 p-3 text-xs font-semibold text-blue-400 shadow-sm transition hover:bg-blue-500/20 active:scale-95"
+          className="flex items-center justify-center gap-2 rounded-2xl border border-amber/40 bg-amber/15 p-3 text-xs font-bold text-espresso shadow-sm transition hover:bg-amber/25 active:scale-95"
         >
-          <ArrowRightLeft className="h-4 w-4" />
+          <ArrowRightLeft className="h-4 w-4 text-terracotta" />
           <span>⇄ Transfer</span>
         </button>
       </div>
@@ -277,10 +277,10 @@ export default function DashboardPage() {
       {/* 4. Daftar Dompet (Horizontal Grid) */}
       <div>
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-bold tracking-tight text-slate-200">Dompet & Rekening</h3>
+          <h3 className="text-sm font-bold tracking-tight text-espresso">Dompet & Rekening</h3>
           <Link
             href="/settings"
-            className="flex items-center gap-1 text-xs font-semibold text-blue-400 hover:text-blue-300"
+            className="flex items-center gap-1 text-xs font-semibold text-terracotta hover:text-terracotta-hover"
           >
             <Plus className="h-3.5 w-3.5" />
             Tambah Dompet
@@ -291,20 +291,20 @@ export default function DashboardPage() {
           {summary?.wallets?.map((wallet: any) => (
             <div
               key={wallet.id}
-              className="rounded-2xl border border-surface-border bg-surface-card p-4 transition hover:border-slate-600"
+              className="rounded-2xl border border-surface-border bg-surface p-4 shadow-sm transition hover:border-terracotta/40 hover:shadow-md"
             >
               <div className="flex items-center justify-between">
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-500/10 text-blue-400">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-terracotta/10 text-terracotta">
                   <WalletIcon className="h-4 w-4" />
                 </div>
-                <span className="rounded-md bg-surface-border px-2 py-0.5 text-[10px] font-medium text-slate-400 uppercase">
+                <span className="rounded-md bg-surface-card px-2 py-0.5 text-[10px] font-semibold text-espresso-muted border border-surface-border uppercase">
                   {wallet.type}
                 </span>
               </div>
-              <span className="mt-3 block text-xs font-medium text-slate-300 truncate">
+              <span className="mt-3 block text-xs font-medium text-espresso-muted truncate">
                 {wallet.name}
               </span>
-              <span className="mt-0.5 block text-sm font-bold text-white">
+              <span className="mt-0.5 block text-sm font-bold text-espresso">
                 {formatIDR(wallet.balance)}
               </span>
             </div>
@@ -332,9 +332,9 @@ export default function DashboardPage() {
         return (
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             {/* Donut Chart: Pengeluaran per Kategori */}
-            <div className="rounded-2xl border border-surface-border bg-surface p-5 shadow-lg">
-              <h3 className="text-sm font-bold text-slate-200">Komposisi Pengeluaran Bulan Ini</h3>
-              <p className="text-xs text-slate-400">Proporsi kategori belanja terbesar</p>
+            <div className="rounded-2xl border border-surface-border bg-surface p-5 shadow-sm">
+              <h3 className="text-sm font-bold text-espresso">Komposisi Pengeluaran Bulan Ini</h3>
+              <p className="text-xs text-espresso-muted">Proporsi kategori belanja terbesar</p>
 
               {mounted && categoryChartData.length > 0 ? (
                 <div className="mt-4 flex flex-col items-center sm:flex-row sm:justify-between">
@@ -364,10 +364,12 @@ export default function DashboardPage() {
                             "Total",
                           ]}
                           contentStyle={{
-                            backgroundColor: "#1E293B",
-                            borderColor: "#334155",
+                            backgroundColor: "#FFFFFF",
+                            borderColor: "#EBD8C1",
                             borderRadius: "12px",
                             fontSize: "12px",
+                            color: "#2A1A0E",
+                            boxShadow: "0 4px 12px rgba(42, 26, 14, 0.08)",
                           }}
                         />
                       </PieChart>
@@ -386,9 +388,9 @@ export default function DashboardPage() {
                                 cat.category_color || DONUT_COLORS[i % DONUT_COLORS.length],
                             }}
                           />
-                          <span className="text-slate-300 truncate">{cat.category_name}</span>
+                          <span className="text-espresso font-medium truncate">{cat.category_name}</span>
                         </div>
-                        <span className="font-semibold text-white ml-2">
+                        <span className="font-bold text-espresso ml-2">
                           {cat.percentage.toFixed(0)}%
                         </span>
                       </div>
@@ -396,16 +398,16 @@ export default function DashboardPage() {
                   </div>
                 </div>
               ) : (
-                <div className="flex h-48 items-center justify-center text-xs text-slate-500">
+                <div className="flex h-48 items-center justify-center text-xs text-espresso-muted">
                   Belum ada data pengeluaran bulan ini.
                 </div>
               )}
             </div>
 
             {/* Bar Chart: Arus Kas 7 Hari Terakhir */}
-            <div className="rounded-2xl border border-surface-border bg-surface p-5 shadow-lg">
-              <h3 className="text-sm font-bold text-slate-200">Arus Kas 7 Hari Terakhir</h3>
-              <p className="text-xs text-slate-400">Pemasukan vs Pengeluaran harian</p>
+            <div className="rounded-2xl border border-surface-border bg-surface p-5 shadow-sm">
+              <h3 className="text-sm font-bold text-espresso">Arus Kas 7 Hari Terakhir</h3>
+              <p className="text-xs text-espresso-muted">Pemasukan vs Pengeluaran harian</p>
 
               {mounted && cashflowChartData.length > 0 && hasCashflowActivity ? (
                 <div className="mt-4 h-48 w-full">
@@ -413,13 +415,13 @@ export default function DashboardPage() {
                     <BarChart data={cashflowChartData}>
                       <XAxis
                         dataKey="day"
-                        stroke="#64748B"
+                        stroke="#8C7767"
                         fontSize={11}
                         tickLine={false}
                         axisLine={false}
                       />
                       <YAxis
-                        stroke="#64748B"
+                        stroke="#8C7767"
                         fontSize={10}
                         tickLine={false}
                         axisLine={false}
@@ -431,19 +433,21 @@ export default function DashboardPage() {
                           "",
                         ]}
                         contentStyle={{
-                          backgroundColor: "#1E293B",
-                          borderColor: "#334155",
+                          backgroundColor: "#FFFFFF",
+                          borderColor: "#EBD8C1",
                           borderRadius: "12px",
                           fontSize: "12px",
+                          color: "#2A1A0E",
+                          boxShadow: "0 4px 12px rgba(42, 26, 14, 0.08)",
                         }}
                       />
-                      <Bar dataKey="income" name="Pemasukan" fill="#10B981" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="expense" name="Pengeluaran" fill="#EF4444" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="income" name="Pemasukan" fill="#588157" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="expense" name="Pengeluaran" fill="#D4621A" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               ) : (
-                <div className="flex h-48 items-center justify-center text-xs text-slate-500">
+                <div className="flex h-48 items-center justify-center text-xs text-espresso-muted">
                   Belum ada riwayat transaksi dalam 7 hari terakhir.
                 </div>
               )}
@@ -457,44 +461,44 @@ export default function DashboardPage() {
         const budgetStatusesList = summary?.budget_statuses || summary?.budgets || [];
         if (!budgetStatusesList || budgetStatusesList.length === 0) return null;
         return (
-          <div className="rounded-2xl border border-surface-border bg-surface p-5 shadow-lg">
+          <div className="rounded-2xl border border-surface-border bg-surface p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-200">Pemantauan Batas Anggaran</h3>
-              <span className="text-xs text-slate-400">Bulan Ini</span>
+              <h3 className="text-sm font-bold text-espresso">Pemantauan Batas Anggaran</h3>
+              <span className="text-xs text-espresso-muted">Bulan Ini</span>
             </div>
 
             <div className="space-y-4">
               {budgetStatusesList.map((b: any) => (
                 <div key={b.category_id || b.id} className="space-y-1.5">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="font-semibold text-slate-200">{b.category_name}</span>
+                    <span className="font-semibold text-espresso">{b.category_name}</span>
                     <span
                       className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${
                         b.status === "overbudget"
-                          ? "bg-red-500/20 text-red-400"
+                          ? "bg-expense/15 text-expense"
                           : b.status === "waspada"
-                          ? "bg-amber-500/20 text-amber-400"
-                          : "bg-emerald-500/20 text-emerald-400"
+                          ? "bg-amber/20 text-terracotta"
+                          : "bg-income/15 text-income"
                       }`}
                     >
                       {b.status.toUpperCase()} ({b.percentage_used}%)
                     </span>
                   </div>
 
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-surface-border">
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-cream-dark/50">
                     <div
                       className={`h-full rounded-full transition-all ${
                         b.status === "overbudget"
-                          ? "bg-red-500"
+                          ? "bg-expense"
                           : b.status === "waspada"
-                          ? "bg-amber-500"
-                          : "bg-emerald-500"
+                          ? "bg-amber"
+                          : "bg-income"
                       }`}
                       style={{ width: `${Math.min(b.percentage_used, 100)}%` }}
                     />
                   </div>
 
-                  <div className="flex items-center justify-between text-[11px] text-slate-400">
+                  <div className="flex items-center justify-between text-[11px] text-espresso-muted">
                     <span>Terpakai: {formatIDR(b.spent_amount)}</span>
                     <span>Batas: {formatIDR(b.amount_limit)}</span>
                   </div>
@@ -506,10 +510,10 @@ export default function DashboardPage() {
       })()}
 
       {/* 7. Transaksi Terkini */}
-      <div className="rounded-2xl border border-surface-border bg-surface p-5 shadow-lg">
+      <div className="rounded-2xl border border-surface-border bg-surface p-5 shadow-sm">
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-bold text-slate-200">5 Transaksi Terakhir</h3>
-          <Link href="/transactions" className="text-xs font-semibold text-blue-400 hover:text-blue-300">
+          <h3 className="text-sm font-bold text-espresso">5 Transaksi Terakhir</h3>
+          <Link href="/transactions" className="text-xs font-semibold text-terracotta hover:text-terracotta-hover">
             Lihat Semua Transaksi →
           </Link>
         </div>
@@ -522,8 +526,8 @@ export default function DashboardPage() {
                   <div
                     className="flex h-9 w-9 items-center justify-center rounded-xl font-bold text-xs"
                     style={{
-                      backgroundColor: tx.type === "transfer" ? "#3B82F620" : `${tx.category_color || "#3B82F6"}20`,
-                      color: tx.type === "transfer" ? "#60A5FA" : (tx.category_color || "#3B82F6"),
+                      backgroundColor: tx.type === "transfer" ? "#F4AE5225" : `${tx.category_color || "#D4621A"}20`,
+                      color: tx.type === "transfer" ? "#D4621A" : (tx.category_color || "#D4621A"),
                     }}
                   >
                     {tx.type === "transfer" ? (
@@ -534,12 +538,12 @@ export default function DashboardPage() {
                   </div>
                   <div>
                     <div className="flex items-center gap-1.5">
-                      <span className="text-sm font-medium text-slate-100">
+                      <span className="text-sm font-semibold text-espresso">
                         {tx.description || tx.category_name}
                       </span>
                       {getSourceIcon(tx.source)}
                     </div>
-                    <span className="text-xs text-slate-400">
+                    <span className="text-xs text-espresso-muted">
                       {tx.wallet_name} • {tx.transaction_date}
                     </span>
                   </div>
@@ -548,10 +552,10 @@ export default function DashboardPage() {
                 <span
                   className={`text-sm font-bold ${
                     tx.type === "income"
-                      ? "text-emerald-400"
+                      ? "text-income"
                       : tx.type === "expense"
-                      ? "text-red-400"
-                      : "text-blue-400"
+                      ? "text-expense"
+                      : "text-terracotta"
                   }`}
                 >
                   {tx.type === "income" ? "+" : tx.type === "expense" ? "-" : "↔ "}
@@ -561,7 +565,7 @@ export default function DashboardPage() {
             ))}
           </div>
         ) : (
-          <div className="py-6 text-center text-xs text-slate-500">
+          <div className="py-6 text-center text-xs text-espresso-muted">
             Belum ada catatan transaksi. Gunakan Quick AI bar di atas atau tombol aksi untuk mulai mencatat!
           </div>
         )}
@@ -569,14 +573,14 @@ export default function DashboardPage() {
 
       {/* Modal Terpadu: Catat Transaksi Cepat (Masuk, Keluar, Transfer dalam 1 UI) */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
           <div className="relative w-full max-w-md rounded-3xl border border-surface-border bg-surface p-6 shadow-2xl">
             <div className="flex items-center justify-between pb-4 border-b border-surface-border">
-              <h3 className="text-base font-bold text-white">Catat Transaksi Manual</h3>
+              <h3 className="text-base font-bold text-espresso">Catat Transaksi Manual</h3>
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="rounded-lg p-1 text-slate-400 hover:bg-surface-border hover:text-white"
+                className="rounded-lg p-1 text-espresso-muted hover:bg-surface-card hover:text-espresso"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -588,10 +592,10 @@ export default function DashboardPage() {
                 <button
                   type="button"
                   onClick={() => handleTypeChange("expense")}
-                  className={`rounded-xl py-2 text-xs font-semibold transition ${
+                  className={`rounded-xl py-2 text-xs font-bold transition ${
                     modalType === "expense"
-                      ? "bg-red-500 text-white shadow-md shadow-red-500/20"
-                      : "text-slate-400 hover:text-white"
+                      ? "bg-expense text-white shadow-md"
+                      : "text-espresso-muted hover:text-espresso"
                   }`}
                 >
                   📉 Keluar
@@ -599,10 +603,10 @@ export default function DashboardPage() {
                 <button
                   type="button"
                   onClick={() => handleTypeChange("income")}
-                  className={`rounded-xl py-2 text-xs font-semibold transition ${
+                  className={`rounded-xl py-2 text-xs font-bold transition ${
                     modalType === "income"
-                      ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/20"
-                      : "text-slate-400 hover:text-white"
+                      ? "bg-income text-white shadow-md"
+                      : "text-espresso-muted hover:text-espresso"
                   }`}
                 >
                   📈 Masuk
@@ -610,10 +614,10 @@ export default function DashboardPage() {
                 <button
                   type="button"
                   onClick={() => handleTypeChange("transfer")}
-                  className={`rounded-xl py-2 text-xs font-semibold transition ${
+                  className={`rounded-xl py-2 text-xs font-bold transition ${
                     modalType === "transfer"
-                      ? "bg-blue-600 text-white shadow-md shadow-blue-600/20"
-                      : "text-slate-400 hover:text-white"
+                      ? "bg-terracotta text-white shadow-md"
+                      : "text-espresso-muted hover:text-espresso"
                   }`}
                 >
                   🔄 Transfer
@@ -622,7 +626,7 @@ export default function DashboardPage() {
 
               {/* Nominal Input */}
               <div>
-                <label className="block text-xs font-medium text-slate-300">Nominal (Rp)</label>
+                <label className="block text-xs font-semibold text-espresso">Nominal (Rp)</label>
                 <input
                   type="number"
                   step="1000"
@@ -631,7 +635,7 @@ export default function DashboardPage() {
                   placeholder="0"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
-                  className="mt-1 block w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2.5 text-base font-bold text-white placeholder:text-slate-600 focus:border-blue-500 focus:outline-none"
+                  className="mt-1 block w-full rounded-xl border border-surface-border bg-surface px-3 py-2.5 text-base font-bold text-espresso placeholder:text-espresso-muted/40 focus:border-terracotta focus:outline-none"
                 />
                 {/* Quick nominal chips */}
                 <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1">
@@ -640,7 +644,7 @@ export default function DashboardPage() {
                       key={val}
                       type="button"
                       onClick={() => setAmount(val.toString())}
-                      className="rounded-lg border border-surface-border bg-surface-card px-2.5 py-1 text-[11px] font-medium text-slate-300 hover:border-slate-500 hover:text-white"
+                      className="rounded-lg border border-surface-border bg-surface-card px-2.5 py-1 text-[11px] font-semibold text-espresso-muted hover:border-terracotta hover:text-espresso"
                     >
                       +{val >= 1000 ? `${val / 1000}rb` : val}
                     </button>
@@ -651,14 +655,14 @@ export default function DashboardPage() {
               {/* Pilihan Kategori (Hanya jika bukan transfer) */}
               {modalType !== "transfer" && (
                 <div>
-                  <label className="block text-xs font-medium text-slate-300">
+                  <label className="block text-xs font-semibold text-espresso">
                     Kategori {modalType === "income" ? "Pemasukan" : "Pengeluaran"}
                   </label>
                   <select
                     value={categoryId}
                     onChange={(e) => setCategoryId(e.target.value)}
                     required
-                    className="mt-1 block w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2.5 text-xs text-slate-200 focus:border-blue-500 focus:outline-none"
+                    className="mt-1 block w-full rounded-xl border border-surface-border bg-surface px-3 py-2.5 text-xs font-medium text-espresso focus:border-terracotta focus:outline-none"
                   >
                     {categories
                       ?.filter((c: any) => c.type === modalType)
@@ -674,14 +678,14 @@ export default function DashboardPage() {
               {/* Pilihan Dompet */}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="block text-xs font-medium text-slate-300">
+                  <label className="block text-xs font-semibold text-espresso">
                     {modalType === "transfer" ? "Dompet Asal" : "Dompet"}
                   </label>
                   <select
                     value={walletId}
                     onChange={(e) => setWalletId(e.target.value)}
                     required
-                    className="mt-1 block w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2.5 text-xs text-slate-200 focus:border-blue-500 focus:outline-none"
+                    className="mt-1 block w-full rounded-xl border border-surface-border bg-surface px-3 py-2.5 text-xs font-medium text-espresso focus:border-terracotta focus:outline-none"
                   >
                     {wallets?.map((w: any) => (
                       <option key={w.id} value={w.id}>
@@ -693,12 +697,12 @@ export default function DashboardPage() {
 
                 {modalType === "transfer" && (
                   <div>
-                    <label className="block text-xs font-medium text-slate-300">Dompet Tujuan</label>
+                    <label className="block text-xs font-semibold text-espresso">Dompet Tujuan</label>
                     <select
                       value={destWalletId}
                       onChange={(e) => setDestWalletId(e.target.value)}
                       required
-                      className="mt-1 block w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2.5 text-xs text-slate-200 focus:border-blue-500 focus:outline-none"
+                      className="mt-1 block w-full rounded-xl border border-surface-border bg-surface px-3 py-2.5 text-xs font-medium text-espresso focus:border-terracotta focus:outline-none"
                     >
                       {wallets
                         ?.filter((w: any) => w.id !== walletId)
@@ -714,13 +718,13 @@ export default function DashboardPage() {
 
               {/* Deskripsi / Catatan */}
               <div>
-                <label className="block text-xs font-medium text-slate-300">Catatan / Deskripsi (Opsional)</label>
+                <label className="block text-xs font-semibold text-espresso">Catatan / Deskripsi (Opsional)</label>
                 <input
                   type="text"
                   placeholder="misal: Makan siang, Uang saku ortu, Beli kopi..."
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="mt-1 block w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs text-slate-200 placeholder:text-slate-600 focus:border-blue-500 focus:outline-none"
+                  className="mt-1 block w-full rounded-xl border border-surface-border bg-surface px-3 py-2 text-xs font-medium text-espresso placeholder:text-espresso-muted/40 focus:border-terracotta focus:outline-none"
                 />
               </div>
 
@@ -728,7 +732,7 @@ export default function DashboardPage() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full rounded-xl bg-blue-600 py-3 text-xs font-bold text-white shadow-lg shadow-blue-500/20 hover:bg-blue-500 transition disabled:opacity-50"
+                className="w-full rounded-xl bg-terracotta py-3 text-xs font-bold text-white shadow-lg shadow-terracotta/20 hover:bg-terracotta-hover transition disabled:opacity-50"
               >
                 {isSubmitting ? (
                   <span className="flex items-center justify-center gap-1.5">
