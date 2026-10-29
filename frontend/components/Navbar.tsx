@@ -31,7 +31,7 @@ export function Navbar() {
   const navItems = [
     { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { label: "Proyeksi", href: "/forecast", icon: Compass },
-    { label: "AI Assistant", href: "/ai-assistant", icon: Sparkles, highlight: true },
+    { label: "Fin AI", href: "/ai-assistant", icon: Sparkles, highlight: true },
     { label: "Transaksi", href: "/transactions", icon: Receipt },
     { label: "Pengaturan", href: "/settings", icon: Settings },
   ];

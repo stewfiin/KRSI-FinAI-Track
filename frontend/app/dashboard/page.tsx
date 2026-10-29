@@ -15,6 +15,7 @@ import {
   Mic,
   Globe,
   Plus,
+  Minus,
   X,
   Loader2,
   Tag,
@@ -76,7 +77,7 @@ export default function DashboardPage() {
 
   const formatIDR = (val: number | string | undefined) => {
     if (val === undefined || val === null) return "Rp0";
-    if (mounted && isBalanceHidden) return "••••••••";
+    if (isBalanceHidden) return "••••••••";
     const num = typeof val === "string" ? parseFloat(val) : val;
     return `Rp${num.toLocaleString("id-ID")}`;
   };
@@ -185,8 +186,8 @@ export default function DashboardPage() {
       </div>
 
       {/* 2. Total Saldo & Financial Overview Card */}
-      <div className="relative overflow-hidden rounded-3xl border border-surface-border bg-gradient-to-br from-surface to-surface-card p-6 shadow-md">
-        <div className="relative z-10 flex flex-col justify-between gap-6 sm:flex-row sm:items-center">
+      <div className="relative overflow-hidden rounded-3xl border border-surface-border bg-gradient-to-br from-surface to-surface-card p-5 sm:p-6 shadow-sm">
+        <div className="relative z-10 flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold tracking-wider text-espresso-muted uppercase">
@@ -195,48 +196,39 @@ export default function DashboardPage() {
               <button
                 type="button"
                 onClick={toggleBalanceHidden}
-                className="text-espresso-muted hover:text-espresso transition"
-                title={isBalanceHidden ? "Tampilkan Saldo" : "Sembunyikan Saldo"}
+                className="flex items-center justify-center h-6 w-6 rounded-md text-espresso-muted hover:text-espresso hover:bg-espresso/5 transition"
+                title={isBalanceHidden ? "Tampilkan nominal (Sensor aktif)" : "Sembunyikan nominal (Sensor nonaktif)"}
+                aria-label={isBalanceHidden ? "Tampilkan Saldo" : "Sembunyikan Saldo"}
               >
                 {isBalanceHidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
-            <h2 className="mt-2 text-3xl font-extrabold tracking-tight text-espresso sm:text-4xl">
+            <h2 className="mt-1.5 text-3xl font-extrabold tracking-tight text-espresso sm:text-4xl">
               {formatIDR(summary?.total_balance)}
             </h2>
           </div>
 
-          {/* Mini Cashflow Metrics - Klik untuk langsung buka modal */}
-          <div className="flex items-center gap-4">
-            <button
-              type="button"
-              onClick={() => openTransactionModal("income")}
-              title="Klik untuk catat pemasukan baru"
-              className="text-left rounded-2xl border border-income/30 bg-income-bg px-4 py-2.5 transition hover:bg-income/20 active:scale-95"
-            >
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-income">
+          {/* Mini Cashflow Metrics - Status Ringkasan Arus Kas Bulan Ini (Indikator informatif, bukan tombol duplikat) */}
+          <div className="grid grid-cols-2 gap-2.5 sm:flex sm:items-center sm:gap-3">
+            <div className="rounded-2xl border border-income/25 bg-income-bg/70 px-3.5 py-2.5 sm:px-4 sm:py-2.5">
+              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-income">
                 <TrendingUp className="h-3.5 w-3.5" />
-                <span>Pemasukan</span>
+                <span>Pemasukan Bln Ini</span>
               </div>
               <span className="mt-1 block text-sm font-bold text-espresso">
                 {formatIDR(summary?.monthly_income)}
               </span>
-            </button>
+            </div>
 
-            <button
-              type="button"
-              onClick={() => openTransactionModal("expense")}
-              title="Klik untuk catat pengeluaran baru"
-              className="text-left rounded-2xl border border-expense/30 bg-expense-bg px-4 py-2.5 transition hover:bg-expense/20 active:scale-95"
-            >
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-expense">
+            <div className="rounded-2xl border border-expense/25 bg-expense-bg/70 px-3.5 py-2.5 sm:px-4 sm:py-2.5">
+              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-expense">
                 <TrendingDown className="h-3.5 w-3.5" />
-                <span>Pengeluaran</span>
+                <span>Pengeluaran Bln Ini</span>
               </div>
               <span className="mt-1 block text-sm font-bold text-espresso">
                 {formatIDR(summary?.monthly_expense)}
               </span>
-            </button>
+            </div>
           </div>
         </div>
 
@@ -244,33 +236,39 @@ export default function DashboardPage() {
         <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-amber/15 blur-3xl pointer-events-none" />
       </div>
 
-      {/* 3. Tombol Aksi Cepat Terpadu (1 UI Langsung Masuk / Keluar / Transfer) */}
-      <div className="grid grid-cols-3 gap-3">
+      {/* 3. Tombol Aksi Cepat Terpadu (Modern, Clean & High-Affordance Input Buttons) */}
+      <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
         <button
           type="button"
           onClick={() => openTransactionModal("income")}
-          className="flex items-center justify-center gap-2 rounded-2xl border border-income/30 bg-income/10 p-3 text-xs font-bold text-income shadow-sm transition hover:bg-income/20 active:scale-95"
+          className="group flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2.5 rounded-2xl border border-income/30 bg-surface px-3 py-3 shadow-xs hover:border-income hover:bg-income/5 hover:shadow-sm active:scale-95 transition-all"
         >
-          <TrendingUp className="h-4 w-4" />
-          <span>+ Pemasukan</span>
+          <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-income/15 text-income group-hover:scale-105 transition-transform">
+            <Plus className="h-4 w-4 stroke-[2.5]" />
+          </div>
+          <span className="text-xs sm:text-sm font-bold text-espresso">Masuk</span>
         </button>
 
         <button
           type="button"
           onClick={() => openTransactionModal("expense")}
-          className="flex items-center justify-center gap-2 rounded-2xl border border-expense/30 bg-expense/10 p-3 text-xs font-bold text-expense shadow-sm transition hover:bg-expense/20 active:scale-95"
+          className="group flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2.5 rounded-2xl border border-expense/30 bg-surface px-3 py-3 shadow-xs hover:border-expense hover:bg-expense/5 hover:shadow-sm active:scale-95 transition-all"
         >
-          <TrendingDown className="h-4 w-4" />
-          <span>- Pengeluaran</span>
+          <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-expense/15 text-expense group-hover:scale-105 transition-transform">
+            <Minus className="h-4 w-4 stroke-[2.5]" />
+          </div>
+          <span className="text-xs sm:text-sm font-bold text-espresso">Keluar</span>
         </button>
 
         <button
           type="button"
           onClick={() => openTransactionModal("transfer")}
-          className="flex items-center justify-center gap-2 rounded-2xl border border-amber/40 bg-amber/15 p-3 text-xs font-bold text-espresso shadow-sm transition hover:bg-amber/25 active:scale-95"
+          className="group flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2.5 rounded-2xl border border-amber/40 bg-surface px-3 py-3 shadow-xs hover:border-amber hover:bg-amber/10 hover:shadow-sm active:scale-95 transition-all"
         >
-          <ArrowRightLeft className="h-4 w-4 text-terracotta" />
-          <span>⇄ Transfer</span>
+          <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-amber/20 text-terracotta group-hover:scale-105 transition-transform">
+            <ArrowRightLeft className="h-4 w-4 stroke-[2.5]" />
+          </div>
+          <span className="text-xs sm:text-sm font-bold text-espresso">Transfer</span>
         </button>
       </div>
 
