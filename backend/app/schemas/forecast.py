@@ -77,6 +77,7 @@ class FixedExpenseBase(BaseModel):
     name: str = Field(..., max_length=150, description="Nama pengeluaran pasti (cth: iCloud, Pulsa, Token)")
     amount: Decimal = Field(..., gt=0, description="Nominal tagihan per siklus")
     category_id: Optional[uuid.UUID] = None
+    wallet_id: Optional[uuid.UUID] = Field(default=None, description="Dompet pembayar khusus (misal: Subscription / BCA)")
     due_day_of_month: Optional[int] = Field(default=None, ge=1, le=31)
     frequency: str = Field(default="monthly")
     is_paid_this_cycle: bool = Field(default=False)
@@ -90,6 +91,7 @@ class FixedExpenseUpdate(BaseModel):
     name: Optional[str] = None
     amount: Optional[Decimal] = None
     category_id: Optional[uuid.UUID] = None
+    wallet_id: Optional[uuid.UUID] = None
     due_day_of_month: Optional[int] = Field(default=None, ge=1, le=31)
     frequency: Optional[str] = None
     is_paid_this_cycle: Optional[bool] = None
@@ -99,6 +101,7 @@ class FixedExpenseResponse(FixedExpenseBase):
     id: uuid.UUID
     user_id: uuid.UUID
     category_name: Optional[str] = None
+    wallet_name: Optional[str] = None
     last_paid_at: Optional[datetime] = None
     created_at: datetime
 
@@ -239,6 +242,8 @@ class ForecastSummaryResponse(BaseModel):
     fixed_obligations: FixedObligationsSummary
     end_of_month_forecast: EndOfMonthForecast
     savings_pool_balance: Decimal
+    current_savings_balance: Decimal = Decimal("0.00")
+    subscription_pool_balance: Decimal = Decimal("0.00")
     safe_to_spend_total: Decimal
     income_streams: List[IncomeStreamResponse] = []
     total_monthly_income_estimated: Decimal = Decimal("0.00")

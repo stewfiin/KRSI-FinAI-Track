@@ -47,7 +47,11 @@ class ForecastService:
         user_id: uuid.UUID,
     ) -> FinancialPlan:
         """Mengambil blueprint rencana keuangan user atau membuat default blueprint jika belum ada."""
-        query = select(FinancialPlan).where(FinancialPlan.user_id == user_id, FinancialPlan.is_active == True)
+        query = (
+            select(FinancialPlan)
+            .where(FinancialPlan.user_id == user_id, FinancialPlan.is_active == True)
+            .order_by(desc(FinancialPlan.created_at))
+        )
         res = await session.exec(query)
         plan = res.first()
 
@@ -66,31 +70,7 @@ class ForecastService:
             await session.commit()
             await session.refresh(plan)
 
-            # Inisialisasi template pengeluaran pasti jika belum ada sama sekali
-            await ForecastService._seed_default_fixed_expenses_if_empty(session, user_id)
-
         return plan
-
-    @staticmethod
-    async def _seed_default_fixed_expenses_if_empty(
-        session: AsyncSession,
-        user_id: uuid.UUID,
-    ) -> None:
-        """Membantu user mengawali pengeluaran pasti (merujuk ke template spreadsheet user)."""
-        check_query = select(func.count(FixedExpense.id)).where(FixedExpense.user_id == user_id)
-        count = (await session.exec(check_query)).one()
-        if count == 0:
-            default_items = [
-                ("iCloud", Decimal("170000.00")),
-                ("Pulsa", Decimal("66000.00")),
-                ("Galon Air", Decimal("94000.00")),
-                ("Bensin Rutin", Decimal("198000.00")),
-                ("Token Listrik", Decimal("53000.00")),
-                ("Laundry", Decimal("64000.00")),
-            ]
-            for name, amt in default_items:
-                session.add(FixedExpense(user_id=user_id, name=name, amount=amt, frequency="monthly"))
-            await session.commit()
 
     @staticmethod
     def get_cycle_dates(cycle_start_day: int, target_date: Optional[date] = None) -> Tuple[date, date]:
@@ -197,17 +177,22 @@ class ForecastService:
         # Pendapatan efektif: Jika user mendefinisikan income streams, gunakan total setara bulanan; jika tidak, gunakan blueprint lama
         effective_monthly_income = total_stream_equivalent if total_stream_equivalent > 0 else plan.monthly_income
 
-        # 2. Dompet Operasional vs Pool Tabungan
+        # 2. Dompet Operasional vs Pool Tabungan vs Pool Tagihan (Subscription)
         wallets_res = await session.exec(select(Wallet).where(Wallet.user_id == user_id))
         wallets = wallets_res.all()
+        wallet_map = {w.id: w for w in wallets}
 
         savings_balance = Decimal("0.00")
+        subscription_balance = Decimal("0.00")
         operational_balance = Decimal("0.00")
 
         for w in wallets:
+            w_purpose = getattr(w, "purpose", "operational") or "operational"
             w_name = w.name.lower()
-            if "tabung" in w_name or "saving" in w_name or "darurat" in w_name:
+            if w_purpose == "savings" or "saving" in w_name or "anniv" in w_name or "tabung" in w_name:
                 savings_balance += w.balance
+            elif w_purpose == "subscription" or "subscrip" in w_name or "tagihan" in w_name:
+                subscription_balance += w.balance
             else:
                 operational_balance += w.balance
 
@@ -216,11 +201,35 @@ class ForecastService:
         fixed_items = fixed_res.all()
 
         total_monthly_fixed = sum((f.amount for f in fixed_items), Decimal("0.00"))
-        unpaid_fixed_buffer = sum((f.amount for f in fixed_items if not f.is_paid_this_cycle), Decimal("0.00"))
-        paid_fixed = total_monthly_fixed - unpaid_fixed_buffer
+        unpaid_fixed_items = [f for f in fixed_items if not f.is_paid_this_cycle]
+        paid_fixed = total_monthly_fixed - sum((f.amount for f in unpaid_fixed_items), Decimal("0.00"))
 
-        # Saldo Operasional Bebas (setelah mencadangkan tagihan pasti yang belum dibayar)
-        safe_to_spend_total = max(Decimal("0.00"), operational_balance - unpaid_fixed_buffer)
+        # Pisahkan buffer tagihan: apakah ditanggung dompet subscription atau dompet operasional?
+        unpaid_sub_buffer = Decimal("0.00")
+        unpaid_op_buffer = Decimal("0.00")
+
+        for f in unpaid_fixed_items:
+            assigned_wallet = wallet_map.get(f.wallet_id) if f.wallet_id else None
+            is_sub_wallet = (
+                assigned_wallet
+                and (
+                    getattr(assigned_wallet, "purpose", "") == "subscription"
+                    or "subscrip" in assigned_wallet.name.lower()
+                    or "tagihan" in assigned_wallet.name.lower()
+                )
+            )
+            if is_sub_wallet or (f.wallet_id is None and subscription_balance > 0):
+                unpaid_sub_buffer += f.amount
+            else:
+                unpaid_op_buffer += f.amount
+
+        # Jika saldo subscription kurang untuk tagihannya, kekurangannya meluber ke operasional
+        sub_deficit = max(Decimal("0.00"), unpaid_sub_buffer - subscription_balance)
+        effective_op_unpaid_buffer = unpaid_op_buffer + sub_deficit
+        unpaid_fixed_buffer = unpaid_sub_buffer + unpaid_op_buffer
+
+        # Saldo Operasional Bebas (setelah mencadangkan tagihan pasti yang memotong operasional)
+        safe_to_spend_total = max(Decimal("0.00"), operational_balance - effective_op_unpaid_buffer)
 
         # 4. Transaksi Pengeluaran Siklus Berjalan
         tx_query = select(Transaction).where(
@@ -238,15 +247,21 @@ class ForecastService:
         # 5. Perhitungan Plafon Pengeluaran Ideal Hari Ini (Adaptive Daily Runway)
         # Anggaran hidup operasional per siklus = Pendapatan - Tagihan Pasti - Target Tabungan
         total_operational_budget = effective_monthly_income - total_monthly_fixed - plan.monthly_savings_target
-        if total_operational_budget <= 0:
-            total_operational_budget = plan.daily_living_budget * Decimal(str(total_cycle_days))
 
-        # Sisa jatah belanja operasional yang tersisa dari budget
+        # Sisa jatah belanja operasional yang tersisa dari budget blueprint
         remaining_cycle_allowance = total_operational_budget - spent_past
 
-        # Ideal spending per hari untuk sisa hari berjalan
-        if remaining_cycle_allowance > 0 and days_remaining > 0:
+        # Hitung ideal spending per hari berbasis dompet operasional riil & blueprint
+        if safe_to_spend_total > 0 and days_remaining > 0:
+            daily_cash_runway = safe_to_spend_total / Decimal(str(days_remaining))
+            if plan.daily_living_budget > 0:
+                ideal_spending_today = min(plan.daily_living_budget, daily_cash_runway)
+            else:
+                ideal_spending_today = daily_cash_runway
+        elif remaining_cycle_allowance > 0 and days_remaining > 0:
             ideal_spending_today = remaining_cycle_allowance / Decimal(str(days_remaining))
+        elif plan.daily_living_budget > 0:
+            ideal_spending_today = plan.daily_living_budget
         else:
             ideal_spending_today = Decimal("0.00")
 
@@ -280,7 +295,9 @@ class ForecastService:
         current_burn_rate_daily = (recent_tx_sum / Decimal(str(recent_days_count))).quantize(Decimal("1.00"))
 
         if current_burn_rate_daily <= 0:
-            current_burn_rate_daily = plan.daily_living_budget
+            current_burn_rate_daily = (
+                ideal_spending_today if ideal_spending_today > 0 else Decimal("30000.00")
+            )
 
         # Berapa hari uang operasional bertahan jika burn rate dipertahankan?
         if current_burn_rate_daily > 0:
@@ -297,32 +314,33 @@ class ForecastService:
             days_short = float(days_remaining) - predicted_runway_days
             status_label = f"Waspada! Uang diprediksi habis {days_short:.0f} hari sebelum akhir siklus"
 
-        # 6. End of Month Forecast (Proyeksi Tabungan & Saldo Akhir)
-        # Estimasi total pengeluaran operasional hingga akhir siklus
-        estimated_future_spent = current_burn_rate_daily * Decimal(str(days_remaining))
-        total_projected_spent = spent_past + estimated_future_spent
-
-        # Estimasi tabungan yang berhasil disisihkan di akhir bulan
-        projected_end_savings = plan.monthly_income - total_monthly_fixed - total_projected_spent
+        # 6. End of Month Forecast (Proyeksi Tabungan & Saldo Akhir Berbasis Dompet Tabungan Nyata)
+        # Tabungan tersimpan nyata saat ini di dompet savings
+        operational_remaining = max(
+            Decimal("0.00"),
+            safe_to_spend_total - (current_burn_rate_daily * Decimal(str(days_remaining))),
+        )
+        # Proyeksi tabungan akhir = Saldo Tabungan Nyata + Sisa Operasional (jika ada surplus)
+        projected_end_savings = savings_balance + operational_remaining
         savings_delta = projected_end_savings - plan.monthly_savings_target
 
         if projected_end_savings >= plan.monthly_savings_target:
             forecast_status = "on_track"
             advice = (
-                f"Laju belanja Anda sangat sehat! Anda diproyeksikan mencapai target tabungan penuh "
-                f"Rp{projected_end_savings:,.0f} (+Rp{savings_delta:,.0f} surplus)."
+                f"Laju tabungan Anda aman! Tabungan Anda saat ini Rp{savings_balance:,.0f} dan diproyeksikan "
+                f"mencapai Rp{projected_end_savings:,.0f} di akhir bulan."
             )
         elif projected_end_savings >= (plan.monthly_savings_target * Decimal("0.7")):
             forecast_status = "warning"
             advice = (
-                f"Pengeluaran sedikit di atas target ideal. Tabungan diproyeksikan tersisa Rp{projected_end_savings:,.0f} "
-                f"(-Rp{abs(savings_delta):,.0f} dari target)."
+                f"Tabungan saat ini Rp{savings_balance:,.0f} dari target Rp{plan.monthly_savings_target:,.0f}. "
+                f"Perketat belanja operasional agar target tabungan tercapai penuh."
             )
         else:
             forecast_status = "deficit"
             advice = (
-                f"Peringatan laju pengeluaran tinggi! Jika kecepatan belanja tidak diturunkan, "
-                f"target tabungan terancam tidak tercapai atau defisit."
+                f"Tabungan saat ini Rp{savings_balance:,.0f} dari target Rp{plan.monthly_savings_target:,.0f}. "
+                f"Sisihkan lebih awal begitu pemasukan tiba."
             )
 
         # 7. Format Fixed Expense Responses
@@ -340,6 +358,8 @@ class ForecastService:
                 amount=f.amount,
                 category_id=f.category_id,
                 category_name=cat_map.get(f.category_id),
+                wallet_id=f.wallet_id,
+                wallet_name=wallet_map[f.wallet_id].name if f.wallet_id and f.wallet_id in wallet_map else None,
                 due_day_of_month=f.due_day_of_month,
                 frequency=f.frequency,
                 is_paid_this_cycle=f.is_paid_this_cycle,
@@ -388,6 +408,8 @@ class ForecastService:
                 advice=advice,
             ),
             savings_pool_balance=savings_balance,
+            current_savings_balance=savings_balance,
+            subscription_pool_balance=subscription_balance,
             safe_to_spend_total=safe_to_spend_total,
             income_streams=stream_responses,
             total_monthly_income_estimated=effective_monthly_income,
@@ -624,16 +646,70 @@ class ForecastService:
         user_id: uuid.UUID,
         expense_id: uuid.UUID,
     ) -> FixedExpenseResponse:
-        """1-Tap Toggle status lunas tagihan pasti bulanan."""
+        """1-Tap Toggle status lunas tagihan pasti bulanan dengan debit dompet & pencatatan transaksi otomatis."""
         expense = await session.get(FixedExpense, expense_id)
         if not expense or expense.user_id != user_id:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tagihan tidak ditemukan.")
 
         expense.is_paid_this_cycle = not expense.is_paid_this_cycle
+
+        target_wallet = None
+        if expense.wallet_id:
+            target_wallet = await session.get(Wallet, expense.wallet_id)
+
         if expense.is_paid_this_cycle:
             expense.last_paid_at = datetime.now(timezone.utc)
+            # Jika terikat ke dompet, potong saldo dompet dan catat transaksi pengeluaran
+            if target_wallet:
+                target_wallet.balance -= expense.amount
+                session.add(target_wallet)
+
+                # Pastikan category_id tidak null untuk constraint tabel transactions
+                cat_id = expense.category_id
+                if not cat_id:
+                    default_cat = (await session.exec(
+                        select(Category).where(
+                            Category.user_id == user_id,
+                            Category.type == "expense"
+                        )
+                    )).first()
+                    if not default_cat:
+                        default_cat = Category(
+                            user_id=user_id,
+                            name="Tagihan & Langganan",
+                            type="expense",
+                            color="#F4AE52",
+                        )
+                        session.add(default_cat)
+                        await session.flush()
+                    cat_id = default_cat.id
+                    expense.category_id = cat_id
+
+                tx = Transaction(
+                    user_id=user_id,
+                    wallet_id=target_wallet.id,
+                    category_id=cat_id,
+                    amount=expense.amount,
+                    type=TransactionType.EXPENSE,
+                    description=f"Pembayaran tagihan: {expense.name}",
+                    transaction_date=date.today(),
+                )
+                session.add(tx)
+                await session.flush()
+                expense.paid_transaction_id = tx.id
         else:
             expense.last_paid_at = None
+            # Jika sebelumnya ada transaksi otomatis yang tercatat, refund saldo dompet & hapus transaksi
+            if expense.paid_transaction_id:
+                tx = await session.get(Transaction, expense.paid_transaction_id)
+                if tx:
+                    if tx.wallet_id:
+                        tx_wallet = await session.get(Wallet, tx.wallet_id)
+                        if tx_wallet:
+                            tx_wallet.balance += tx.amount
+                            session.add(tx_wallet)
+                    await session.delete(tx)
+                expense.paid_transaction_id = None
 
         session.add(expense)
         await session.commit()
@@ -644,6 +720,11 @@ class ForecastService:
             cat = await session.get(Category, expense.category_id)
             cat_name = cat.name if cat else None
 
+        wallet_name = None
+        if expense.wallet_id:
+            w = await session.get(Wallet, expense.wallet_id)
+            wallet_name = w.name if w else None
+
         return FixedExpenseResponse(
             id=expense.id,
             user_id=expense.user_id,
@@ -651,6 +732,8 @@ class ForecastService:
             amount=expense.amount,
             category_id=expense.category_id,
             category_name=cat_name,
+            wallet_id=expense.wallet_id,
+            wallet_name=wallet_name,
             due_day_of_month=expense.due_day_of_month,
             frequency=expense.frequency,
             is_paid_this_cycle=expense.is_paid_this_cycle,

@@ -121,6 +121,9 @@ async def list_fixed_expenses(
     res = await session.exec(query)
     items = res.all()
 
+    wallets_res = await session.exec(select(Wallet).where(Wallet.user_id == current_user.id))
+    wallet_map = {w.id: w.name for w in wallets_res.all()}
+
     results = []
     for item in items:
         cat_name = None
@@ -136,6 +139,8 @@ async def list_fixed_expenses(
                 amount=item.amount,
                 category_id=item.category_id,
                 category_name=cat_name,
+                wallet_id=item.wallet_id,
+                wallet_name=wallet_map.get(item.wallet_id),
                 due_day_of_month=item.due_day_of_month,
                 frequency=item.frequency,
                 is_paid_this_cycle=item.is_paid_this_cycle,
@@ -161,6 +166,7 @@ async def create_fixed_expense(
         name=payload.name,
         amount=payload.amount,
         category_id=payload.category_id,
+        wallet_id=payload.wallet_id,
         due_day_of_month=payload.due_day_of_month,
         frequency=payload.frequency,
         is_paid_this_cycle=payload.is_paid_this_cycle,
@@ -174,6 +180,11 @@ async def create_fixed_expense(
         cat = await session.get(Category, item.category_id)
         cat_name = cat.name if cat else None
 
+    wallet_name = None
+    if item.wallet_id:
+        w = await session.get(Wallet, item.wallet_id)
+        wallet_name = w.name if w else None
+
     return FixedExpenseResponse(
         id=item.id,
         user_id=item.user_id,
@@ -181,6 +192,8 @@ async def create_fixed_expense(
         amount=item.amount,
         category_id=item.category_id,
         category_name=cat_name,
+        wallet_id=item.wallet_id,
+        wallet_name=wallet_name,
         due_day_of_month=item.due_day_of_month,
         frequency=item.frequency,
         is_paid_this_cycle=item.is_paid_this_cycle,
@@ -218,6 +231,17 @@ async def delete_fixed_expense(
     item = await session.get(FixedExpense, expense_id)
     if not item or item.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tagihan tidak ditemukan.")
+
+    if item.paid_transaction_id:
+        tx = await session.get(Transaction, item.paid_transaction_id)
+        if tx:
+            if tx.wallet_id:
+                w = await session.get(Wallet, tx.wallet_id)
+                if w:
+                    w.balance += tx.amount
+                    session.add(w)
+            await session.delete(tx)
+
     await session.delete(item)
     await session.commit()
     return {"ok": True}

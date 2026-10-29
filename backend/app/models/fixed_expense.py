@@ -32,6 +32,19 @@ class FixedExpense(SQLModel, table=True):
         nullable=True,
         ondelete="SET NULL",
     )
+    wallet_id: Optional[uuid.UUID] = Field(
+        default=None,
+        foreign_key="wallets.id",
+        index=True,
+        nullable=True,
+        ondelete="SET NULL",
+    )
+    paid_transaction_id: Optional[uuid.UUID] = Field(
+        default=None,
+        foreign_key="transactions.id",
+        nullable=True,
+        ondelete="SET NULL",
+    )
     name: str = Field(nullable=False, max_length=150)
     amount: Decimal = Field(
         sa_column=Column(Numeric(15, 2), nullable=False),

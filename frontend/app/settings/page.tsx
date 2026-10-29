@@ -37,6 +37,7 @@ export default function SettingsPage() {
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
   const [walletName, setWalletName] = useState("");
   const [walletType, setWalletType] = useState<"cash" | "bank" | "ewallet">("bank");
+  const [walletPurpose, setWalletPurpose] = useState<"operational" | "savings" | "subscription">("operational");
   const [walletBalance, setWalletBalance] = useState("0");
 
   // New Category Modal State
@@ -112,11 +113,13 @@ export default function SettingsPage() {
       await api.post("/api/v1/wallets", {
         name: walletName.trim(),
         type: walletType,
+        purpose: walletPurpose,
         balance: parseFloat(walletBalance) || 0,
       });
       setIsWalletModalOpen(false);
       setWalletName("");
       setWalletBalance("0");
+      setWalletPurpose("operational");
       refetchWallets();
     } catch (err: any) {
       alert(err.response?.data?.detail || "Gagal menambah dompet.");
@@ -265,7 +268,20 @@ export default function SettingsPage() {
             >
               <div>
                 <span className="text-xs font-bold text-espresso block">{w.name}</span>
-                <span className="text-[10px] text-espresso-muted uppercase">{w.type}</span>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="text-[10px] text-espresso-muted uppercase">{w.type}</span>
+                  <span
+                    className={`rounded-md px-1.5 py-0.2 text-[9px] font-bold border ${
+                      w.purpose === "savings"
+                        ? "bg-income/15 text-income border-income/30"
+                        : w.purpose === "subscription"
+                        ? "bg-amber/20 text-terracotta border-amber/40"
+                        : "bg-surface text-espresso-muted border-surface-border"
+                    }`}
+                  >
+                    {w.purpose === "savings" ? "Tabungan" : w.purpose === "subscription" ? "Tagihan" : "Operasional"}
+                  </span>
+                </div>
               </div>
               <span className="text-xs font-bold text-espresso">
                 Rp{parseFloat(w.balance).toLocaleString("id-ID")}
@@ -435,6 +451,24 @@ export default function SettingsPage() {
                   <option value="bank">Bank</option>
                   <option value="ewallet">E-Wallet</option>
                 </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-espresso mb-1">
+                  Peruntukan Dompet (Amplop / Pocket)
+                </label>
+                <select
+                  value={walletPurpose}
+                  onChange={(e: any) => setWalletPurpose(e.target.value)}
+                  className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs font-medium text-espresso focus:outline-none focus:border-terracotta"
+                >
+                  <option value="operational">Operasional (Uang jajan / belanja harian bebas)</option>
+                  <option value="savings">Tabungan (Disimpan khusus / dana darurat / impian)</option>
+                  <option value="subscription">Tagihan / Langganan (Khusus bayar cicilan / tagihan rutin)</option>
+                </select>
+                <span className="text-[10px] text-espresso-muted mt-1 block leading-tight">
+                  Sistem proyeksi akan memisahkan saldo tabungan nyata & tagihan agar tidak tercampur ke batas jajan harian.
+                </span>
               </div>
 
               <div>

@@ -29,6 +29,7 @@ class Wallet(SQLModel, table=True):
     )
     name: str = Field(nullable=False, max_length=100)
     type: WalletType = Field(default=WalletType.CASH, nullable=False)
+    purpose: str = Field(default="operational", max_length=30)  # operational | savings | subscription
     balance: Decimal = Field(
         default=Decimal("0.00"),
         sa_column=Column(Numeric(15, 2), default=0.00, nullable=False),

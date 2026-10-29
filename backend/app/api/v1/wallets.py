@@ -33,6 +33,7 @@ async def create_wallet(
         user_id=current_user.id,
         name=payload.name.strip(),
         type=payload.type,
+        purpose=payload.purpose or "operational",
         balance=payload.balance,
     )
     session.add(new_wallet)
@@ -74,6 +75,8 @@ async def update_wallet(
         wallet.name = payload.name.strip()
     if payload.type is not None:
         wallet.type = payload.type
+    if payload.purpose is not None:
+        wallet.purpose = payload.purpose
     if payload.balance is not None:
         wallet.balance = payload.balance
 

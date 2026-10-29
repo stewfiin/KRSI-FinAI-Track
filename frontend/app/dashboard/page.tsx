@@ -295,9 +295,22 @@ export default function DashboardPage() {
                 <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-terracotta/10 text-terracotta">
                   <WalletIcon className="h-4 w-4" />
                 </div>
-                <span className="rounded-md bg-surface-card px-2 py-0.5 text-[10px] font-semibold text-espresso-muted border border-surface-border uppercase">
-                  {wallet.type}
-                </span>
+                <div className="flex items-center gap-1">
+                  <span className="rounded-md bg-surface-card px-2 py-0.5 text-[10px] font-semibold text-espresso-muted border border-surface-border uppercase">
+                    {wallet.type}
+                  </span>
+                  {wallet.purpose && wallet.purpose !== "operational" && (
+                    <span
+                      className={`rounded-md px-1.5 py-0.5 text-[9px] font-bold border ${
+                        wallet.purpose === "savings"
+                          ? "bg-income/15 text-income border-income/30"
+                          : "bg-amber/20 text-terracotta border-amber/40"
+                      }`}
+                    >
+                      {wallet.purpose === "savings" ? "Tabungan" : "Tagihan"}
+                    </span>
+                  )}
+                </div>
               </div>
               <span className="mt-3 block text-xs font-medium text-espresso-muted truncate">
                 {wallet.name}
@@ -627,8 +640,8 @@ export default function DashboardPage() {
                 <label className="block text-xs font-semibold text-espresso">Nominal (Rp)</label>
                 <input
                   type="number"
-                  step="1000"
                   min="1"
+                  step="any"
                   required
                   placeholder="0"
                   value={amount}

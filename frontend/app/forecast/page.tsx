@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Compass,
   TrendingUp,
@@ -42,10 +42,13 @@ export default function ForecastPage() {
   const [streamReceiveDay, setStreamReceiveDay] = useState(0); // 0=Senin, 1..31=Tanggal
   const [isSavingStream, setIsSavingStream] = useState(false);
 
+  const queryClient = useQueryClient();
+
   // Add Fixed Expense Modal State
   const [isAddFixedModalOpen, setIsAddFixedModalOpen] = useState(false);
   const [fixedName, setFixedName] = useState("");
   const [fixedAmount, setFixedAmount] = useState("");
+  const [fixedWalletId, setFixedWalletId] = useState("");
   const [isSavingFixed, setIsSavingFixed] = useState(false);
 
   // Add Wishlist Modal State
@@ -112,6 +115,11 @@ export default function ForecastPage() {
   } = useQuery({
     queryKey: ["forecast-income-streams"],
     queryFn: async () => (await api.get("/api/v1/forecast/income-streams")).data,
+  });
+
+  const { data: wallets } = useQuery({
+    queryKey: ["wallets"],
+    queryFn: async () => (await api.get("/api/v1/wallets")).data,
   });
 
   const formatIDR = (val: number | string | undefined) => {
@@ -186,6 +194,8 @@ export default function ForecastPage() {
     try {
       await api.post(`/api/v1/forecast/fixed-expenses/${id}/toggle-paid`);
       refetchSummary();
+      queryClient.invalidateQueries({ queryKey: ["wallets"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
     } catch (err: any) {
       alert("Gagal memperbarui status tagihan.");
     }
@@ -199,13 +209,15 @@ export default function ForecastPage() {
       await api.post("/api/v1/forecast/fixed-expenses", {
         name: fixedName.trim(),
         amount: parseFloat(fixedAmount),
+        wallet_id: fixedWalletId || null,
       });
       setIsAddFixedModalOpen(false);
       setFixedName("");
       setFixedAmount("");
+      setFixedWalletId("");
       refetchSummary();
     } catch (err: any) {
-      alert("Gagal menambah tagihan pasti.");
+      alert(err.response?.data?.detail || "Gagal menambah tagihan pasti.");
     } finally {
       setIsSavingFixed(false);
     }
@@ -362,28 +374,44 @@ export default function ForecastPage() {
             <div className="rounded-2xl border border-surface-border bg-surface p-2.5">
               <div className="flex items-center gap-1.5 text-espresso-muted text-[11px]">
                 <Clock className="h-3.5 w-3.5 text-terracotta" />
-                <span>Daya Tahan Uang</span>
+                <span>Saldo Operasional Bebas</span>
               </div>
               <span className="mt-1 block text-sm font-extrabold text-espresso">
-                {summary.runway_prediction.predicted_runway_days} Hari
+                {formatIDR(summary.safe_to_spend_total)}
               </span>
               <span className="text-[10px] text-espresso-muted block truncate">
-                {summary.runway_prediction.is_runway_safe ? "✅ Cukup sampai gajian" : "⚠️ Cepat habis!"}
+                Daya tahan: <strong>{summary.runway_prediction.predicted_runway_days} Hari</strong> {summary.runway_prediction.is_runway_safe ? "✅" : "⚠️"}
               </span>
             </div>
 
             <div className="rounded-2xl border border-surface-border bg-surface p-2.5">
               <div className="flex items-center gap-1.5 text-espresso-muted text-[11px]">
                 <Sparkles className="h-3.5 w-3.5 text-income" />
-                <span>Prediksi Tabungan</span>
+                <span>Tabungan Tersimpan</span>
               </div>
               <span className="mt-1 block text-sm font-extrabold text-income">
-                {formatIDR(summary.end_of_month_forecast.projected_end_savings)}
+                {formatIDR(summary.current_savings_balance ?? summary.savings_pool_balance)}
               </span>
               <span className="text-[10px] text-espresso-muted block truncate">
                 Target: {formatIDR(summary.end_of_month_forecast.target_savings)}
               </span>
             </div>
+          </div>
+
+          {/* Envelope / Pocket Banking Breakdown Strip */}
+          <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[11px]">
+            <span className="inline-flex items-center gap-1.5 rounded-xl bg-surface px-2.5 py-1 text-espresso border border-surface-border">
+              <span className="h-2 w-2 rounded-full bg-terracotta" />
+              <span>Operasional: <strong>{formatIDR(summary.safe_to_spend_total)}</strong></span>
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-xl bg-surface px-2.5 py-1 text-espresso border border-surface-border">
+              <span className="h-2 w-2 rounded-full bg-income" />
+              <span>Tabungan: <strong>{formatIDR(summary.current_savings_balance ?? summary.savings_pool_balance)}</strong></span>
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-xl bg-surface px-2.5 py-1 text-espresso border border-surface-border">
+              <span className="h-2 w-2 rounded-full bg-amber" />
+              <span>Pool Tagihan: <strong>{formatIDR(summary.subscription_pool_balance)}</strong></span>
+            </span>
           </div>
         </div>
       )}
@@ -550,15 +578,24 @@ export default function ForecastPage() {
                     <Check className="h-4 w-4" />
                   </button>
                   <div>
-                    <span
-                      className={`text-xs font-bold block ${
-                        item.is_paid_this_cycle ? "line-through text-espresso-muted" : "text-espresso"
-                      }`}
-                    >
-                      {item.name}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className={`text-xs font-bold block ${
+                          item.is_paid_this_cycle ? "line-through text-espresso-muted" : "text-espresso"
+                        }`}
+                      >
+                        {item.name}
+                      </span>
+                      {item.wallet_name && (
+                        <span className="rounded-md bg-amber/20 px-1.5 py-0.2 text-[9px] font-bold text-terracotta border border-amber/30">
+                          💳 {item.wallet_name}
+                        </span>
+                      )}
+                    </div>
                     <span className="text-[10px] text-espresso-muted">
-                      {item.is_paid_this_cycle ? "✅ Lunas bulan ini" : "⏳ Belum dibayar (Dicadangkan)"}
+                      {item.is_paid_this_cycle
+                        ? `✅ Lunas bulan ini${item.wallet_name ? ` (dari ${item.wallet_name})` : ""}`
+                        : "⏳ Belum dibayar (Dicadangkan)"}
                     </span>
                   </div>
                 </div>
@@ -1127,6 +1164,27 @@ export default function ForecastPage() {
                   placeholder="170000"
                   className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-sm font-bold text-espresso focus:outline-none focus:border-terracotta"
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-espresso mb-1">
+                  Dompet Pembayar (Opsional)
+                </label>
+                <select
+                  value={fixedWalletId}
+                  onChange={(e) => setFixedWalletId(e.target.value)}
+                  className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs font-medium text-espresso focus:outline-none focus:border-terracotta"
+                >
+                  <option value="">-- Bebas / Otomatis dari Operasional --</option>
+                  {wallets?.map((w: any) => (
+                    <option key={w.id} value={w.id}>
+                      {w.name} ({w.purpose === "subscription" ? "Tagihan" : w.purpose === "savings" ? "Tabungan" : "Operasional"}) - {formatIDR(w.balance)}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-[10px] text-espresso-muted mt-1 block">
+                  Pilih dompet khusus tagihan (misal: Subscription) agar dicadangkan dari dompet tersebut dan dipotong saat ditandai lunas.
+                </span>
               </div>
 
               <div className="flex gap-2 pt-2">
