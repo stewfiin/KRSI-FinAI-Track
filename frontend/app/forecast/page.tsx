@@ -51,6 +51,9 @@ export default function ForecastPage() {
   const [fixedWalletId, setFixedWalletId] = useState("");
   const [isSavingFixed, setIsSavingFixed] = useState(false);
 
+  // Quick Wallet Purpose Config Modal State
+  const [isWalletConfigModalOpen, setIsWalletConfigModalOpen] = useState(false);
+
   // Add Wishlist Modal State
   const [isAddWishlistModalOpen, setIsAddWishlistModalOpen] = useState(false);
   const [wishlistName, setWishlistName] = useState("");
@@ -399,19 +402,30 @@ export default function ForecastPage() {
           </div>
 
           {/* Envelope / Pocket Banking Breakdown Strip */}
-          <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[11px]">
-            <span className="inline-flex items-center gap-1.5 rounded-xl bg-surface px-2.5 py-1 text-espresso border border-surface-border">
-              <span className="h-2 w-2 rounded-full bg-terracotta" />
-              <span>Operasional: <strong>{formatIDR(summary.safe_to_spend_total)}</strong></span>
-            </span>
-            <span className="inline-flex items-center gap-1.5 rounded-xl bg-surface px-2.5 py-1 text-espresso border border-surface-border">
-              <span className="h-2 w-2 rounded-full bg-income" />
-              <span>Tabungan: <strong>{formatIDR(summary.current_savings_balance ?? summary.savings_pool_balance)}</strong></span>
-            </span>
-            <span className="inline-flex items-center gap-1.5 rounded-xl bg-surface px-2.5 py-1 text-espresso border border-surface-border">
-              <span className="h-2 w-2 rounded-full bg-amber" />
-              <span>Pool Tagihan: <strong>{formatIDR(summary.subscription_pool_balance)}</strong></span>
-            </span>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 text-[11px]">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="inline-flex items-center gap-1.5 rounded-xl bg-surface px-2.5 py-1 text-espresso border border-surface-border">
+                <span className="h-2 w-2 rounded-full bg-terracotta" />
+                <span>Operasional: <strong>{formatIDR(summary.safe_to_spend_total)}</strong></span>
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-xl bg-surface px-2.5 py-1 text-espresso border border-surface-border">
+                <span className="h-2 w-2 rounded-full bg-income" />
+                <span>Tabungan: <strong>{formatIDR(summary.current_savings_balance ?? summary.savings_pool_balance)}</strong></span>
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-xl bg-surface px-2.5 py-1 text-espresso border border-surface-border">
+                <span className="h-2 w-2 rounded-full bg-amber" />
+                <span>Tagihan: <strong>{formatIDR(summary.subscription_pool_balance)}</strong></span>
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsWalletConfigModalOpen(true)}
+              className="inline-flex items-center justify-center gap-1 rounded-xl border border-surface-border bg-surface px-2.5 py-1 text-[11px] font-bold text-terracotta hover:border-terracotta transition shadow-xs"
+              title="Atur dompet mana yang jadi tabungan, operasional, atau tagihan"
+            >
+              <span>⚙️ Atur Dompet</span>
+            </button>
           </div>
         </div>
       )}
@@ -1258,6 +1272,114 @@ export default function ForecastPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* ===================================================================== */}
+      {/* MODAL 4: ATUR PERUNTUKAN DOMPET LANGSUNG                              */}
+      {/* ===================================================================== */}
+      {isWalletConfigModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm rounded-3xl border border-surface-border bg-surface p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-surface-border pb-3">
+              <div>
+                <h3 className="text-base font-bold text-espresso">Atur Peruntukan Dompet</h3>
+                <p className="text-xs text-espresso-muted">Pilih dompet yang jadi tabungan atau operasional</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsWalletConfigModalOpen(false)}
+                className="rounded-lg p-1 text-espresso-muted hover:bg-surface-card hover:text-espresso"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+              {wallets?.map((w: any) => (
+                <div
+                  key={w.id}
+                  className="rounded-2xl border border-surface-border bg-surface-card p-3 space-y-2.5"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-bold text-espresso block">{w.name}</span>
+                      <span className="text-[10px] text-espresso-muted uppercase">{w.type}</span>
+                    </div>
+                    <span className="text-xs font-extrabold text-espresso">
+                      {formatIDR(w.balance)}
+                    </span>
+                  </div>
+
+                  {/* 3 Option Pills */}
+                  <div className="grid grid-cols-3 gap-1 pt-0.5 text-[10px] font-bold">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await api.put(`/api/v1/wallets/${w.id}`, { purpose: "operational" });
+                        refetchSummary();
+                        refetchLedger();
+                        queryClient.invalidateQueries({ queryKey: ["wallets"] });
+                        queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+                      }}
+                      className={`rounded-xl py-1.5 px-1.5 transition text-center border ${
+                        (w.purpose || "operational") === "operational"
+                          ? "bg-terracotta text-white border-terracotta shadow-xs"
+                          : "bg-surface text-espresso-muted border-surface-border hover:text-espresso"
+                      }`}
+                    >
+                      💼 Operasional
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await api.put(`/api/v1/wallets/${w.id}`, { purpose: "savings" });
+                        refetchSummary();
+                        refetchLedger();
+                        queryClient.invalidateQueries({ queryKey: ["wallets"] });
+                        queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+                      }}
+                      className={`rounded-xl py-1.5 px-1.5 transition text-center border ${
+                        w.purpose === "savings"
+                          ? "bg-income text-white border-income shadow-xs"
+                          : "bg-surface text-espresso-muted border-surface-border hover:text-income"
+                      }`}
+                    >
+                      💰 Tabungan
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await api.put(`/api/v1/wallets/${w.id}`, { purpose: "subscription" });
+                        refetchSummary();
+                        refetchLedger();
+                        queryClient.invalidateQueries({ queryKey: ["wallets"] });
+                        queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+                      }}
+                      className={`rounded-xl py-1.5 px-1.5 transition text-center border ${
+                        w.purpose === "subscription"
+                          ? "bg-amber text-espresso border-amber shadow-xs"
+                          : "bg-surface text-espresso-muted border-surface-border hover:text-terracotta"
+                      }`}
+                    >
+                      💳 Tagihan
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="pt-2 border-t border-surface-border">
+              <button
+                type="button"
+                onClick={() => setIsWalletConfigModalOpen(false)}
+                className="w-full rounded-xl bg-terracotta py-2 text-xs font-bold text-white hover:bg-terracotta-hover transition"
+              >
+                Selesai
+              </button>
+            </div>
           </div>
         </div>
       )}

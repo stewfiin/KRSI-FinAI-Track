@@ -11,6 +11,7 @@ import {
   ExternalLink,
   Plus,
   Trash2,
+  Pencil,
   Loader2,
   Copy,
   Clock,
@@ -39,6 +40,14 @@ export default function SettingsPage() {
   const [walletType, setWalletType] = useState<"cash" | "bank" | "ewallet">("bank");
   const [walletPurpose, setWalletPurpose] = useState<"operational" | "savings" | "subscription">("operational");
   const [walletBalance, setWalletBalance] = useState("0");
+
+  // Edit Wallet Modal State
+  const [editingWallet, setEditingWallet] = useState<any | null>(null);
+  const [editWalletName, setEditWalletName] = useState("");
+  const [editWalletType, setEditWalletType] = useState<"cash" | "bank" | "ewallet">("bank");
+  const [editWalletPurpose, setEditWalletPurpose] = useState<"operational" | "savings" | "subscription">("operational");
+  const [editWalletBalance, setEditWalletBalance] = useState("0");
+  const [isUpdatingWallet, setIsUpdatingWallet] = useState(false);
 
   // New Category Modal State
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
@@ -121,8 +130,73 @@ export default function SettingsPage() {
       setWalletBalance("0");
       setWalletPurpose("operational");
       refetchWallets();
+      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["forecast-summary"] });
     } catch (err: any) {
       alert(err.response?.data?.detail || "Gagal menambah dompet.");
+    }
+  };
+
+  // Action: Open Edit Wallet Modal
+  const openEditWallet = (w: any) => {
+    setEditingWallet(w);
+    setEditWalletName(w.name);
+    setEditWalletType(w.type);
+    setEditWalletPurpose(w.purpose || "operational");
+    setEditWalletBalance(String(w.balance));
+  };
+
+  // Action: Update Wallet
+  const handleUpdateWallet = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingWallet || !editWalletName.trim()) return;
+    setIsUpdatingWallet(true);
+    try {
+      await api.put(`/api/v1/wallets/${editingWallet.id}`, {
+        name: editWalletName.trim(),
+        type: editWalletType,
+        purpose: editWalletPurpose,
+        balance: parseFloat(editWalletBalance) || 0,
+      });
+      setEditingWallet(null);
+      refetchWallets();
+      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["forecast-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["forecast-ledger"] });
+    } catch (err: any) {
+      alert(err.response?.data?.detail || "Gagal mengubah data dompet.");
+    } finally {
+      setIsUpdatingWallet(false);
+    }
+  };
+
+  // Action: 1-Click Quick Change Purpose from Card
+  const handleQuickChangePurpose = async (walletId: string, newPurpose: string) => {
+    try {
+      await api.put(`/api/v1/wallets/${walletId}`, {
+        purpose: newPurpose,
+      });
+      refetchWallets();
+      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["forecast-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["forecast-ledger"] });
+    } catch (err: any) {
+      alert("Gagal memperbarui peruntukan dompet.");
+    }
+  };
+
+  // Action: Delete Wallet
+  const handleDeleteWallet = async (walletId: string, walletName: string) => {
+    if (!confirm(`Hapus dompet "${walletName}"? Seluruh transaksi yang terikat dompet ini akan terhapus.`)) return;
+    try {
+      await api.delete(`/api/v1/wallets/${walletId}`);
+      if (editingWallet?.id === walletId) setEditingWallet(null);
+      refetchWallets();
+      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["forecast-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["forecast-ledger"] });
+    } catch (err: any) {
+      alert("Gagal menghapus dompet.");
     }
   };
 
@@ -260,32 +334,61 @@ export default function SettingsPage() {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {wallets?.map((w: any) => (
             <div
               key={w.id}
-              className="rounded-2xl border border-surface-border bg-surface-card p-3.5 flex items-center justify-between"
+              className="rounded-2xl border border-surface-border bg-surface-card p-3.5 flex flex-col justify-between gap-3 shadow-xs hover:border-terracotta/40 transition"
             >
-              <div>
-                <span className="text-xs font-bold text-espresso block">{w.name}</span>
-                <div className="flex items-center gap-1.5 mt-0.5">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <span className="text-xs font-bold text-espresso block">{w.name}</span>
                   <span className="text-[10px] text-espresso-muted uppercase">{w.type}</span>
-                  <span
-                    className={`rounded-md px-1.5 py-0.2 text-[9px] font-bold border ${
-                      w.purpose === "savings"
-                        ? "bg-income/15 text-income border-income/30"
-                        : w.purpose === "subscription"
-                        ? "bg-amber/20 text-terracotta border-amber/40"
-                        : "bg-surface text-espresso-muted border-surface-border"
-                    }`}
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => openEditWallet(w)}
+                    className="rounded-lg p-1.5 text-espresso-muted hover:bg-surface hover:text-espresso transition"
+                    title="Ubah Dompet & Peruntukan"
                   >
-                    {w.purpose === "savings" ? "Tabungan" : w.purpose === "subscription" ? "Tagihan" : "Operasional"}
-                  </span>
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteWallet(w.id, w.name)}
+                    className="rounded-lg p-1.5 text-espresso-muted hover:bg-expense/10 hover:text-expense transition"
+                    title="Hapus Dompet"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
                 </div>
               </div>
-              <span className="text-xs font-bold text-espresso">
-                Rp{parseFloat(w.balance).toLocaleString("id-ID")}
-              </span>
+
+              {/* Saldo & Quick Purpose Selector */}
+              <div className="flex items-center justify-between border-t border-surface-border/60 pt-2 text-xs">
+                <span className="font-extrabold text-espresso">
+                  Rp{parseFloat(w.balance).toLocaleString("id-ID")}
+                </span>
+
+                {/* Quick Toggle / Select Purpose */}
+                <select
+                  value={w.purpose || "operational"}
+                  onChange={(e) => handleQuickChangePurpose(w.id, e.target.value)}
+                  className={`rounded-lg px-2 py-1 text-[11px] font-bold border cursor-pointer focus:outline-none transition ${
+                    w.purpose === "savings"
+                      ? "bg-income/15 text-income border-income/30"
+                      : w.purpose === "subscription"
+                      ? "bg-amber/20 text-terracotta border-amber/40"
+                      : "bg-surface text-espresso border-surface-border"
+                  }`}
+                  title="Ubah peruntukan dompet ini langsung"
+                >
+                  <option value="operational">💼 Operasional</option>
+                  <option value="savings">💰 Tabungan</option>
+                  <option value="subscription">💳 Tagihan</option>
+                </select>
+              </div>
             </div>
           ))}
         </div>
@@ -496,6 +599,142 @@ export default function SettingsPage() {
                   className="flex-1 rounded-xl bg-terracotta py-2 text-xs font-semibold text-white hover:bg-terracotta-hover"
                 >
                   Simpan
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* MODAL 2B: UBAH DATA & PERUNTUKAN DOMPET                               */}
+      {/* ===================================================================== */}
+      {editingWallet && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm rounded-3xl border border-surface-border bg-surface p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-surface-border pb-3">
+              <div>
+                <h3 className="text-base font-bold text-espresso">Atur Dompet</h3>
+                <p className="text-xs text-espresso-muted">Tentukan fungsi dompet untuk sistem proyeksi</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingWallet(null)}
+                className="rounded-lg p-1 text-espresso-muted hover:bg-surface-card hover:text-espresso"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateWallet} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-espresso mb-1">Nama Dompet</label>
+                <input
+                  type="text"
+                  required
+                  value={editWalletName}
+                  onChange={(e) => setEditWalletName(e.target.value)}
+                  className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs text-espresso focus:outline-none focus:border-terracotta font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-espresso mb-1">Tipe</label>
+                <select
+                  value={editWalletType}
+                  onChange={(e: any) => setEditWalletType(e.target.value)}
+                  className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs font-medium text-espresso focus:outline-none"
+                >
+                  <option value="cash">Tunai (Cash)</option>
+                  <option value="bank">Bank</option>
+                  <option value="ewallet">E-Wallet</option>
+                </select>
+              </div>
+
+              {/* PERUNTUKAN DOMPET SELECTION CARDS */}
+              <div>
+                <label className="block text-xs font-semibold text-espresso mb-1.5">
+                  Peruntukan Dompet (Amplop / Pocket)
+                </label>
+                <div className="space-y-2">
+                  <div
+                    onClick={() => setEditWalletPurpose("operational")}
+                    className={`cursor-pointer rounded-2xl border p-3 transition flex items-start gap-3 ${
+                      editWalletPurpose === "operational"
+                        ? "border-terracotta bg-terracotta/5 shadow-xs ring-1 ring-terracotta"
+                        : "border-surface-border bg-surface-card hover:border-terracotta/40"
+                    }`}
+                  >
+                    <span className="text-lg">💼</span>
+                    <div>
+                      <span className="text-xs font-bold text-espresso block">Dompet Operasional</span>
+                      <span className="text-[10px] text-espresso-muted block leading-tight mt-0.5">
+                        Uang jajan & makan harian. Saldo ini menjadi dasar jatah belanja ideal hari ini.
+                      </span>
+                    </div>
+                  </div>
+
+                  <div
+                    onClick={() => setEditWalletPurpose("savings")}
+                    className={`cursor-pointer rounded-2xl border p-3 transition flex items-start gap-3 ${
+                      editWalletPurpose === "savings"
+                        ? "border-income bg-income/5 shadow-xs ring-1 ring-income"
+                        : "border-surface-border bg-surface-card hover:border-income/40"
+                    }`}
+                  >
+                    <span className="text-lg">💰</span>
+                    <div>
+                      <span className="text-xs font-bold text-income block">Dompet Tabungan</span>
+                      <span className="text-[10px] text-espresso-muted block leading-tight mt-0.5">
+                        Simpanan riil / dana darurat. Saldo ini <strong>tidak boleh terpotong jajan harian</strong> dan dihitung sebagai tabungan tersimpan.
+                      </span>
+                    </div>
+                  </div>
+
+                  <div
+                    onClick={() => setEditWalletPurpose("subscription")}
+                    className={`cursor-pointer rounded-2xl border p-3 transition flex items-start gap-3 ${
+                      editWalletPurpose === "subscription"
+                        ? "border-amber bg-amber/10 shadow-xs ring-1 ring-amber"
+                        : "border-surface-border bg-surface-card hover:border-amber/40"
+                    }`}
+                  >
+                    <span className="text-lg">💳</span>
+                    <div>
+                      <span className="text-xs font-bold text-terracotta block">Dompet Tagihan / Langganan</span>
+                      <span className="text-[10px] text-espresso-muted block leading-tight mt-0.5">
+                        Khusus pembayaran tagihan rutin (iCloud, wifi, cicilan). Dicadangkan terpisah agar aman.
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-espresso mb-1">Saldo Dompet Saat Ini (Rp)</label>
+                <input
+                  type="number"
+                  step="any"
+                  value={editWalletBalance}
+                  onChange={(e) => setEditWalletBalance(e.target.value)}
+                  className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs font-bold text-espresso focus:outline-none focus:border-terracotta"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingWallet(null)}
+                  className="flex-1 rounded-xl bg-surface-card py-2 text-xs font-semibold text-espresso-muted hover:text-espresso"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUpdatingWallet}
+                  className="flex-1 rounded-xl bg-terracotta py-2 text-xs font-bold text-white hover:bg-terracotta-hover transition disabled:opacity-50"
+                >
+                  {isUpdatingWallet ? "Menyimpan..." : "Simpan Perubahan"}
                 </button>
               </div>
             </form>

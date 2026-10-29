@@ -187,14 +187,22 @@ class ForecastService:
         operational_balance = Decimal("0.00")
 
         for w in wallets:
-            w_purpose = getattr(w, "purpose", "operational") or "operational"
-            w_name = w.name.lower()
-            if w_purpose == "savings" or "saving" in w_name or "anniv" in w_name or "tabung" in w_name:
-                savings_balance += w.balance
-            elif w_purpose == "subscription" or "subscrip" in w_name or "tagihan" in w_name:
-                subscription_balance += w.balance
+            w_purpose = getattr(w, "purpose", None)
+            if w_purpose in ("savings", "subscription", "operational"):
+                if w_purpose == "savings":
+                    savings_balance += w.balance
+                elif w_purpose == "subscription":
+                    subscription_balance += w.balance
+                else:
+                    operational_balance += w.balance
             else:
-                operational_balance += w.balance
+                w_name = (w.name or "").lower()
+                if "saving" in w_name or "anniv" in w_name or "tabung" in w_name:
+                    savings_balance += w.balance
+                elif "subscrip" in w_name or "tagihan" in w_name:
+                    subscription_balance += w.balance
+                else:
+                    operational_balance += w.balance
 
         # 3. Tagihan Pasti / Fixed Obligations
         fixed_res = await session.exec(select(FixedExpense).where(FixedExpense.user_id == user_id))
@@ -210,14 +218,15 @@ class ForecastService:
 
         for f in unpaid_fixed_items:
             assigned_wallet = wallet_map.get(f.wallet_id) if f.wallet_id else None
-            is_sub_wallet = (
-                assigned_wallet
-                and (
-                    getattr(assigned_wallet, "purpose", "") == "subscription"
-                    or "subscrip" in assigned_wallet.name.lower()
-                    or "tagihan" in assigned_wallet.name.lower()
-                )
-            )
+            is_sub_wallet = False
+            if assigned_wallet:
+                p = getattr(assigned_wallet, "purpose", None)
+                if p:
+                    is_sub_wallet = (p == "subscription")
+                else:
+                    w_name = (assigned_wallet.name or "").lower()
+                    is_sub_wallet = ("subscrip" in w_name or "tagihan" in w_name)
+
             if is_sub_wallet or (f.wallet_id is None and subscription_balance > 0):
                 unpaid_sub_buffer += f.amount
             else:
