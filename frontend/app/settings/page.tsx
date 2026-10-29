@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Settings as SettingsIcon,
   Bot,
@@ -15,6 +15,8 @@ import {
   Copy,
   Clock,
   LogOut,
+  AlertTriangle,
+  RotateCcw,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/store";
@@ -22,6 +24,7 @@ import { useRouter } from "next/navigation";
 
 export default function SettingsPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { user, clearAuth } = useAuthStore();
 
   // Telegram Integration State
@@ -40,6 +43,11 @@ export default function SettingsPage() {
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [catName, setCatName] = useState("");
   const [catType, setCatType] = useState<"expense" | "income">("expense");
+
+  // Reset Account State
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [confirmResetText, setConfirmResetText] = useState("");
+  const [isResetting, setIsResetting] = useState(false);
 
   // 1. Fetch Telegram Status
   const {
@@ -129,6 +137,25 @@ export default function SettingsPage() {
       refetchCategories();
     } catch (err: any) {
       alert(err.response?.data?.detail || "Gagal menambah kategori.");
+    }
+  };
+
+  // Action: Reset All Financial Data (Akun Baru)
+  const handleResetData = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (confirmResetText.trim().toUpperCase() !== "RESET") return;
+    setIsResetting(true);
+    try {
+      await api.post("/api/v1/auth/reset-data");
+      queryClient.clear();
+      setIsResetModalOpen(false);
+      setConfirmResetText("");
+      alert("Seluruh data keuangan berhasil di-reset. Akun Anda kembali bersih seperti baru!");
+      window.location.href = "/dashboard";
+    } catch (err: any) {
+      alert(err.response?.data?.detail || "Gagal mereset data akun.");
+    } finally {
+      setIsResetting(false);
     }
   };
 
@@ -281,6 +308,32 @@ export default function SettingsPage() {
               <span className="text-[10px] text-espresso-muted uppercase ml-1">({c.type})</span>
             </span>
           ))}
+        </div>
+      </div>
+
+      {/* ===================================================================== */}
+      {/* KARTU 4: DANGER ZONE - RESET DATA AKUN SEPERTI BARU                   */}
+      {/* ===================================================================== */}
+      <div className="rounded-3xl border border-expense/30 bg-expense-bg/30 p-6 shadow-sm space-y-3">
+        <div className="flex items-center gap-2 text-expense">
+          <AlertTriangle className="h-5 w-5 shrink-0" />
+          <h3 className="text-sm font-bold text-espresso">Reset Seluruh Data Finansial</h3>
+        </div>
+        <p className="text-xs text-espresso-muted leading-relaxed">
+          Hapus seluruh nominal saldo, riwayat transaksi, dompet tambahan, tagihan rutin, wishlist, dan blueprint keuangan. Akun Anda akan kembali bersih seperti baru dengan 1 dompet Tunai standar (Rp0).
+        </p>
+        <div className="pt-1">
+          <button
+            type="button"
+            onClick={() => {
+              setConfirmResetText("");
+              setIsResetModalOpen(true);
+            }}
+            className="flex items-center gap-2 rounded-xl bg-expense px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-expense/90 transition active:scale-95"
+          >
+            <RotateCcw className="h-4 w-4" />
+            <span>Reset Seluruh Data Akun</span>
+          </button>
         </div>
       </div>
 
@@ -461,6 +514,69 @@ export default function SettingsPage() {
                   className="flex-1 rounded-xl bg-income py-2 text-xs font-semibold text-white hover:bg-income-hover"
                 >
                   Simpan
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* MODAL 4: KONFIRMASI RESET DATA                                        */}
+      {/* ===================================================================== */}
+      {isResetModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm rounded-3xl border border-expense/40 bg-surface p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-2.5 text-expense border-b border-surface-border pb-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-expense/15 text-expense">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-espresso">Konfirmasi Reset Data</h3>
+                <span className="text-[11px] font-semibold text-expense">Tindakan ini permanen!</span>
+              </div>
+            </div>
+
+            <p className="text-xs text-espresso-muted leading-relaxed">
+              Seluruh transaksi, saldo dompet, rencana keuangan, dan pengeluaran pasti akan <strong>dihapus secara permanen</strong>. Akun Anda akan dimulai ulang dengan 1 dompet <strong>Tunai (Rp0)</strong>.
+            </p>
+
+            <form onSubmit={handleResetData} className="space-y-3 pt-1">
+              <div>
+                <label className="block text-[11px] font-semibold text-espresso mb-1">
+                  Ketik kata <span className="font-mono font-bold text-expense">RESET</span> di bawah untuk konfirmasi:
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={confirmResetText}
+                  onChange={(e) => setConfirmResetText(e.target.value)}
+                  placeholder="Ketik RESET"
+                  className="w-full rounded-xl border border-expense/30 bg-surface-card px-3 py-2 text-xs font-bold text-espresso focus:outline-none focus:border-expense tracking-wider uppercase placeholder:normal-case placeholder:font-normal"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsResetModalOpen(false)}
+                  className="flex-1 rounded-xl bg-surface-card py-2 text-xs font-semibold text-espresso-muted hover:text-espresso"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={confirmResetText.trim().toUpperCase() !== "RESET" || isResetting}
+                  className="flex-1 rounded-xl bg-expense py-2 text-xs font-bold text-white hover:bg-expense/90 transition disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+                >
+                  {isResetting ? (
+                    <span className="flex items-center justify-center gap-1.5">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Mereset...
+                    </span>
+                  ) : (
+                    "Reset Semua"
+                  )}
                 </button>
               </div>
             </form>

@@ -1,6 +1,7 @@
 from decimal import Decimal
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import delete
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select
 
@@ -12,6 +13,13 @@ from app.models.enums import CategoryType, WalletType
 from app.models.category import Category
 from app.models.user import User
 from app.models.wallet import Wallet
+from app.models.transaction import Transaction
+from app.models.budget import Budget
+from app.models.fixed_expense import FixedExpense
+from app.models.wishlist import Wishlist
+from app.models.income_stream import IncomeStream
+from app.models.financial_plan import FinancialPlan
+from app.models.ai_chat_log import AIChatLog
 from app.schemas.auth import (
     TokenResponse,
     UserLoginRequest,
@@ -152,4 +160,58 @@ async def get_current_user_profile(
     current_user: User = Depends(get_current_user),
 ):
     return UserResponse.model_validate(current_user)
+
+
+@router.post(
+    "/reset-data",
+    summary="Reset Seluruh Data Keuangan Pengguna",
+    description="Menghapus seluruh transaksi, dompet, anggaran, tagihan pasti, wishlist, aliran pendapatan, dan chat AI. Mengembalikan akun ke kondisi bersih seperti akun baru dengan 1 dompet Tunai default.",
+)
+async def reset_user_financial_data(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    # 1. Hapus seluruh data transaksi
+    await session.exec(delete(Transaction).where(Transaction.user_id == current_user.id))
+    # 2. Hapus seluruh data anggaran (budgets)
+    await session.exec(delete(Budget).where(Budget.user_id == current_user.id))
+    # 3. Hapus seluruh tagihan pasti (fixed_expenses)
+    await session.exec(delete(FixedExpense).where(FixedExpense.user_id == current_user.id))
+    # 4. Hapus seluruh wishlist belanja
+    await session.exec(delete(Wishlist).where(Wishlist.user_id == current_user.id))
+    # 5. Hapus seluruh multi-stream income
+    await session.exec(delete(IncomeStream).where(IncomeStream.user_id == current_user.id))
+    # 6. Hapus seluruh chat log AI
+    await session.exec(delete(AIChatLog).where(AIChatLog.user_id == current_user.id))
+    # 7. Hapus seluruh rencana keuangan blueprint
+    await session.exec(delete(FinancialPlan).where(FinancialPlan.user_id == current_user.id))
+    # 8. Hapus seluruh dompet
+    await session.exec(delete(Wallet).where(Wallet.user_id == current_user.id))
+
+    # 9. Buatkan 1 Dompet default 'Tunai' dengan saldo 0 (persis seperti saat akun baru dibuat)
+    default_wallet = Wallet(
+        user_id=current_user.id,
+        name="Tunai",
+        type=WalletType.CASH,
+        balance=Decimal("0.00"),
+    )
+    session.add(default_wallet)
+
+    # 10. Pastikan kategori dasar tersedia
+    cat_query = select(Category).where(Category.user_id == current_user.id)
+    existing_cats = (await session.exec(cat_query)).all()
+    if not existing_cats:
+        for cat in DEFAULT_CATEGORIES:
+            session.add(
+                Category(
+                    user_id=current_user.id,
+                    name=cat["name"],
+                    type=cat["type"],
+                    icon=cat["icon"],
+                    color=cat["color"],
+                )
+            )
+
+    await session.commit()
+    return {"status": "success", "message": "Seluruh data keuangan berhasil di-reset menjadi seperti akun baru."}
 
