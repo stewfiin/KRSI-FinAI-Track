@@ -14,6 +14,7 @@ from app.core.redis import verify_and_consume_telegram_otp
 from app.models.enums import ChatPlatform, TransactionSource
 from app.models.user import User
 from app.services.ai_service import AIService
+from app.services.forecast_service import ForecastService
 
 logger = logging.getLogger("finai.telegram_bot")
 
@@ -268,9 +269,24 @@ async def handle_voice_message(message: Message):
             source=TransactionSource.TELEGRAM_BOT,
         )
 
+        # Ambil wawasan prediksi jika ada transaksi yang tercatat
+        prediction_snippet = ""
+        if chat_res.transaction:
+            try:
+                forecast = await ForecastService.get_forecast_summary(session, user.id)
+                var_text = f"Surplus +Rp{forecast.today_metrics.daily_variance:,.0f}" if forecast.today_metrics.daily_variance >= 0 else f"Defisit -Rp{abs(forecast.today_metrics.daily_variance):,.0f}"
+                prediction_snippet = (
+                    f"\n\n🧭 *Radar Proyeksi Finansial:*\n"
+                    f"• Plafon ideal hari ini: Rp{forecast.today_metrics.ideal_spending_today:,.0f} ({var_text})\n"
+                    f"• {forecast.runway_prediction.status_label}\n"
+                    f"• Estimasi tabungan akhir bulan: Rp{forecast.end_of_month_forecast.projected_end_savings:,.0f}"
+                )
+            except Exception:
+                pass
+
         response_text = (
             f"🎙️ *Transkripsi Suara:*\n_{transcript}_\n\n"
-            f"{chat_res.reply}"
+            f"{chat_res.reply}{prediction_snippet}"
         )
         try:
             await message.reply(response_text, parse_mode="Markdown")
@@ -312,10 +328,26 @@ async def handle_text_message(message: Message):
             source=TransactionSource.TELEGRAM_BOT,
         )
 
+        # Ambil wawasan prediksi jika ada transaksi yang tercatat
+        prediction_snippet = ""
+        if chat_res.transaction:
+            try:
+                forecast = await ForecastService.get_forecast_summary(session, user.id)
+                var_text = f"Surplus +Rp{forecast.today_metrics.daily_variance:,.0f}" if forecast.today_metrics.daily_variance >= 0 else f"Defisit -Rp{abs(forecast.today_metrics.daily_variance):,.0f}"
+                prediction_snippet = (
+                    f"\n\n🧭 *Radar Proyeksi Finansial:*\n"
+                    f"• Plafon ideal hari ini: Rp{forecast.today_metrics.ideal_spending_today:,.0f} ({var_text})\n"
+                    f"• {forecast.runway_prediction.status_label}\n"
+                    f"• Estimasi tabungan akhir bulan: Rp{forecast.end_of_month_forecast.projected_end_savings:,.0f}"
+                )
+            except Exception:
+                pass
+
+        reply_full = f"{chat_res.reply}{prediction_snippet}"
         try:
-            await message.reply(chat_res.reply, parse_mode="Markdown")
+            await message.reply(reply_full, parse_mode="Markdown")
         except Exception:
-            await message.reply(chat_res.reply)
+            await message.reply(reply_full)
 
 
 # ==============================================================================

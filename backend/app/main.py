@@ -6,12 +6,14 @@ from app.api.v1 import api_router
 from app.api.v1.ai import router as ai_direct_router
 from app.api.v1.telegram import router as telegram_direct_router
 from app.core.config import settings
+from app.core.database import init_db
 from app.services.telegram_bot import start_telegram_bot, stop_telegram_bot
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Siklus hidup aplikasi FastAPI: aktifkan bot Telegram saat startup dan tutup saat shutdown."""
+    """Siklus hidup aplikasi FastAPI: inisialisasi tabel, aktifkan bot Telegram saat startup dan tutup saat shutdown."""
+    await init_db()
     await start_telegram_bot()
     yield
     await stop_telegram_bot()

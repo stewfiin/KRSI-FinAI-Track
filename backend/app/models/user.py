@@ -10,6 +10,9 @@ if TYPE_CHECKING:
     from app.models.transaction import Transaction
     from app.models.budget import Budget
     from app.models.ai_chat_log import AIChatLog
+    from app.models.financial_plan import FinancialPlan
+    from app.models.fixed_expense import FixedExpense
+    from app.models.wishlist import Wishlist
 
 
 class User(SQLModel, table=True):
@@ -52,6 +55,18 @@ class User(SQLModel, table=True):
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
     ai_chat_logs: List["AIChatLog"] = Relationship(
+        back_populates="user",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
+    )
+    financial_plans: List["FinancialPlan"] = Relationship(
+        back_populates="user",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
+    )
+    fixed_expenses: List["FixedExpense"] = Relationship(
+        back_populates="user",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
+    )
+    wishlists: List["Wishlist"] = Relationship(
         back_populates="user",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )

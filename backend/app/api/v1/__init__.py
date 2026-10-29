@@ -8,6 +8,7 @@ from app.api.v1.budgets import router as budgets_router
 from app.api.v1.dashboard import router as dashboard_router
 from app.api.v1.ai import router as ai_router
 from app.api.v1.telegram import router as telegram_router
+from app.api.v1.forecast import router as forecast_router
 
 api_router = APIRouter()
 
@@ -17,5 +18,6 @@ api_router.include_router(categories_router, prefix="/categories", tags=["Catego
 api_router.include_router(transactions_router, prefix="/transactions", tags=["Transactions"])
 api_router.include_router(budgets_router, prefix="/budgets", tags=["Budgets"])
 api_router.include_router(dashboard_router, prefix="/dashboard", tags=["Dashboard"])
+api_router.include_router(forecast_router, prefix="/forecast", tags=["Financial Forecast & Runway"])
 api_router.include_router(ai_router, prefix="/ai", tags=["AI Assistant"])
 api_router.include_router(telegram_router, prefix="/telegram", tags=["Telegram Integration"])

@@ -12,6 +12,9 @@ from app.models.category import Category
 from app.models.transaction import Transaction
 from app.models.budget import Budget
 from app.models.ai_chat_log import AIChatLog
+from app.models.financial_plan import FinancialPlan
+from app.models.fixed_expense import FixedExpense
+from app.models.wishlist import Wishlist
 
 __all__ = [
     "WalletType",
@@ -26,5 +29,8 @@ __all__ = [
     "Transaction",
     "Budget",
     "AIChatLog",
+    "FinancialPlan",
+    "FixedExpense",
+    "Wishlist",
 ]
 
