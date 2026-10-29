@@ -13,6 +13,7 @@ from app.models.category import Category
 from app.models.enums import TransactionType
 from app.models.financial_plan import FinancialPlan
 from app.models.fixed_expense import FixedExpense
+from app.models.income_stream import IncomeStream
 from app.models.transaction import Transaction
 from app.models.wallet import Wallet
 from app.models.wishlist import Wishlist
@@ -26,6 +27,9 @@ from app.schemas.forecast import (
     FixedExpenseUpdate,
     FixedObligationsSummary,
     ForecastSummaryResponse,
+    IncomeStreamCreate,
+    IncomeStreamResponse,
+    IncomeStreamUpdate,
     RunwayPrediction,
     SimulationRequest,
     SimulationResponse,
@@ -126,6 +130,25 @@ class ForecastService:
         return start_date, end_date
 
     @staticmethod
+    def calculate_monthly_equivalent(stream: IncomeStream, total_cycle_days: int = 30) -> Decimal:
+        """Konversi nominal penerimaan berbagai frekuensi ke ekuivalen 1 siklus bulanan penuh."""
+        freq = (stream.frequency or "monthly").lower()
+        amt = stream.amount or Decimal("0.00")
+        days = Decimal(str(max(1, total_cycle_days)))
+
+        if freq == "daily":
+            return (amt * days).quantize(Decimal("1.00"))
+        elif freq == "weekly":
+            # Rata-rata minggu dalam siklus: total_hari / 7
+            return (amt * (days / Decimal("7.0"))).quantize(Decimal("1.00"))
+        elif freq == "biweekly":
+            # Rata-rata 2-mingguan: total_hari / 14
+            return (amt * (days / Decimal("14.0"))).quantize(Decimal("1.00"))
+        else:
+            # monthly
+            return amt.quantize(Decimal("1.00"))
+
+    @staticmethod
     async def get_forecast_summary(
         session: AsyncSession,
         user_id: uuid.UUID,
@@ -145,7 +168,36 @@ class ForecastService:
         days_elapsed = (today - start_date).days
         days_remaining = max(1, (end_date - today).days + 1)  # Termasuk hari ini
 
-        # 1. Dompet Operasional vs Pool Tabungan
+        # 1. Multi-Stream Income: Ambil semua sumber pendapatan aktif
+        income_res = await session.exec(
+            select(IncomeStream).where(IncomeStream.user_id == user_id, IncomeStream.is_active == True)
+        )
+        active_streams = income_res.all()
+
+        stream_responses = []
+        total_stream_equivalent = Decimal("0.00")
+        for s in active_streams:
+            equiv = ForecastService.calculate_monthly_equivalent(s, total_cycle_days)
+            total_stream_equivalent += equiv
+            stream_responses.append(
+                IncomeStreamResponse(
+                    id=s.id,
+                    user_id=s.user_id,
+                    name=s.name,
+                    amount=s.amount,
+                    frequency=s.frequency,
+                    receive_day=s.receive_day,
+                    is_active=s.is_active,
+                    monthly_equivalent=equiv,
+                    created_at=s.created_at,
+                    updated_at=s.updated_at,
+                )
+            )
+
+        # Pendapatan efektif: Jika user mendefinisikan income streams, gunakan total setara bulanan; jika tidak, gunakan blueprint lama
+        effective_monthly_income = total_stream_equivalent if total_stream_equivalent > 0 else plan.monthly_income
+
+        # 2. Dompet Operasional vs Pool Tabungan
         wallets_res = await session.exec(select(Wallet).where(Wallet.user_id == user_id))
         wallets = wallets_res.all()
 
@@ -159,7 +211,7 @@ class ForecastService:
             else:
                 operational_balance += w.balance
 
-        # 2. Tagihan Pasti / Fixed Obligations
+        # 3. Tagihan Pasti / Fixed Obligations
         fixed_res = await session.exec(select(FixedExpense).where(FixedExpense.user_id == user_id))
         fixed_items = fixed_res.all()
 
@@ -170,7 +222,7 @@ class ForecastService:
         # Saldo Operasional Bebas (setelah mencadangkan tagihan pasti yang belum dibayar)
         safe_to_spend_total = max(Decimal("0.00"), operational_balance - unpaid_fixed_buffer)
 
-        # 3. Transaksi Pengeluaran Siklus Berjalan
+        # 4. Transaksi Pengeluaran Siklus Berjalan
         tx_query = select(Transaction).where(
             Transaction.user_id == user_id,
             Transaction.type == TransactionType.EXPENSE,
@@ -183,9 +235,9 @@ class ForecastService:
         spent_past = sum((tx.amount for tx in tx_rows if tx.transaction_date < today), Decimal("0.00"))
         total_spent_cycle = spent_past + spent_today
 
-        # 4. Perhitungan Plafon Pengeluaran Ideal Hari Ini (Adaptive Daily Runway)
+        # 5. Perhitungan Plafon Pengeluaran Ideal Hari Ini (Adaptive Daily Runway)
         # Anggaran hidup operasional per siklus = Pendapatan - Tagihan Pasti - Target Tabungan
-        total_operational_budget = plan.monthly_income - total_monthly_fixed - plan.monthly_savings_target
+        total_operational_budget = effective_monthly_income - total_monthly_fixed - plan.monthly_savings_target
         if total_operational_budget <= 0:
             total_operational_budget = plan.daily_living_budget * Decimal(str(total_cycle_days))
 
@@ -328,7 +380,7 @@ class ForecastService:
                 items=fixed_responses,
             ),
             end_of_month_forecast=EndOfMonthForecast(
-                monthly_income=plan.monthly_income,
+                monthly_income=effective_monthly_income,
                 target_savings=plan.monthly_savings_target,
                 projected_end_savings=projected_end_savings.quantize(Decimal("1.00")),
                 savings_delta=savings_delta.quantize(Decimal("1.00")),
@@ -337,6 +389,8 @@ class ForecastService:
             ),
             savings_pool_balance=savings_balance,
             safe_to_spend_total=safe_to_spend_total,
+            income_streams=stream_responses,
+            total_monthly_income_estimated=effective_monthly_income,
         )
 
     @staticmethod
@@ -374,8 +428,20 @@ class ForecastService:
         fixed_res = await session.exec(select(FixedExpense).where(FixedExpense.user_id == user_id))
         total_fixed = sum((f.amount for f in fixed_res.all()), Decimal("0.00"))
 
-        total_op_budget = plan.monthly_income - total_fixed - plan.monthly_savings_target
         total_cycle_days = (end_date - start_date).days + 1
+
+        # Ambil sumber pendapatan aktif
+        income_res = await session.exec(
+            select(IncomeStream).where(IncomeStream.user_id == user_id, IncomeStream.is_active == True)
+        )
+        active_streams = income_res.all()
+        total_stream_equiv = sum(
+            (ForecastService.calculate_monthly_equivalent(s, total_cycle_days) for s in active_streams),
+            Decimal("0.00"),
+        )
+        effective_income = total_stream_equiv if total_stream_equiv > 0 else plan.monthly_income
+
+        total_op_budget = effective_income - total_fixed - plan.monthly_savings_target
         base_ideal = total_op_budget / Decimal(str(total_cycle_days)) if total_op_budget > 0 else plan.daily_living_budget
 
         day_names = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
@@ -407,6 +473,29 @@ class ForecastService:
             else:
                 st = "deficit"
 
+            # Periksa apakah ada jadwal pemasukan di tanggal ini
+            sched_amt = Decimal("0.00")
+            sched_names = []
+            for s in active_streams:
+                freq = (s.frequency or "monthly").lower()
+                if freq == "daily":
+                    sched_amt += s.amount
+                    sched_names.append(s.name)
+                elif freq == "weekly":
+                    rec_day = s.receive_day if s.receive_day is not None else 0  # Default 0=Senin
+                    if curr.weekday() == rec_day:
+                        sched_amt += s.amount
+                        sched_names.append(s.name)
+                elif freq == "biweekly":
+                    if (curr - start_date).days % 14 == 0:
+                        sched_amt += s.amount
+                        sched_names.append(s.name)
+                elif freq == "monthly":
+                    rec_day = s.receive_day if s.receive_day is not None else plan.cycle_start_day
+                    if curr.day == rec_day:
+                        sched_amt += s.amount
+                        sched_names.append(s.name)
+
             items.append(
                 DailyLedgerItem(
                     date=curr,
@@ -415,6 +504,8 @@ class ForecastService:
                     ideal_spending=current_day_ideal,
                     daily_variance=variance,
                     status=st,
+                    scheduled_income=sched_amt if sched_amt > 0 else None,
+                    scheduled_income_names=sched_names if sched_names else None,
                 )
             )
 
@@ -566,4 +657,28 @@ class ForecastService:
             last_paid_at=expense.last_paid_at,
             created_at=expense.created_at,
         )
+
+    @staticmethod
+    async def sync_financial_plan_income(session: AsyncSession, user_id: uuid.UUID) -> Decimal:
+        """Menghitung total setara bulanan dari semua stream aktif dan menyinkronkan ke FinancialPlan."""
+        plan = await ForecastService.get_or_create_financial_plan(session, user_id)
+        start_date, end_date = ForecastService.get_cycle_dates(plan.cycle_start_day)
+        total_cycle_days = (end_date - start_date).days + 1
+
+        income_res = await session.exec(
+            select(IncomeStream).where(IncomeStream.user_id == user_id, IncomeStream.is_active == True)
+        )
+        active_streams = income_res.all()
+        if active_streams:
+            total_monthly = sum(
+                (ForecastService.calculate_monthly_equivalent(s, total_cycle_days) for s in active_streams),
+                Decimal("0.00"),
+            )
+            plan.monthly_income = total_monthly
+            plan.updated_at = datetime.now(timezone.utc)
+            session.add(plan)
+            await session.commit()
+            await session.refresh(plan)
+            return total_monthly
+        return plan.monthly_income
 

@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import select, desc
@@ -9,6 +10,7 @@ from app.core.database import get_session
 from app.models.category import Category
 from app.models.financial_plan import FinancialPlan
 from app.models.fixed_expense import FixedExpense
+from app.models.income_stream import IncomeStream
 from app.models.user import User
 from app.models.wishlist import Wishlist
 from app.schemas.forecast import (
@@ -19,6 +21,9 @@ from app.schemas.forecast import (
     FixedExpenseResponse,
     FixedExpenseUpdate,
     ForecastSummaryResponse,
+    IncomeStreamCreate,
+    IncomeStreamResponse,
+    IncomeStreamUpdate,
     SimulationRequest,
     SimulationResponse,
     WishlistCreate,
@@ -294,4 +299,156 @@ async def simulate_purchase(
         user_id=current_user.id,
         req=payload,
     )
+
+
+# ==============================================================================
+# 6. Income Streams (Multi-Sumber Pendapatan & Siklus Harian/Mingguan/Bulanan)
+# ==============================================================================
+@router.get(
+    "/income-streams",
+    response_model=List[IncomeStreamResponse],
+    summary="Daftar Sumber Pendapatan Pengguna",
+)
+async def list_income_streams(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    plan = await ForecastService.get_or_create_financial_plan(session, current_user.id)
+    start_date, end_date = ForecastService.get_cycle_dates(plan.cycle_start_day)
+    total_cycle_days = (end_date - start_date).days + 1
+
+    query = select(IncomeStream).where(IncomeStream.user_id == current_user.id).order_by(IncomeStream.created_at)
+    res = (await session.exec(query)).all()
+
+    return [
+        IncomeStreamResponse(
+            id=s.id,
+            user_id=s.user_id,
+            name=s.name,
+            amount=s.amount,
+            frequency=s.frequency,
+            receive_day=s.receive_day,
+            is_active=s.is_active,
+            monthly_equivalent=ForecastService.calculate_monthly_equivalent(s, total_cycle_days),
+            created_at=s.created_at,
+            updated_at=s.updated_at,
+        )
+        for s in res
+    ]
+
+
+@router.post(
+    "/income-streams",
+    response_model=IncomeStreamResponse,
+    summary="Tambah Sumber Pendapatan Baru",
+)
+async def create_income_stream(
+    payload: IncomeStreamCreate,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    item = IncomeStream(
+        user_id=current_user.id,
+        name=payload.name,
+        amount=payload.amount,
+        frequency=payload.frequency,
+        receive_day=payload.receive_day,
+        is_active=payload.is_active,
+    )
+    session.add(item)
+    await session.commit()
+    await session.refresh(item)
+
+    # Sinkronisasi ke blueprint
+    await ForecastService.sync_financial_plan_income(session, current_user.id)
+
+    plan = await ForecastService.get_or_create_financial_plan(session, current_user.id)
+    start_date, end_date = ForecastService.get_cycle_dates(plan.cycle_start_day)
+    total_cycle_days = (end_date - start_date).days + 1
+
+    return IncomeStreamResponse(
+        id=item.id,
+        user_id=item.user_id,
+        name=item.name,
+        amount=item.amount,
+        frequency=item.frequency,
+        receive_day=item.receive_day,
+        is_active=item.is_active,
+        monthly_equivalent=ForecastService.calculate_monthly_equivalent(item, total_cycle_days),
+        created_at=item.created_at,
+        updated_at=item.updated_at,
+    )
+
+
+@router.put(
+    "/income-streams/{stream_id}",
+    response_model=IncomeStreamResponse,
+    summary="Perbarui Sumber Pendapatan",
+)
+async def update_income_stream(
+    stream_id: uuid.UUID,
+    payload: IncomeStreamUpdate,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    item = await session.get(IncomeStream, stream_id)
+    if not item or item.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sumber pendapatan tidak ditemukan.")
+
+    if payload.name is not None:
+        item.name = payload.name
+    if payload.amount is not None:
+        item.amount = payload.amount
+    if payload.frequency is not None:
+        item.frequency = payload.frequency
+    if payload.receive_day is not None:
+        item.receive_day = payload.receive_day
+    if payload.is_active is not None:
+        item.is_active = payload.is_active
+
+    item.updated_at = datetime.now(timezone.utc)
+    session.add(item)
+    await session.commit()
+    await session.refresh(item)
+
+    # Sinkronisasi ke blueprint
+    await ForecastService.sync_financial_plan_income(session, current_user.id)
+
+    plan = await ForecastService.get_or_create_financial_plan(session, current_user.id)
+    start_date, end_date = ForecastService.get_cycle_dates(plan.cycle_start_day)
+    total_cycle_days = (end_date - start_date).days + 1
+
+    return IncomeStreamResponse(
+        id=item.id,
+        user_id=item.user_id,
+        name=item.name,
+        amount=item.amount,
+        frequency=item.frequency,
+        receive_day=item.receive_day,
+        is_active=item.is_active,
+        monthly_equivalent=ForecastService.calculate_monthly_equivalent(item, total_cycle_days),
+        created_at=item.created_at,
+        updated_at=item.updated_at,
+    )
+
+
+@router.delete(
+    "/income-streams/{stream_id}",
+    summary="Hapus Sumber Pendapatan",
+)
+async def delete_income_stream(
+    stream_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    item = await session.get(IncomeStream, stream_id)
+    if not item or item.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sumber pendapatan tidak ditemukan.")
+
+    await session.delete(item)
+    await session.commit()
+
+    # Sinkronisasi ulang blueprint
+    await ForecastService.sync_financial_plan_income(session, current_user.id)
+    return {"ok": True}
 

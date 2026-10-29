@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from app.models.financial_plan import FinancialPlan
     from app.models.fixed_expense import FixedExpense
     from app.models.wishlist import Wishlist
+    from app.models.income_stream import IncomeStream
 
 
 class User(SQLModel, table=True):
@@ -67,6 +68,10 @@ class User(SQLModel, table=True):
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
     wishlists: List["Wishlist"] = Relationship(
+        back_populates="user",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
+    )
+    income_streams: List["IncomeStream"] = Relationship(
         back_populates="user",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )

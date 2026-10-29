@@ -34,6 +34,14 @@ export default function ForecastPage() {
   const [cycleStartDay, setCycleStartDay] = useState(1);
   const [isSavingPlan, setIsSavingPlan] = useState(false);
 
+  // Income Stream (Multi-Sumber Pendapatan) State
+  const [isAddStreamOpen, setIsAddStreamOpen] = useState(false);
+  const [streamName, setStreamName] = useState("");
+  const [streamAmount, setStreamAmount] = useState("");
+  const [streamFrequency, setStreamFrequency] = useState<"daily" | "weekly" | "biweekly" | "monthly">("weekly");
+  const [streamReceiveDay, setStreamReceiveDay] = useState(0); // 0=Senin, 1..31=Tanggal
+  const [isSavingStream, setIsSavingStream] = useState(false);
+
   // Add Fixed Expense Modal State
   const [isAddFixedModalOpen, setIsAddFixedModalOpen] = useState(false);
   const [fixedName, setFixedName] = useState("");
@@ -98,6 +106,14 @@ export default function ForecastPage() {
     queryFn: async () => (await api.get("/api/v1/forecast/wishlists")).data,
   });
 
+  const {
+    data: incomeStreams,
+    refetch: refetchIncomeStreams,
+  } = useQuery({
+    queryKey: ["forecast-income-streams"],
+    queryFn: async () => (await api.get("/api/v1/forecast/income-streams")).data,
+  });
+
   const formatIDR = (val: number | string | undefined) => {
     if (val === undefined || val === null) return "Rp0";
     const num = typeof val === "string" ? parseFloat(val) : val;
@@ -125,6 +141,44 @@ export default function ForecastPage() {
       alert(err.response?.data?.detail || "Gagal menyimpan blueprint keuangan.");
     } finally {
       setIsSavingPlan(false);
+    }
+  };
+
+  const handleCreateStream = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!streamName.trim() || !streamAmount) return;
+    setIsSavingStream(true);
+    try {
+      await api.post("/api/v1/forecast/income-streams", {
+        name: streamName.trim(),
+        amount: parseFloat(streamAmount),
+        frequency: streamFrequency,
+        receive_day: streamFrequency === "weekly" ? streamReceiveDay : (streamFrequency === "monthly" ? streamReceiveDay : null),
+      });
+      setStreamName("");
+      setStreamAmount("");
+      setIsAddStreamOpen(false);
+      refetchIncomeStreams();
+      refetchSummary();
+      refetchLedger();
+      refetchPlan();
+    } catch (err: any) {
+      alert(err.response?.data?.detail || "Gagal menambah sumber pendapatan.");
+    } finally {
+      setIsSavingStream(false);
+    }
+  };
+
+  const handleDeleteStream = async (id: string) => {
+    if (!confirm("Hapus sumber pendapatan ini?")) return;
+    try {
+      await api.delete(`/api/v1/forecast/income-streams/${id}`);
+      refetchIncomeStreams();
+      refetchSummary();
+      refetchLedger();
+      refetchPlan();
+    } catch (err: any) {
+      alert("Gagal menghapus sumber pendapatan.");
     }
   };
 
@@ -406,6 +460,12 @@ export default function ForecastPage() {
                     <span className="text-[11px] text-espresso-muted block">
                       Plafon Ideal: {formatIDR(item.ideal_spending)}
                     </span>
+                    {item.scheduled_income && (
+                      <span className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-semibold text-income bg-income/10 px-1.5 py-0.5 rounded-md">
+                        <TrendingUp className="h-3 w-3" />
+                        +{formatIDR(item.scheduled_income)} ({item.scheduled_income_names?.join(", ")})
+                      </span>
+                    )}
                   </div>
 
                   <div className="text-right">
@@ -711,98 +771,330 @@ export default function ForecastPage() {
       {/* ===================================================================== */}
       {/* MODAL 1: ATUR BLUEPRINT KEUANGAN                                      */}
       {/* ===================================================================== */}
-      {isPlanModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="w-full max-w-sm rounded-3xl border border-surface-border bg-surface p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-surface-border">
-              <h3 className="text-base font-bold text-espresso">Atur Blueprint Finansial</h3>
-              <button
-                type="button"
-                onClick={() => setIsPlanModalOpen(false)}
-                className="rounded-lg p-1 text-espresso-muted hover:bg-surface-card hover:text-espresso"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+      {isPlanModalOpen && (() => {
+        const totalStreamMonthly = (incomeStreams || []).reduce(
+          (acc: number, s: any) => acc + (parseFloat(s.monthly_equivalent) || 0),
+          0
+        );
+        const cycleDays = summary?.cycle_info?.total_days || 30;
+        const parsedAmt = parseFloat(streamAmount) || 0;
+        let estimatedStreamEquivalent = 0;
+        if (streamFrequency === "daily") {
+          estimatedStreamEquivalent = parsedAmt * cycleDays;
+        } else if (streamFrequency === "weekly") {
+          estimatedStreamEquivalent = parsedAmt * (cycleDays / 7);
+        } else if (streamFrequency === "biweekly") {
+          estimatedStreamEquivalent = parsedAmt * (cycleDays / 14);
+        } else {
+          estimatedStreamEquivalent = parsedAmt;
+        }
 
-            <form onSubmit={handleSavePlan} className="space-y-3">
-              <div>
-                <label className="block text-xs font-semibold text-espresso mb-1">Pendapatan Bulanan (Rp)</label>
-                <input
-                  type="number"
-                  required
-                  value={monthlyIncome}
-                  onChange={(e) => setMonthlyIncome(e.target.value)}
-                  placeholder="2600000"
-                  className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs font-bold text-espresso focus:outline-none focus:border-terracotta"
-                />
-              </div>
+        const daysOfWeek = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"];
 
-              <div>
-                <label className="block text-xs font-semibold text-espresso mb-1">
-                  Patokan Belanja Harian Normal (Rp)
-                </label>
-                <input
-                  type="number"
-                  required
-                  value={dailyLivingBudget}
-                  onChange={(e) => setDailyLivingBudget(e.target.value)}
-                  placeholder="45000"
-                  className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs font-bold text-espresso focus:outline-none focus:border-terracotta"
-                />
-                <span className="text-[10px] text-espresso-muted mt-0.5 block">
-                  Misal: Makan Rp45.000 x 28 hari = Rp1.260.000
-                </span>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-espresso mb-1">Target Tabungan Bulanan (Rp)</label>
-                <input
-                  type="number"
-                  required
-                  value={monthlySavingsTarget}
-                  onChange={(e) => setMonthlySavingsTarget(e.target.value)}
-                  placeholder="695000"
-                  className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs font-bold text-espresso focus:outline-none focus:border-terracotta"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-espresso mb-1">Tanggal Mulai Siklus / Gajian</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="31"
-                  required
-                  value={cycleStartDay}
-                  onChange={(e) => setCycleStartDay(parseInt(e.target.value) || 1)}
-                  className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs font-bold text-espresso focus:outline-none focus:border-terracotta"
-                />
-                <span className="text-[10px] text-espresso-muted mt-0.5 block">
-                  Pilih 1 untuk awal bulan standar, atau tanggal gajian (misal 25).
-                </span>
-              </div>
-
-              <div className="flex gap-2 pt-2">
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+            <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-3xl border border-surface-border bg-surface p-5 sm:p-6 shadow-2xl space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-surface-border">
+                <div>
+                  <h3 className="text-base font-bold text-espresso">Atur Blueprint Finansial</h3>
+                  <p className="text-[11px] text-espresso-muted">Alur pendapatan multi-sumber, jatah harian & tabungan</p>
+                </div>
                 <button
                   type="button"
                   onClick={() => setIsPlanModalOpen(false)}
-                  className="flex-1 rounded-xl bg-surface-card py-2 text-xs font-semibold text-espresso-muted hover:text-espresso"
+                  className="rounded-lg p-1 text-espresso-muted hover:bg-surface-card hover:text-espresso"
                 >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSavingPlan}
-                  className="flex-1 rounded-xl bg-terracotta py-2 text-xs font-bold text-white hover:bg-terracotta-hover transition disabled:opacity-50"
-                >
-                  {isSavingPlan ? "Menyimpan..." : "Simpan Blueprint"}
+                  <X className="h-5 w-5" />
                 </button>
               </div>
-            </form>
+
+              {/* 1. SEKSI SUMBER PENDAPATAN (MULTI-STREAM) */}
+              <div className="rounded-2xl border border-surface-border bg-surface-card/60 p-3.5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-bold text-espresso block">Sumber Pendapatan</span>
+                    <span className="text-[10px] text-espresso-muted">
+                      {incomeStreams && incomeStreams.length > 0
+                        ? `${incomeStreams.length} aliran aktif (Gaji, uang saku, warung, dll)`
+                        : "Bisa 1 atau lebih aliran (harian/mingguan/bulanan)"}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsAddStreamOpen(!isAddStreamOpen)}
+                    className="flex items-center gap-1 rounded-xl bg-terracotta/15 px-2.5 py-1 text-[11px] font-bold text-terracotta hover:bg-terracotta/25 transition"
+                  >
+                    <Plus className="h-3 w-3" />
+                    <span>{isAddStreamOpen ? "Tutup Form" : "Tambah"}</span>
+                  </button>
+                </div>
+
+                {/* Sub-form Tambah Aliran Baru */}
+                {isAddStreamOpen && (
+                  <form onSubmit={handleCreateStream} className="rounded-xl border border-terracotta/30 bg-surface p-3 space-y-2.5 shadow-sm">
+                    <span className="text-[11px] font-bold text-terracotta block">
+                      + Tambah Sumber Pendapatan Baru
+                    </span>
+
+                    <div>
+                      <label className="block text-[10px] font-semibold text-espresso mb-0.5">Nama Sumber</label>
+                      <input
+                        type="text"
+                        required
+                        value={streamName}
+                        onChange={(e) => setStreamName(e.target.value)}
+                        placeholder="Contoh: Uang Mingguan Kos, Gaji Utama, Freelance"
+                        className="w-full rounded-lg border border-surface-border bg-surface-card px-2.5 py-1.5 text-xs text-espresso focus:outline-none focus:border-terracotta"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-semibold text-espresso mb-0.5">Nominal per Penerimaan (Rp)</label>
+                      <input
+                        type="number"
+                        required
+                        value={streamAmount}
+                        onChange={(e) => setStreamAmount(e.target.value)}
+                        placeholder="Contoh: 415258"
+                        className="w-full rounded-lg border border-surface-border bg-surface-card px-2.5 py-1.5 text-xs font-bold text-espresso focus:outline-none focus:border-terracotta"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-semibold text-espresso mb-1">Siklus Penerimaan</label>
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {[
+                          { id: "daily", label: "Harian" },
+                          { id: "weekly", label: "Mingguan" },
+                          { id: "biweekly", label: "2-Mgg" },
+                          { id: "monthly", label: "Bulanan" },
+                        ].map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => setStreamFrequency(item.id as any)}
+                            className={`rounded-lg py-1 text-[11px] font-bold border transition ${
+                              streamFrequency === item.id
+                                ? "bg-terracotta text-white border-terracotta shadow-xs"
+                                : "bg-surface-card text-espresso-muted border-surface-border hover:text-espresso"
+                            }`}
+                          >
+                            {item.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {streamFrequency === "weekly" && (
+                      <div>
+                        <label className="block text-[10px] font-semibold text-espresso mb-0.5">Hari Masuk / Cair</label>
+                        <select
+                          value={streamReceiveDay}
+                          onChange={(e) => setStreamReceiveDay(parseInt(e.target.value))}
+                          className="w-full rounded-lg border border-surface-border bg-surface-card px-2.5 py-1.5 text-xs text-espresso focus:outline-none focus:border-terracotta"
+                        >
+                          {daysOfWeek.map((day, idx) => (
+                            <option key={idx} value={idx}>
+                              Setiap hari {day}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {streamFrequency === "monthly" && (
+                      <div>
+                        <label className="block text-[10px] font-semibold text-espresso mb-0.5">Tanggal Cair (1-31)</label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="31"
+                          value={streamReceiveDay || 1}
+                          onChange={(e) => setStreamReceiveDay(parseInt(e.target.value) || 1)}
+                          className="w-full rounded-lg border border-surface-border bg-surface-card px-2.5 py-1.5 text-xs text-espresso focus:outline-none focus:border-terracotta"
+                        />
+                      </div>
+                    )}
+
+                    {parsedAmt > 0 && (
+                      <div className="rounded-lg bg-amber/15 px-2.5 py-1.5 text-[11px] text-terracotta font-semibold">
+                        Estimasi setara bulanan: ~{formatIDR(estimatedStreamEquivalent)} / siklus ({cycleDays} hari)
+                      </div>
+                    )}
+
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setIsAddStreamOpen(false)}
+                        className="flex-1 rounded-lg bg-surface-card py-1.5 text-[11px] font-semibold text-espresso-muted"
+                      >
+                        Batal
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isSavingStream}
+                        className="flex-1 rounded-lg bg-terracotta py-1.5 text-[11px] font-bold text-white hover:bg-terracotta-hover transition disabled:opacity-50"
+                      >
+                        {isSavingStream ? "Menyimpan..." : "Simpan Aliran"}
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {/* List Aliran yang sudah terdaftar */}
+                {incomeStreams && incomeStreams.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {incomeStreams.map((s: any) => {
+                      const freqLabel = {
+                        daily: "Harian",
+                        weekly: "Mingguan",
+                        biweekly: "2-Mgg",
+                        monthly: "Bulanan",
+                      }[s.frequency] || s.frequency;
+
+                      const freqBadgeColor = {
+                        daily: "bg-amber/20 text-terracotta border-amber/30",
+                        weekly: "bg-income/15 text-income border-income/30",
+                        biweekly: "bg-purple-100 text-purple-800 border-purple-200",
+                        monthly: "bg-espresso/10 text-espresso border-espresso/20",
+                      }[s.frequency] || "bg-surface text-espresso";
+
+                      return (
+                        <div
+                          key={s.id}
+                          className="flex items-center justify-between rounded-xl border border-surface-border bg-surface px-3 py-2 text-xs shadow-2xs"
+                        >
+                          <div>
+                            <div className="flex items-center gap-1.5 font-bold text-espresso">
+                              <span>{s.name}</span>
+                              <span className={`rounded-md border px-1.5 py-0.2 text-[9px] font-semibold uppercase ${freqBadgeColor}`}>
+                                {freqLabel}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-espresso-muted">
+                              <span className="font-semibold text-espresso">
+                                {formatIDR(s.amount)}/{s.frequency === "daily" ? "hari" : s.frequency === "weekly" ? "minggu" : s.frequency === "biweekly" ? "2-mgg" : "bln"}
+                              </span>
+                              <span>•</span>
+                              <span>~{formatIDR(s.monthly_equivalent)}/bln</span>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteStream(s.id)}
+                            className="rounded-lg p-1.5 text-espresso-muted hover:bg-expense/10 hover:text-expense transition"
+                            title="Hapus sumber pendapatan ini"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      );
+                    })}
+
+                    <div className="pt-1 flex items-center justify-between text-xs font-bold text-espresso border-t border-surface-border">
+                      <span className="text-[11px] text-espresso-muted">Total Proyeksi Bulanan:</span>
+                      <span className="text-sm text-terracotta">{formatIDR(totalStreamMonthly)}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-espresso-muted italic">
+                    Belum ada rincian aliran. Anda dapat memasukkan nominal total pendapatan langsung di bawah atau klik tombol Tambah di atas.
+                  </p>
+                )}
+              </div>
+
+              {/* 2. FORM BLUEPRINT KEUANGAN */}
+              <form onSubmit={handleSavePlan} className="space-y-3 pt-1">
+                <div>
+                  <label className="block text-xs font-semibold text-espresso mb-1">
+                    Pendapatan Bulanan (Rp)
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    value={totalStreamMonthly > 0 ? totalStreamMonthly : monthlyIncome}
+                    onChange={(e) => setMonthlyIncome(e.target.value)}
+                    disabled={totalStreamMonthly > 0}
+                    placeholder="2600000"
+                    className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs font-bold text-espresso focus:outline-none focus:border-terracotta disabled:opacity-75 disabled:cursor-not-allowed"
+                  />
+                  {totalStreamMonthly > 0 ? (
+                    <span className="text-[10px] text-income mt-0.5 block font-medium">
+                      ✓ Dihitung otomatis dari akumulasi sumber pendapatan di atas.
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-espresso-muted mt-0.5 block">
+                      Masukkan nominal total jika tidak merinci per sumber.
+                    </span>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-espresso mb-1">
+                    Patokan Belanja Harian Normal (Rp)
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    value={dailyLivingBudget}
+                    onChange={(e) => setDailyLivingBudget(e.target.value)}
+                    placeholder="45000"
+                    className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs font-bold text-espresso focus:outline-none focus:border-terracotta"
+                  />
+                  <span className="text-[10px] text-espresso-muted mt-0.5 block">
+                    Misal: Makan Rp45.000 x 28 hari = Rp1.260.000
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-espresso mb-1">Target Tabungan Bulanan (Rp)</label>
+                  <input
+                    type="number"
+                    required
+                    value={monthlySavingsTarget}
+                    onChange={(e) => setMonthlySavingsTarget(e.target.value)}
+                    placeholder="695000"
+                    className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs font-bold text-espresso focus:outline-none focus:border-terracotta"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-espresso mb-1">Tanggal Mulai Siklus / Gajian</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="31"
+                    required
+                    value={cycleStartDay}
+                    onChange={(e) => setCycleStartDay(parseInt(e.target.value) || 1)}
+                    className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs font-bold text-espresso focus:outline-none focus:border-terracotta"
+                  />
+                  <span className="text-[10px] text-espresso-muted mt-0.5 block">
+                    Pilih 1 untuk awal bulan standar, atau tanggal gajian (misal 25).
+                  </span>
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsPlanModalOpen(false)}
+                    className="flex-1 rounded-xl bg-surface-card py-2 text-xs font-semibold text-espresso-muted hover:text-espresso"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingPlan}
+                    className="flex-1 rounded-xl bg-terracotta py-2 text-xs font-bold text-white hover:bg-terracotta-hover transition disabled:opacity-50"
+                  >
+                    {isSavingPlan ? "Menyimpan..." : "Simpan Blueprint"}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ===================================================================== */}
       {/* MODAL 2: TAMBAH TAGIHAN PASTI                                         */}

@@ -6,6 +6,40 @@ from pydantic import BaseModel, Field
 
 
 # ==============================================================================
+# Income Stream Schemas (Multi-Sumber Pendapatan & Siklus Harian/Mingguan/Bulanan)
+# ==============================================================================
+class IncomeStreamBase(BaseModel):
+    name: str = Field(..., max_length=150, description="Nama sumber pendapatan (cth: Gaji Kantor, Uang Saku Mingguan, Omzet Warung)")
+    amount: Decimal = Field(..., gt=0, description="Nominal per siklus penerimaan")
+    frequency: str = Field(default="monthly", description="daily, weekly, biweekly, monthly")
+    receive_day: Optional[int] = Field(default=None, description="Tanggal (1-31) jika bulanan, atau hari (0=Senin, 6=Minggu) jika mingguan")
+    is_active: bool = Field(default=True)
+
+
+class IncomeStreamCreate(IncomeStreamBase):
+    pass
+
+
+class IncomeStreamUpdate(BaseModel):
+    name: Optional[str] = None
+    amount: Optional[Decimal] = None
+    frequency: Optional[str] = None
+    receive_day: Optional[int] = None
+    is_active: Optional[bool] = None
+
+
+class IncomeStreamResponse(IncomeStreamBase):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    monthly_equivalent: Decimal = Field(default=Decimal("0.00"), description="Estimasi setara bulanan otomatis")
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ==============================================================================
 # Financial Plan Schemas
 # ==============================================================================
 class FinancialPlanBase(BaseModel):
@@ -140,6 +174,8 @@ class DailyLedgerItem(BaseModel):
     ideal_spending: Decimal
     daily_variance: Decimal  # ideal - spent (Positif = Surplus, Negatif = Defisit)
     status: str  # "surplus" | "deficit" | "neutral"
+    scheduled_income: Optional[Decimal] = None
+    scheduled_income_names: Optional[List[str]] = None
 
 
 class DailyLedgerResponse(BaseModel):
@@ -204,4 +240,6 @@ class ForecastSummaryResponse(BaseModel):
     end_of_month_forecast: EndOfMonthForecast
     savings_pool_balance: Decimal
     safe_to_spend_total: Decimal
+    income_streams: List[IncomeStreamResponse] = []
+    total_monthly_income_estimated: Decimal = Decimal("0.00")
 
