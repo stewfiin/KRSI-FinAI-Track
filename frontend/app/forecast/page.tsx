@@ -23,6 +23,7 @@ import {
   ArrowRightLeft,
   ArrowDownRight,
   ArrowUpRight,
+  Info,
 } from "lucide-react";
 import { api } from "@/lib/api";
 
@@ -91,7 +92,7 @@ export default function ForecastPage() {
   // Forward Range Projection Filters
   const [projWalletFilter, setProjWalletFilter] = useState("all_operational");
   const [projCustomInitialBalance, setProjCustomInitialBalance] = useState("");
-  const [projRangePreset, setProjRangePreset] = useState<"7days" | "14days" | "end_of_cycle" | "custom">("14days");
+  const [projRangePreset, setProjRangePreset] = useState<"14days" | "end_of_cycle" | "3months" | "1year" | "custom">("14days");
   const [projStartDate, setProjStartDate] = useState(new Date().toISOString().split("T")[0]);
   const [projEndDate, setProjEndDate] = useState("");
   const [projIncludeMeal, setProjIncludeMeal] = useState(true);
@@ -168,12 +169,12 @@ export default function ForecastPage() {
   });
 
   // Hitung tanggal akhir efektif berdasarkan preset yang dipilih
+  const maxAllowedDate = new Date();
+  maxAllowedDate.setFullYear(maxAllowedDate.getFullYear() + 1);
+  const maxAllowedDateStr = maxAllowedDate.toISOString().split("T")[0];
+
   let effectiveEndDate = projEndDate;
-  if (projRangePreset === "7days") {
-    const d = new Date();
-    d.setDate(d.getDate() + 7);
-    effectiveEndDate = d.toISOString().split("T")[0];
-  } else if (projRangePreset === "14days") {
+  if (projRangePreset === "14days") {
     const d = new Date();
     d.setDate(d.getDate() + 14);
     effectiveEndDate = d.toISOString().split("T")[0];
@@ -185,6 +186,14 @@ export default function ForecastPage() {
       d.setDate(d.getDate() + 30);
       effectiveEndDate = d.toISOString().split("T")[0];
     }
+  } else if (projRangePreset === "3months") {
+    const d = new Date();
+    d.setMonth(d.getMonth() + 3);
+    effectiveEndDate = d.toISOString().split("T")[0];
+  } else if (projRangePreset === "1year") {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() + 1);
+    effectiveEndDate = d.toISOString().split("T")[0];
   }
 
   const {
@@ -749,11 +758,12 @@ export default function ForecastPage() {
                     <label className="block text-[11px] font-semibold text-espresso mb-1">
                       Rentang Waktu Prediksi
                     </label>
-                    <div className="grid grid-cols-4 gap-1">
+                    <div className="grid grid-cols-5 gap-1">
                       {[
                         { id: "14days", label: "14 Hari" },
                         { id: "end_of_cycle", label: "Akhir Siklus" },
-                        { id: "7days", label: "7 Hari" },
+                        { id: "3months", label: "3 Bulan" },
+                        { id: "1year", label: "1 Tahun" },
                         { id: "custom", label: "Kustom" },
                       ].map((item) => (
                         <button
@@ -805,10 +815,13 @@ export default function ForecastPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-semibold text-espresso mb-0.5">Sampai Tanggal</label>
+                      <label className="block text-[10px] font-semibold text-espresso mb-0.5">
+                        Sampai Tanggal <span className="text-[9px] text-espresso-muted">(Maks. 1 Thn)</span>
+                      </label>
                       <input
                         type="date"
                         value={projEndDate}
+                        max={maxAllowedDateStr}
                         onChange={(e) => setProjEndDate(e.target.value)}
                         className="w-full rounded-lg border border-surface-border bg-surface-card px-2.5 py-1 text-xs text-espresso focus:outline-none focus:border-terracotta"
                       />
@@ -886,6 +899,17 @@ export default function ForecastPage() {
                       </span>
                     </div>
                   </div>
+
+                  {/* Banner Informasi Jika Rentang Dibatasi Sistem */}
+                  {rangeProjection.is_clamped && (
+                    <div className="rounded-2xl p-2.5 bg-amber/10 border border-amber/30 text-amber-900 text-xs flex items-center gap-2">
+                      <Info className="h-4 w-4 shrink-0 text-amber-700" />
+                      <div>
+                        <span className="font-bold">Rentang Dibatasi Maksimal 1 Tahun:</span>{" "}
+                        Simulasi otomatis dibatasi maksimal 365 hari (hingga {rangeProjection.end_date}) demi menjaga kestabilan performa.
+                      </div>
+                    </div>
+                  )}
 
                   {/* Banner Status Aman / Defisit */}
                   <div className={`rounded-2xl p-3 border text-xs font-semibold flex items-center gap-2 ${

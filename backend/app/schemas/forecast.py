@@ -355,5 +355,7 @@ class RangeProjectionResponse(BaseModel):
     lowest_balance_date: Optional[date] = None
     critical_deficit_date: Optional[date] = None
     is_safe: bool
+    is_clamped: bool = False
+    max_allowed_days: int = 365
     timeline: List[ProjectedDayItem]
 

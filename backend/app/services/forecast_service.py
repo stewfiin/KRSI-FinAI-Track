@@ -146,12 +146,13 @@ class ForecastService:
             rec_day = stream.receive_day if stream.receive_day is not None else 0  # 0=Senin, 6=Minggu
             return target_date.weekday() == rec_day
         elif freq == "biweekly":
-            anchor = stream.created_at.date() if stream.created_at else date(target_date.year, 1, 1)
+            anchor = stream.created_at.date() if stream.created_at else date(2026, 1, 1)
             diff = (target_date - anchor).days
             return diff >= 0 and (diff % 14 == 0)
         elif freq == "monthly":
             rec_day = stream.receive_day if stream.receive_day is not None else cycle_start_day
-            return target_date.day == rec_day
+            _, last_day = calendar.monthrange(target_date.year, target_date.month)
+            return target_date.day == min(rec_day, last_day)
         return False
 
     @staticmethod
@@ -159,13 +160,15 @@ class ForecastService:
         """Menentukan apakah tagihan bulanan atau siklus biaya berkala jatuh tempo pada tanggal target tertentu."""
         freq = (expense.frequency or "monthly").lower()
         if freq == "monthly":
-            return target_date.day == (expense.due_day_of_month or 1)
+            due_day = expense.due_day_of_month or 1
+            _, last_day = calendar.monthrange(target_date.year, target_date.month)
+            return target_date.day == min(due_day, last_day)
         elif freq == "weekly":
             day_idx = expense.interval_value if expense.interval_value is not None else 5  # default Sabtu (5)
             return target_date.weekday() == day_idx
         elif freq == "biweekly":
             anchor = expense.anchor_date.date() if expense.anchor_date else (
-                expense.created_at.date() if expense.created_at else date(target_date.year, 1, 1)
+                expense.created_at.date() if expense.created_at else date(2026, 1, 1)
             )
             diff = (target_date - anchor).days
             return diff >= 0 and (diff % 14 == 0)
@@ -877,9 +880,12 @@ class ForecastService:
                 detail="Tanggal akhir prediksi tidak boleh lebih awal dari tanggal mulai.",
             )
 
-        # Batasi rentang maksimal 90 hari untuk efisiensi komputasi
-        if (end_d - start_d).days > 90:
-            end_d = start_d + timedelta(days=90)
+        # Batasi rentang maksimal 365 hari (1 tahun) demi efisiensi komputasi & performa browser
+        MAX_PROJECTION_DAYS = 365
+        is_clamped = False
+        if (end_d - start_d).days > MAX_PROJECTION_DAYS:
+            end_d = start_d + timedelta(days=MAX_PROJECTION_DAYS)
+            is_clamped = True
 
         # 1. Ambil data dompet user
         wallets_res = await session.exec(select(Wallet).where(Wallet.user_id == user_id))
@@ -1239,6 +1245,8 @@ class ForecastService:
             lowest_balance_date=lowest_balance_date,
             critical_deficit_date=critical_deficit_date,
             is_safe=is_safe,
+            is_clamped=is_clamped,
+            max_allowed_days=MAX_PROJECTION_DAYS,
             timeline=timeline,
         )
 
