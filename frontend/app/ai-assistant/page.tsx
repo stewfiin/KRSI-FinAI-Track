@@ -242,9 +242,6 @@ export default function AIAssistantPage() {
             <Sparkles className="h-5 w-5 text-terracotta" />
             AI Finance Assistant
           </h1>
-          <p className="text-xs text-espresso-muted">
-            Pencatatan natural language, tanya-jawab finansial, dan generator anggaran pintar.
-          </p>
         </div>
 
         {/* Tab Toggle */}

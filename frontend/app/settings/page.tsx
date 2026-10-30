@@ -244,9 +244,6 @@ export default function SettingsPage() {
           <SettingsIcon className="h-5 w-5 text-terracotta" />
           Pengaturan & Integrasi
         </h1>
-        <p className="text-xs text-espresso-muted">
-          Kelola profil pengguna, integrasi bot Telegram, dompet, dan kategori.
-        </p>
       </div>
 
       {/* ===================================================================== */}

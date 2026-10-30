@@ -24,6 +24,12 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   Info,
+  ChevronRight,
+  Receipt,
+  PiggyBank,
+  Wallet,
+  CreditCard,
+  Lightbulb,
 } from "lucide-react";
 import { api } from "@/lib/api";
 
@@ -115,6 +121,9 @@ export default function ForecastPage() {
   const [plannedNotes, setPlannedNotes] = useState("");
   const [isSavingPlanned, setIsSavingPlanned] = useState(false);
   const [isExecutingPlanned, setIsExecutingPlanned] = useState<string | null>(null);
+
+  // Modal Detail Tanggal Buku Kas Masa Depan
+  const [selectedDayDetail, setSelectedDayDetail] = useState<any | null>(null);
 
   // ===========================================================================
   // 1. Data Fetching
@@ -217,6 +226,7 @@ export default function ForecastPage() {
       projCustomDailyMeal,
       projIncludeSavings,
       projCustomDailySavings,
+      incomeStreams?.length,
     ],
     queryFn: async () => {
       const payload: any = {
@@ -329,6 +339,8 @@ export default function ForecastPage() {
       refetchPlan();
       refetchSummary();
       refetchLedger();
+      queryClient.invalidateQueries({ queryKey: ["forecast-range-projection"] });
+      refetchRangeProjection();
     } catch (err: any) {
       alert(err.response?.data?.detail || "Gagal menyimpan blueprint keuangan.");
     } finally {
@@ -356,6 +368,8 @@ export default function ForecastPage() {
       refetchSummary();
       refetchLedger();
       refetchPlan();
+      queryClient.invalidateQueries({ queryKey: ["forecast-range-projection"] });
+      refetchRangeProjection();
     } catch (err: any) {
       alert(err.response?.data?.detail || "Gagal menambah sumber pendapatan.");
     } finally {
@@ -371,6 +385,8 @@ export default function ForecastPage() {
       refetchSummary();
       refetchLedger();
       refetchPlan();
+      queryClient.invalidateQueries({ queryKey: ["forecast-range-projection"] });
+      refetchRangeProjection();
     } catch (err: any) {
       alert("Gagal menghapus sumber pendapatan.");
     }
@@ -457,6 +473,8 @@ export default function ForecastPage() {
     try {
       await api.delete(`/api/v1/forecast/fixed-expenses/${id}`);
       refetchSummary();
+      queryClient.invalidateQueries({ queryKey: ["forecast-range-projection"] });
+      refetchRangeProjection();
     } catch (err: any) {
       alert("Gagal menghapus tagihan.");
     }
@@ -522,15 +540,13 @@ export default function ForecastPage() {
   return (
     <div className="space-y-5 pb-16">
       {/* Header */}
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-extrabold tracking-tight text-espresso flex items-center gap-2">
             <Compass className="h-5 w-5 text-terracotta" />
             Proyeksi & Runway
           </h1>
-          <p className="text-xs text-espresso-muted">
-            Prediksi daya tahan uang, plafon belanja harian ideal, dan simulasi belanja.
-          </p>
         </div>
 
         <button
@@ -600,30 +616,35 @@ export default function ForecastPage() {
 
           {/* Quick Metrics Grid */}
           <div className="grid grid-cols-2 gap-2 pt-2 border-t border-surface-border text-xs">
-            <div className="rounded-2xl border border-surface-border bg-surface p-2.5">
-              <div className="flex items-center gap-1.5 text-espresso-muted text-[11px]">
-                <Clock className="h-3.5 w-3.5 text-terracotta" />
-                <span>Saldo Operasional Bebas</span>
+            <div className="rounded-2xl border border-surface-border bg-surface p-2.5 flex flex-col justify-between min-h-[76px]">
+              <div className="flex items-center gap-1.5 text-espresso-muted text-[11px] h-4">
+                <Clock className="h-3.5 w-3.5 text-terracotta shrink-0" />
+                <span className="truncate font-medium">Kas Bebas</span>
               </div>
-              <span className="mt-1 block text-sm font-extrabold text-espresso">
+              <span className="text-sm sm:text-base font-extrabold text-espresso truncate">
                 {formatIDR(summary.safe_to_spend_total)}
               </span>
-              <span className="text-[10px] text-espresso-muted block truncate">
-                Daya tahan: <strong>{summary.runway_prediction.predicted_runway_days} Hari</strong> {summary.runway_prediction.is_runway_safe ? "✅" : "⚠️"}
-              </span>
+              <div className="text-[10px] text-espresso-muted truncate h-4 flex items-center gap-1">
+                <span>Daya tahan: <strong>{summary.runway_prediction.predicted_runway_days} Hari</strong></span>
+                {summary.runway_prediction.is_runway_safe ? (
+                  <CheckCircle2 className="h-3 w-3 text-income shrink-0" />
+                ) : (
+                  <AlertTriangle className="h-3 w-3 text-amber shrink-0" />
+                )}
+              </div>
             </div>
 
-            <div className="rounded-2xl border border-surface-border bg-surface p-2.5">
-              <div className="flex items-center gap-1.5 text-espresso-muted text-[11px]">
-                <Sparkles className="h-3.5 w-3.5 text-income" />
-                <span>Tabungan Tersimpan</span>
+            <div className="rounded-2xl border border-surface-border bg-surface p-2.5 flex flex-col justify-between min-h-[76px]">
+              <div className="flex items-center gap-1.5 text-espresso-muted text-[11px] h-4">
+                <Sparkles className="h-3.5 w-3.5 text-income shrink-0" />
+                <span className="truncate font-medium">Tabungan</span>
               </div>
-              <span className="mt-1 block text-sm font-extrabold text-income">
+              <span className="text-sm sm:text-base font-extrabold text-income truncate">
                 {formatIDR(summary.current_savings_balance ?? summary.savings_pool_balance)}
               </span>
-              <span className="text-[10px] text-espresso-muted block truncate">
-                Target: {formatIDR(summary.end_of_month_forecast.target_savings)}
-              </span>
+              <div className="text-[10px] text-espresso-muted truncate h-4 flex items-center">
+                <span>Target: {formatIDR(summary.end_of_month_forecast.target_savings)}</span>
+              </div>
             </div>
           </div>
 
@@ -647,10 +668,11 @@ export default function ForecastPage() {
             <button
               type="button"
               onClick={() => setIsWalletConfigModalOpen(true)}
-              className="inline-flex items-center justify-center gap-1 rounded-xl border border-surface-border bg-surface px-2.5 py-1 text-[11px] font-bold text-terracotta hover:border-terracotta transition shadow-xs"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-surface-border bg-surface px-2.5 py-1 text-[11px] font-bold text-terracotta hover:border-terracotta transition shadow-xs"
               title="Atur dompet mana yang jadi tabungan, operasional, atau tagihan"
             >
-              <span>⚙️ Atur Dompet</span>
+              <Sliders className="h-3 w-3 shrink-0" />
+              <span>Atur Dompet</span>
             </button>
           </div>
         </div>
@@ -663,35 +685,38 @@ export default function ForecastPage() {
         <button
           type="button"
           onClick={() => setActiveTab("ledger")}
-          className={`rounded-xl py-2 transition ${
+          className={`rounded-xl py-2 px-1 inline-flex items-center justify-center gap-1.5 truncate transition whitespace-nowrap ${
             activeTab === "ledger"
               ? "bg-terracotta text-white shadow-sm"
               : "text-espresso-muted hover:text-espresso"
           }`}
         >
-          🔮 Proyeksi & Harian
+          <TrendingUp className="h-3.5 w-3.5 shrink-0" />
+          <span>Proyeksi</span>
         </button>
         <button
           type="button"
           onClick={() => setActiveTab("fixed")}
-          className={`rounded-xl py-2 transition ${
+          className={`rounded-xl py-2 px-1 inline-flex items-center justify-center gap-1.5 truncate transition whitespace-nowrap ${
             activeTab === "fixed"
               ? "bg-terracotta text-white shadow-sm"
               : "text-espresso-muted hover:text-espresso"
           }`}
         >
-          📋 Tagihan & Siklus
+          <Receipt className="h-3.5 w-3.5 shrink-0" />
+          <span>Tagihan</span>
         </button>
         <button
           type="button"
           onClick={() => setActiveTab("simulator")}
-          className={`rounded-xl py-2 transition ${
+          className={`rounded-xl py-2 px-1 inline-flex items-center justify-center gap-1.5 truncate transition whitespace-nowrap ${
             activeTab === "simulator"
               ? "bg-terracotta text-white shadow-sm"
               : "text-espresso-muted hover:text-espresso"
           }`}
         >
-          💡 Simulasi
+          <Lightbulb className="h-3.5 w-3.5 shrink-0" />
+          <span>Simulasi</span>
         </button>
       </div>
 
@@ -705,26 +730,26 @@ export default function ForecastPage() {
             <button
               type="button"
               onClick={() => setTimelineView("forward")}
-              className={`flex-1 py-2 rounded-xl transition flex items-center justify-center gap-1.5 ${
+              className={`flex-1 py-2 px-2 rounded-xl transition flex items-center justify-center gap-1.5 whitespace-nowrap truncate ${
                 timelineView === "forward"
                   ? "bg-surface text-terracotta shadow-xs border border-surface-border"
                   : "text-espresso-muted hover:text-espresso"
               }`}
             >
-              <Sparkles className="h-3.5 w-3.5 text-terracotta" />
-              <span>Prediksi Saldo Masa Depan</span>
+              <Sparkles className="h-3.5 w-3.5 text-terracotta shrink-0" />
+              <span className="truncate">Prediksi Saldo</span>
             </button>
             <button
               type="button"
               onClick={() => setTimelineView("history")}
-              className={`flex-1 py-2 rounded-xl transition flex items-center justify-center gap-1.5 ${
+              className={`flex-1 py-2 px-2 rounded-xl transition flex items-center justify-center gap-1.5 whitespace-nowrap truncate ${
                 timelineView === "history"
                   ? "bg-surface text-terracotta shadow-xs border border-surface-border"
                   : "text-espresso-muted hover:text-espresso"
               }`}
             >
-              <Clock className="h-3.5 w-3.5 text-espresso-muted" />
-              <span>Realisasi Siklus Berjalan</span>
+              <Clock className="h-3.5 w-3.5 text-espresso-muted shrink-0" />
+              <span className="truncate">Realisasi Harian</span>
             </button>
           </div>
 
@@ -738,7 +763,6 @@ export default function ForecastPage() {
                 <div className="flex items-center justify-between pb-2 border-b border-surface-border">
                   <div>
                     <h3 className="text-sm font-bold text-espresso">Filter Proyeksi Arus Kas</h3>
-                    <p className="text-[11px] text-espresso-muted">Pilih dompet, rentang waktu & simulasikan transaksi</p>
                   </div>
                   <button
                     type="button"
@@ -761,10 +785,10 @@ export default function ForecastPage() {
                       onChange={(e) => setProjWalletFilter(e.target.value)}
                       className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs font-semibold text-espresso focus:outline-none focus:border-terracotta"
                     >
-                      <option value="all_operational">💼 Semua Dompet Operasional</option>
-                      <option value="all_savings">💰 Semua Tabungan (Savings)</option>
-                      <option value="all_wallets">🌐 Seluruh Dompet (Konsolidasi)</option>
-                      <option value="custom_balance">🧪 Mode Simulasi Saldo Kustom</option>
+                      <option value="all_operational">Semua Dompet Operasional</option>
+                      <option value="all_savings">Semua Tabungan (Savings)</option>
+                      <option value="all_wallets">Seluruh Dompet (Konsolidasi)</option>
+                      <option value="custom_balance">Mode Simulasi Saldo Kustom</option>
                       {wallets?.map((w: any) => (
                         <option key={w.id} value={w.id}>
                           {w.name} ({w.purpose === "savings" ? "Tabungan" : w.purpose === "subscription" ? "Tagihan" : "Operasional"}) - {formatIDR(w.balance)}
@@ -875,8 +899,9 @@ export default function ForecastPage() {
                           className="rounded border-emerald-500 text-emerald-600 focus:ring-emerald-500"
                         />
                         <div>
-                          <span className="text-emerald-900 font-bold text-[11px] block">
-                            💰 Simulasikan Alokasi Setor Tabungan
+                          <span className="text-emerald-900 font-bold text-[11px] flex items-center gap-1">
+                            <PiggyBank className="h-3.5 w-3.5 text-emerald-700 shrink-0" />
+                            <span>Simulasikan Alokasi Setor Tabungan</span>
                           </span>
                           <span className="text-emerald-700 text-[10px] block">
                             Alokasikan {formatIDR(projCustomDailySavings || (plan?.monthly_savings_target ? Math.round(plan.monthly_savings_target / 30) : 0))}/hari dari kas operasional ke tabungan
@@ -913,66 +938,56 @@ export default function ForecastPage() {
                     <span className="font-bold text-espresso">
                       Proyeksi {rangeProjection.total_days} Hari ({rangeProjection.start_date} s/d {rangeProjection.end_date})
                     </span>
-                    <span className="text-[10px] text-espresso-muted font-medium bg-surface-card px-2 py-0.5 rounded-md border border-surface-border">
-                      {rangeProjection.wallet_filter_label}
-                    </span>
                   </div>
 
                   {/* 5 Metrik Utama Grid */}
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 text-xs">
-                    <div className="rounded-2xl bg-surface p-2.5 border border-surface-border">
-                      <span className="text-[10px] text-espresso-muted uppercase font-bold block">Saldo Kas Awal</span>
-                      <span className="text-sm font-extrabold text-espresso block mt-0.5">
+                    <div className="rounded-2xl bg-surface p-2.5 border border-surface-border flex flex-col justify-between min-h-[72px]">
+                      <span className="text-[10px] text-espresso-muted uppercase font-bold block truncate">Saldo Kas Awal</span>
+                      <span className="text-sm font-extrabold text-espresso block truncate">
                         {formatIDR(rangeProjection.initial_balance)}
                       </span>
                     </div>
 
-                    <div className="rounded-2xl bg-income/10 p-2.5 border border-income/20">
-                      <span className="text-[10px] text-income uppercase font-bold block">Estimasi Masuk</span>
-                      <span className="text-sm font-extrabold text-income block mt-0.5">
+                    <div className="rounded-2xl bg-income/10 p-2.5 border border-income/20 flex flex-col justify-between min-h-[72px]">
+                      <span className="text-[10px] text-income uppercase font-bold block truncate">Estimasi Masuk</span>
+                      <span className="text-sm font-extrabold text-income block truncate">
                         +{formatIDR(rangeProjection.total_inflow)}
                       </span>
                     </div>
 
-                    <div className="rounded-2xl bg-expense/10 p-2.5 border border-expense/20">
-                      <span className="text-[10px] text-expense uppercase font-bold block">Estimasi Keluar</span>
-                      <span className="text-sm font-extrabold text-expense block mt-0.5">
+                    <div className="rounded-2xl bg-expense/10 p-2.5 border border-expense/20 flex flex-col justify-between min-h-[72px]">
+                      <span className="text-[10px] text-expense uppercase font-bold block truncate">Estimasi Keluar</span>
+                      <span className="text-sm font-extrabold text-expense block truncate">
                         -{formatIDR(rangeProjection.total_outflow)}
                       </span>
                     </div>
 
-                    <div className={`rounded-2xl p-2.5 border ${
+                    <div className={`rounded-2xl p-2.5 border flex flex-col justify-between min-h-[72px] ${
                       rangeProjection.final_balance >= 0
                         ? "bg-surface border-surface-border"
                         : "bg-expense/15 border-expense/30"
                     }`}>
-                      <span className="text-[10px] text-espresso-muted uppercase font-bold block">Sisa Kas Operasional</span>
-                      <span className={`text-sm font-extrabold block mt-0.5 ${
+                      <span className="text-[10px] text-espresso-muted uppercase font-bold block truncate">Sisa Kas Operasional</span>
+                      <span className={`text-sm font-extrabold block truncate ${
                         rangeProjection.final_balance >= 0 ? "text-terracotta" : "text-expense"
                       }`}>
                         {formatIDR(rangeProjection.final_balance)}
                       </span>
                     </div>
 
-                    <div className="rounded-2xl bg-emerald-500/10 p-2.5 border border-emerald-500/25 col-span-2 md:col-span-1">
+                    <div className="rounded-2xl bg-emerald-500/10 p-2.5 border border-emerald-500/25 col-span-2 md:col-span-1 flex flex-col justify-between min-h-[72px]">
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] text-emerald-800 uppercase font-bold block">Prediksi Tabungan</span>
+                        <span className="text-[10px] text-emerald-800 uppercase font-bold block truncate">Prediksi Tabungan</span>
                         {rangeProjection.target_savings > 0 && (
                           <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded-md bg-emerald-600 text-white" title={`Target: ${formatIDR(rangeProjection.target_savings)}`}>
                             {rangeProjection.savings_achievement_rate}%
                           </span>
                         )}
                       </div>
-                      <span className="text-sm font-extrabold text-emerald-900 block mt-0.5">
+                      <span className="text-sm font-extrabold text-emerald-900 block truncate">
                         {formatIDR(rangeProjection.final_savings_balance ?? rangeProjection.initial_savings_balance ?? 0)}
                       </span>
-                      <div className="text-[10px] text-emerald-700 block mt-0.5 font-medium leading-tight">
-                        {rangeProjection.total_saved_in_range > 0 ? (
-                          <span>+{formatIDR(rangeProjection.total_saved_in_range)} disisihkan</span>
-                        ) : (
-                          <span>Saldo tabungan saat ini</span>
-                        )}
-                      </div>
                     </div>
                   </div>
 
@@ -1022,8 +1037,7 @@ export default function ForecastPage() {
               <div className="rounded-3xl border border-surface-border bg-surface p-4 shadow-sm space-y-3">
                 <div className="flex items-center justify-between pb-2 border-b border-surface-border">
                   <div>
-                    <h4 className="text-sm font-bold text-espresso">Buku Kas Masa Depan (Daily Timeline)</h4>
-                    <p className="text-[11px] text-espresso-muted">Mutasi harian & saldo berjalan hari demi hari</p>
+                    <h4 className="text-sm font-bold text-espresso">Buku Kas Masa Depan</h4>
                   </div>
                 </div>
 
@@ -1033,79 +1047,54 @@ export default function ForecastPage() {
                   </div>
                 ) : rangeProjection && rangeProjection.timeline.length > 0 ? (
                   <div className="divide-y divide-surface-border">
-                    {rangeProjection.timeline.map((day: any, idx: number) => (
-                      <div key={idx} className="py-3 space-y-1.5 text-xs">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-1.5 font-bold text-espresso">
-                            <span>{day.date}</span>
-                            <span className="text-[10px] font-normal text-espresso-muted">({day.day_name})</span>
-                            {day.is_today && (
-                              <span className="rounded-md bg-terracotta text-white px-1.5 py-0.2 text-[9px] font-bold">
-                                Hari Ini
-                              </span>
-                            )}
-                          </div>
+                    {rangeProjection.timeline.map((day: any, idx: number) => {
+                      const hasInflow = Number(day.total_inflow) > 0;
+                      const hasOutflow = Number(day.total_outflow) > 0;
 
-                          <div className="text-right">
-                            <div className="flex items-center justify-end gap-2 text-right">
-                              <div>
-                                <span className="text-[9px] text-espresso-muted block">Kas Ops:</span>
-                                <span className={`text-xs font-black ${
-                                  day.closing_balance >= 0 ? "text-espresso" : "text-expense"
-                                }`}>
-                                  {formatIDR(day.closing_balance)}
+                      return (
+                        <div
+                          key={idx}
+                          onClick={() => setSelectedDayDetail(day)}
+                          className="py-2.5 px-2 -mx-2 rounded-2xl hover:bg-surface-card transition-all flex items-center justify-between group cursor-pointer text-xs"
+                        >
+                          {/* Sisi Kiri: Tanggal & Indikator Pemasukan/Pengeluaran */}
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-1.5 font-bold text-espresso">
+                              <span>{day.date}</span>
+                              {day.is_today && (
+                                <span className="rounded-md bg-terracotta text-white px-1.5 py-0.2 text-[9px] font-bold">
+                                  Hari Ini
                                 </span>
-                              </div>
-                              {day.running_savings_balance !== undefined && (
-                                <div className="pl-2 border-l border-surface-border">
-                                  <span className="text-[9px] text-emerald-800 block">Tabungan:</span>
-                                  <span className="text-xs font-bold text-emerald-900">
-                                    {formatIDR(day.running_savings_balance)}
-                                  </span>
-                                </div>
                               )}
                             </div>
+                            <div className="flex items-center gap-1.5 text-[10px]">
+                              <span className={`font-semibold ${hasInflow ? "text-income" : "text-espresso-muted/50"}`}>
+                                +{formatIDR(day.total_inflow)}
+                              </span>
+                              <span className="text-espresso-muted/30">•</span>
+                              <span className={`font-semibold ${hasOutflow ? "text-expense" : "text-espresso-muted/50"}`}>
+                                -{formatIDR(day.total_outflow)}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Sisi Kanan: Kas Ops & Chevron Icon */}
+                          <div className="flex items-center gap-2 text-right">
+                            <div>
+                              <span className="text-[9px] text-espresso-muted block font-medium">Kas Ops</span>
+                              <span
+                                className={`text-xs font-black ${
+                                  day.closing_balance >= 0 ? "text-espresso" : "text-expense"
+                                }`}
+                              >
+                                {formatIDR(day.closing_balance)}
+                              </span>
+                            </div>
+                            <ChevronRight className="h-4 w-4 text-espresso-muted/50 group-hover:text-espresso group-hover:translate-x-0.5 transition-all shrink-0" />
                           </div>
                         </div>
-
-                        {/* Badges Kejadian / Events di hari ini */}
-                        {day.events && day.events.length > 0 ? (
-                          <div className="flex flex-wrap gap-1.5 pt-0.5">
-                            {day.events.map((ev: any, evIdx: number) => {
-                              const badgeStyleMap: Record<string, string> = {
-                                INCOME: "bg-income/10 text-income border-income/30",
-                                MEAL: "bg-amber/15 text-terracotta border-amber/30",
-                                CYCLICAL: "bg-purple-100 text-purple-800 border-purple-200",
-                                FIXED_BILL: "bg-espresso/10 text-espresso border-espresso/20",
-                                PLANNED: "bg-blue-100 text-blue-800 border-blue-200",
-                                SAVINGS: "bg-emerald-100 text-emerald-800 border-emerald-300 font-bold",
-                              };
-                              const badgeStyle = badgeStyleMap[ev.type] || "bg-surface text-espresso";
-
-                              return (
-                                <span
-                                  key={evIdx}
-                                  className={`inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 text-[10px] font-semibold ${badgeStyle}`}
-                                >
-                                  {ev.type === "SAVINGS" && <span>💰</span>}
-                                  <span>{ev.name}</span>
-                                  <span className="font-bold">
-                                    {ev.direction === "INFLOW" ? "+" : "-"}{formatIDR(ev.amount)}
-                                  </span>
-                                  {ev.wallet_name && (
-                                    <span className="opacity-75">
-                                      ({ev.wallet_name}{ev.to_wallet_name ? ` ➔ ${ev.to_wallet_name}` : ""})
-                                    </span>
-                                  )}
-                                </span>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <span className="text-[10px] text-espresso-muted italic">Tidak ada mutasi terjadwal</span>
-                        )}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="py-8 text-center text-xs text-espresso-muted">
@@ -1119,7 +1108,6 @@ export default function ForecastPage() {
                 <div className="flex items-center justify-between pb-2 border-b border-surface-border">
                   <div>
                     <h4 className="text-sm font-bold text-espresso">Rencana Transaksi Terdaftar</h4>
-                    <p className="text-[11px] text-espresso-muted">Disuntikkan ke timeline untuk menguji dampaknya sebelum dieksekusi</p>
                   </div>
                   <button
                     type="button"
@@ -1150,7 +1138,7 @@ export default function ForecastPage() {
                                 ? "bg-emerald-100 text-emerald-800 border-emerald-300"
                                 : "bg-expense/10 text-expense border-expense/30"
                             }`}>
-                              {pt.type === "INCOME" ? "Pemasukan" : pt.type === "TRANSFER" ? "Pindah Dompet" : pt.type === "SAVINGS" ? "💰 Menabung" : "Pengeluaran"}
+                              {pt.type === "INCOME" ? "Pemasukan" : pt.type === "TRANSFER" ? "Pindah Dompet" : pt.type === "SAVINGS" ? "Menabung" : "Pengeluaran"}
                             </span>
                             {pt.is_completed && (
                               <span className="rounded-md bg-income text-white px-1.5 py-0.2 text-[9px] font-bold">
@@ -1159,13 +1147,19 @@ export default function ForecastPage() {
                             )}
                           </div>
                           <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-espresso-muted flex-wrap">
-                            <span>📅 {pt.planned_date}</span>
+                            <span className="inline-flex items-center gap-1">
+                              <Calendar className="h-3 w-3 shrink-0" />
+                              <span>{pt.planned_date}</span>
+                            </span>
                             <span>•</span>
                             <span>Nominal: <strong>{formatIDR(pt.amount)}</strong></span>
                             {pt.wallet_name && (
                               <>
                                 <span>•</span>
-                                <span>💳 {pt.wallet_name}</span>
+                                <span className="inline-flex items-center gap-1">
+                                  <CreditCard className="h-3 w-3 shrink-0" />
+                                  <span>{pt.wallet_name}</span>
+                                </span>
                               </>
                             )}
                             {pt.to_wallet_name && (
@@ -1216,7 +1210,6 @@ export default function ForecastPage() {
               <div className="flex items-center justify-between pb-2 border-b border-surface-border">
                 <div>
                   <h3 className="text-sm font-bold text-espresso">Rekap Realisasi Harian</h3>
-                  <p className="text-[11px] text-espresso-muted">Realisasi belanja vs jatah ideal per tanggal</p>
                 </div>
                 {ledger && (
                   <span className="rounded-lg bg-surface-card px-2 py-1 text-[11px] font-bold text-espresso border border-surface-border">
@@ -1327,20 +1320,22 @@ export default function ForecastPage() {
             <button
               type="button"
               onClick={() => setFixedFilter("monthly")}
-              className={`flex-1 py-1 rounded-lg transition ${
+              className={`flex-1 py-1 rounded-lg transition inline-flex items-center justify-center gap-1 ${
                 fixedFilter === "monthly" ? "bg-surface text-terracotta shadow-xs" : "text-espresso-muted hover:text-espresso"
               }`}
             >
-              📅 Bulanan ({summary?.fixed_obligations?.items?.filter((f: any) => !f.frequency || f.frequency === "monthly").length || 0})
+              <Calendar className="h-3 w-3 shrink-0" />
+              <span>Bulanan ({summary?.fixed_obligations?.items?.filter((f: any) => !f.frequency || f.frequency === "monthly").length || 0})</span>
             </button>
             <button
               type="button"
               onClick={() => setFixedFilter("cyclical")}
-              className={`flex-1 py-1 rounded-lg transition ${
+              className={`flex-1 py-1 rounded-lg transition inline-flex items-center justify-center gap-1 ${
                 fixedFilter === "cyclical" ? "bg-surface text-terracotta shadow-xs" : "text-espresso-muted hover:text-espresso"
               }`}
             >
-              🔄 Siklus ({summary?.fixed_obligations?.items?.filter((f: any) => f.frequency && f.frequency !== "monthly").length || 0})
+              <ArrowRightLeft className="h-3 w-3 shrink-0" />
+              <span>Siklus ({summary?.fixed_obligations?.items?.filter((f: any) => f.frequency && f.frequency !== "monthly").length || 0})</span>
             </button>
           </div>
 
@@ -1353,18 +1348,19 @@ export default function ForecastPage() {
               })
               .map((item: any) => {
                 const isCyclical = item.frequency && item.frequency !== "monthly";
-                const isSavings = item.expense_type === "SAVINGS_TRANSFER";
+                const isSavings = item.expense_type === "SAVINGS_TRANSFER" && (!item.to_wallet_name || item.to_wallet_name.toLowerCase().includes("saving") || item.to_wallet_name.toLowerCase().includes("tabung") || item.to_wallet_name.toLowerCase().includes("anniv"));
+                const isPosTransfer = item.to_wallet_name && !isSavings;
                 const daysOfWeek = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"];
                 const freqBadge =
                   item.frequency === "daily"
-                    ? "🔄 Harian (Tiap Hari)"
+                    ? "Harian (Tiap Hari)"
                     : item.frequency === "every_n_days"
-                    ? `🔄 Tiap ${item.interval_value || 1} Hari`
+                    ? `Tiap ${item.interval_value || 1} Hari`
                     : item.frequency === "weekly"
-                    ? `🔄 Mingguan (${daysOfWeek[item.interval_value || 0] || "Sabtu"})`
+                    ? `Mingguan (${daysOfWeek[item.interval_value || 0] || "Sabtu"})`
                     : item.frequency === "biweekly"
-                    ? "🔄 2-Mingguan"
-                    : `📅 Bulanan (Tgl ${item.due_day_of_month || 1})`;
+                    ? "2-Mingguan"
+                    : `Bulanan (Tgl ${item.due_day_of_month || 1})`;
 
                 return (
                   <div
@@ -1374,7 +1370,11 @@ export default function ForecastPage() {
                     <div className="flex items-center gap-3">
                       {isSavings ? (
                         <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
-                          <span className="text-xs">💰</span>
+                          <PiggyBank className="h-3.5 w-3.5" />
+                        </div>
+                      ) : isPosTransfer ? (
+                        <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-blue-100 text-blue-700">
+                          <ArrowRightLeft className="h-3.5 w-3.5" />
                         </div>
                       ) : !isCyclical ? (
                         <button
@@ -1403,32 +1403,47 @@ export default function ForecastPage() {
                           >
                             {item.name}
                           </span>
-                          <span className={`rounded-md border px-1.5 py-0.2 text-[9px] font-semibold ${
-                            isSavings
-                              ? "border-emerald-300 bg-emerald-100 text-emerald-800"
-                              : "border-amber/30 bg-amber/15 text-terracotta"
-                          }`}>
+                          {isSavings ? (
+                            <span className="inline-flex items-center gap-1 rounded-md border border-emerald-300 bg-emerald-100 px-1.5 py-0.2 text-[9px] font-bold text-emerald-800">
+                              <PiggyBank className="h-3 w-3 shrink-0" />
+                              <span>Setor Tabungan</span>
+                            </span>
+                          ) : isPosTransfer ? (
+                            <span className="inline-flex items-center gap-1 rounded-md border border-blue-300 bg-blue-100 px-1.5 py-0.2 text-[9px] font-bold text-blue-800">
+                              <ArrowRightLeft className="h-3 w-3 shrink-0" />
+                              <span>Setor Tagihan</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 rounded-md border border-terracotta/30 bg-terracotta/10 px-1.5 py-0.2 text-[9px] font-bold text-terracotta">
+                              <ArrowUpRight className="h-3 w-3 shrink-0" />
+                              <span>Pengeluaran</span>
+                            </span>
+                          )}
+                          <span className="rounded-md border border-surface-border bg-surface px-1.5 py-0.2 text-[9px] font-semibold text-espresso-muted">
                             {freqBadge}
                           </span>
-                          {isSavings && (
-                            <span className="rounded-md border border-emerald-300 bg-emerald-50 px-1.5 py-0.2 text-[9px] font-bold text-emerald-700">
-                              💰 Setor Tabungan
+                          {item.to_wallet_name ? (
+                            <span className="inline-flex items-center gap-1 rounded-md bg-espresso/10 px-1.5 py-0.2 text-[9px] font-bold text-espresso border border-espresso/20">
+                              <CreditCard className="h-3 w-3 shrink-0" />
+                              <span>{item.wallet_name || "Operasional"} ➔ {item.to_wallet_name}</span>
                             </span>
-                          )}
-                          {item.wallet_name && (
-                            <span className="rounded-md bg-espresso/10 px-1.5 py-0.2 text-[9px] font-bold text-espresso border border-espresso/20">
-                              💳 {item.wallet_name}{item.to_wallet_name ? ` ➔ 🏦 ${item.to_wallet_name}` : ""}
+                          ) : item.wallet_name ? (
+                            <span className="inline-flex items-center gap-1 rounded-md bg-espresso/10 px-1.5 py-0.2 text-[9px] font-bold text-espresso border border-espresso/20">
+                              <CreditCard className="h-3 w-3 shrink-0" />
+                              <span>{item.wallet_name}</span>
                             </span>
-                          )}
+                          ) : null}
                         </div>
                         <span className="text-[10px] text-espresso-muted">
                           {isSavings
-                            ? `💰 Pindah otomatis ke tabungan (tidak dihitung defisit)`
+                            ? `Pindah otomatis ke tabungan (tidak dihitung defisit)`
+                            : isPosTransfer
+                            ? `Alokasi rutin ke dompet tagihan/pos belanja`
                             : isCyclical
-                            ? `🔄 Siklus otomatis dicadangkan di Safe-to-Spend`
+                            ? `Siklus otomatis dicadangkan di Safe-to-Spend`
                             : item.is_paid_this_cycle
-                            ? `✅ Lunas bulan ini${item.wallet_name ? ` (dari ${item.wallet_name})` : ""}`
-                            : "⏳ Belum dibayar (Dicadangkan)"}
+                            ? `Lunas bulan ini${item.wallet_name ? ` (dari ${item.wallet_name})` : ""}`
+                            : "Belum dibayar (Dicadangkan)"}
                         </span>
                       </div>
                     </div>
@@ -1465,9 +1480,6 @@ export default function ForecastPage() {
                 <Zap className="h-4 w-4 text-amber" />
                 Simulasi Belanja ("Bisa Beli Nggak?")
               </h3>
-              <p className="text-xs text-espresso-muted mt-0.5">
-                Uji dampak pengeluaran sebelum membeli agar tabungan dan jatah hidup Anda tetap aman.
-              </p>
             </div>
 
             <form onSubmit={handleRunSimulation} className="space-y-3">
@@ -1508,7 +1520,10 @@ export default function ForecastPage() {
                         : "border-surface-border bg-surface-card text-espresso-muted"
                     }`}
                   >
-                    💰 Dari Tabungan
+                    <div className="flex items-center gap-1.5 font-bold">
+                      <PiggyBank className="h-3.5 w-3.5 text-emerald-700 shrink-0" />
+                      <span>Dari Tabungan</span>
+                    </div>
                     <span className="block text-[10px] font-normal text-espresso-muted">
                       Saldo: {formatIDR(summary?.savings_pool_balance)}
                     </span>
@@ -1523,7 +1538,10 @@ export default function ForecastPage() {
                         : "border-surface-border bg-surface-card text-espresso-muted"
                     }`}
                   >
-                    👛 Dari Uang Jajan
+                    <div className="flex items-center gap-1.5 font-bold">
+                      <Wallet className="h-3.5 w-3.5 text-terracotta shrink-0" />
+                      <span>Dari Kas Harian</span>
+                    </div>
                     <span className="block text-[10px] font-normal text-espresso-muted">
                       Plafon: {formatIDR(summary?.today_metrics.ideal_spending_today)}/hr
                     </span>
@@ -1534,7 +1552,7 @@ export default function ForecastPage() {
               <button
                 type="submit"
                 disabled={isSimulating}
-                className="w-full rounded-xl bg-terracotta py-2.5 text-xs font-bold text-white shadow-md shadow-terracotta/20 hover:bg-terracotta-hover transition disabled:opacity-50"
+                className="w-full rounded-xl bg-terracotta py-2.5 text-xs font-bold text-white shadow-md shadow-terracotta/20 hover:bg-terracotta-hover transition disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
               >
                 {isSimulating ? (
                   <span className="flex items-center justify-center gap-1.5">
@@ -1542,7 +1560,10 @@ export default function ForecastPage() {
                     Menghitung Dampak Finansial...
                   </span>
                 ) : (
-                  "⚡ Simulasikan Sekarang"
+                  <>
+                    <Zap className="h-4 w-4 shrink-0" />
+                    <span>Simulasikan Sekarang</span>
+                  </>
                 )}
               </button>
             </form>
@@ -1591,7 +1612,6 @@ export default function ForecastPage() {
             <div className="flex items-center justify-between pb-2 border-b border-surface-border">
               <div>
                 <h3 className="text-sm font-bold text-espresso">Daftar Impian Belanja (Wishlist)</h3>
-                <p className="text-[11px] text-espresso-muted">Rencana belanja besar yang diuji terhadap tabungan</p>
               </div>
               <button
                 type="button"
@@ -1668,7 +1688,6 @@ export default function ForecastPage() {
               <div className="flex items-center justify-between pb-3 border-b border-surface-border">
                 <div>
                   <h3 className="text-base font-bold text-espresso">Atur Blueprint Finansial</h3>
-                  <p className="text-[11px] text-espresso-muted">Alur pendapatan multi-sumber, jatah harian & tabungan</p>
                 </div>
                 <button
                   type="button"
@@ -1869,7 +1888,10 @@ export default function ForecastPage() {
                               {s.wallet_name && (
                                 <>
                                   <span>•</span>
-                                  <span className="font-semibold text-terracotta">💳 {s.wallet_name}</span>
+                                  <span className="font-semibold text-terracotta inline-flex items-center gap-1">
+                                    <CreditCard className="h-3 w-3 shrink-0" />
+                                    <span>{s.wallet_name}</span>
+                                  </span>
                                 </>
                               )}
                             </div>
@@ -1931,28 +1953,30 @@ export default function ForecastPage() {
                         <button
                           type="button"
                           onClick={() => setCyclicalExpenseType("EXPENSE")}
-                          className={`rounded-lg py-1.5 text-[11px] font-bold border transition ${
+                          className={`rounded-lg py-1.5 inline-flex items-center justify-center gap-1.5 text-[11px] font-bold border transition ${
                             cyclicalExpenseType === "EXPENSE"
                               ? "bg-terracotta text-white border-terracotta shadow-xs"
                               : "bg-surface-card text-espresso-muted border-surface-border hover:text-espresso"
                           }`}
                         >
-                          💸 Pengeluaran Rutin
+                          <ArrowUpRight className="h-3.5 w-3.5 shrink-0" />
+                          <span>Pengeluaran Rutin</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => {
                             setCyclicalExpenseType("SAVINGS_TRANSFER");
-                            const savingsWallet = wallets?.find((w: any) => w.purpose === "savings");
-                            if (savingsWallet) setCyclicalToWalletId(savingsWallet.id);
+                            const defaultTarget = wallets?.find((w: any) => w.purpose === "savings") || wallets?.[0];
+                            if (defaultTarget) setCyclicalToWalletId(defaultTarget.id);
                           }}
-                          className={`rounded-lg py-1.5 text-[11px] font-bold border transition ${
+                          className={`rounded-lg py-1.5 inline-flex items-center justify-center gap-1.5 text-[11px] font-bold border transition ${
                             cyclicalExpenseType === "SAVINGS_TRANSFER"
                               ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
                               : "bg-surface-card text-espresso-muted border-surface-border hover:text-espresso"
                           }`}
                         >
-                          💰 Setor Tabungan Rutin
+                          <PiggyBank className="h-3.5 w-3.5 shrink-0" />
+                          <span>Setor Tabungan</span>
                         </button>
                       </div>
                     </div>
@@ -2055,7 +2079,7 @@ export default function ForecastPage() {
 
                     <div>
                       <label className="block text-[10px] font-semibold text-espresso mb-0.5">
-                        {cyclicalExpenseType === "SAVINGS_TRANSFER" ? "Dari Dompet (Sumber Operasional)" : "Dipotong dari Dompet"}
+                        {cyclicalExpenseType === "SAVINGS_TRANSFER" ? "Dari Dompet (Sumber)" : "Dipotong dari Dompet"}
                       </label>
                       <select
                         value={cyclicalWalletId}
@@ -2063,20 +2087,18 @@ export default function ForecastPage() {
                         className="w-full rounded-lg border border-surface-border bg-surface-card px-2.5 py-1.5 text-xs text-espresso focus:outline-none focus:border-terracotta"
                       >
                         <option value="">-- Otomatis Operasional Utama --</option>
-                        {wallets
-                          ?.filter((w: any) => cyclicalExpenseType !== "SAVINGS_TRANSFER" || w.purpose !== "savings")
-                          ?.map((w: any) => (
-                            <option key={w.id} value={w.id}>
-                              {w.name} ({w.purpose === "savings" ? "Tabungan" : w.purpose === "subscription" ? "Tagihan" : "Operasional"}) - {formatIDR(w.balance)}
-                            </option>
-                          ))}
+                        {wallets?.map((w: any) => (
+                          <option key={w.id} value={w.id}>
+                            {w.name} ({w.purpose === "savings" ? "Tabungan" : w.purpose === "subscription" ? "Tagihan" : "Operasional"}) - {formatIDR(w.balance)}
+                          </option>
+                        ))}
                       </select>
                     </div>
 
                     {cyclicalExpenseType === "SAVINGS_TRANSFER" && (
                       <div>
                         <label className="block text-[10px] font-semibold text-espresso mb-0.5">
-                          Ke Dompet (Tujuan Tabungan)
+                          Ke Dompet (Tujuan Setoran/Alokasi)
                         </label>
                         <select
                           value={cyclicalToWalletId}
@@ -2084,12 +2106,12 @@ export default function ForecastPage() {
                           required
                           className="w-full rounded-lg border border-surface-border bg-surface-card px-2.5 py-1.5 text-xs text-espresso focus:outline-none focus:border-terracotta"
                         >
-                          <option value="">-- Pilih Dompet Tabungan Tujuan --</option>
+                          <option value="">-- Pilih Dompet Tujuan --</option>
                           {wallets
-                            ?.filter((w: any) => w.purpose === "savings")
+                            ?.filter((w: any) => !cyclicalWalletId || w.id !== cyclicalWalletId)
                             ?.map((w: any) => (
                               <option key={w.id} value={w.id}>
-                                {w.name} (Tabungan) - {formatIDR(w.balance)}
+                                {w.name} ({w.purpose === "savings" ? "Tabungan" : w.purpose === "subscription" ? "Tagihan" : "Operasional"}) - {formatIDR(w.balance)}
                               </option>
                             ))}
                         </select>
@@ -2125,7 +2147,8 @@ export default function ForecastPage() {
                     {summary.fixed_obligations.items
                       .filter((f: any) => f.frequency && f.frequency !== "monthly")
                       .map((c: any) => {
-                        const isSavingsTransfer = c.expense_type === "SAVINGS_TRANSFER";
+                        const isSavings = c.expense_type === "SAVINGS_TRANSFER" && (!c.to_wallet_name || c.to_wallet_name.toLowerCase().includes("saving") || c.to_wallet_name.toLowerCase().includes("tabung") || c.to_wallet_name.toLowerCase().includes("anniv"));
+                        const isPosTransfer = c.to_wallet_name && !isSavings;
                         const label =
                           c.frequency === "daily"
                             ? "Harian (Tiap Hari)"
@@ -2139,28 +2162,49 @@ export default function ForecastPage() {
                           <div
                             key={c.id}
                             className={`flex items-center justify-between rounded-xl border px-3 py-2 text-xs shadow-2xs ${
-                              isSavingsTransfer
-                                ? "border-emerald-200 bg-emerald-50/40"
+                              isSavings
+                                ? "border-emerald-300 bg-emerald-50/50"
+                                : isPosTransfer
+                                ? "border-blue-300 bg-blue-50/50"
                                 : "border-surface-border bg-surface"
                             }`}
                           >
                             <div>
-                              <div className="flex items-center gap-1.5 font-bold text-espresso">
-                                <span>{isSavingsTransfer ? "💰 " : ""}{c.name}</span>
-                                <span className={`rounded-md border px-1.5 py-0.2 text-[9px] font-semibold ${
-                                  isSavingsTransfer
-                                    ? "border-emerald-300 bg-emerald-100 text-emerald-800"
-                                    : "border-amber/30 bg-amber/15 text-terracotta"
-                                }`}>
+                              <div className="flex items-center gap-1.5 flex-wrap font-bold text-espresso">
+                                <span>{c.name}</span>
+                                {isSavings ? (
+                                  <span className="inline-flex items-center gap-1 rounded-md border border-emerald-300 bg-emerald-100 px-1.5 py-0.2 text-[9px] font-bold text-emerald-800">
+                                    <PiggyBank className="h-3 w-3 shrink-0" />
+                                    <span>Setor Tabungan</span>
+                                  </span>
+                                ) : isPosTransfer ? (
+                                  <span className="inline-flex items-center gap-1 rounded-md border border-blue-300 bg-blue-100 px-1.5 py-0.2 text-[9px] font-bold text-blue-800">
+                                    <ArrowRightLeft className="h-3 w-3 shrink-0" />
+                                    <span>Setor Tagihan</span>
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 rounded-md border border-terracotta/30 bg-terracotta/10 px-1.5 py-0.2 text-[9px] font-bold text-terracotta">
+                                    <ArrowUpRight className="h-3 w-3 shrink-0" />
+                                    <span>Pengeluaran</span>
+                                  </span>
+                                )}
+                                <span className="rounded-md border border-surface-border bg-surface px-1.5 py-0.2 text-[9px] font-semibold text-espresso-muted">
                                   {label}
                                 </span>
                               </div>
                               <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-espresso-muted">
                                 <span className="font-semibold text-espresso">{formatIDR(c.amount)}/siklus</span>
                                 <span>•</span>
-                                <span>💳 {c.wallet_name || "Operasional"}</span>
-                                {c.to_wallet_name && (
-                                  <span> ➔ 🏦 {c.to_wallet_name}</span>
+                                {c.to_wallet_name ? (
+                                  <span className="inline-flex items-center gap-1 font-medium text-espresso">
+                                    <CreditCard className="h-3 w-3 shrink-0" />
+                                    <span>{c.wallet_name || "Operasional"} ➔ {c.to_wallet_name}</span>
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1">
+                                    <CreditCard className="h-3 w-3 shrink-0" />
+                                    <span>Dipotong dari: {c.wallet_name || "Operasional"}</span>
+                                  </span>
                                 )}
                               </div>
                             </div>
@@ -2284,7 +2328,6 @@ export default function ForecastPage() {
           <div className="w-full max-w-sm rounded-3xl border border-surface-border bg-surface p-6 shadow-2xl space-y-4">
             <div>
               <h3 className="text-base font-bold text-espresso">Tambah Tagihan / Siklus Biaya</h3>
-              <p className="text-[11px] text-espresso-muted">Tagihan bulanan, siklus berkala, atau setoran tabungan rutin</p>
             </div>
             <form onSubmit={handleCreateFixed} className="space-y-3">
               <div>
@@ -2293,13 +2336,14 @@ export default function ForecastPage() {
                   <button
                     type="button"
                     onClick={() => setFixedExpenseType("EXPENSE")}
-                    className={`rounded-lg py-1.5 text-[11px] font-bold border transition ${
+                    className={`rounded-lg py-1.5 inline-flex items-center justify-center gap-1.5 text-[11px] font-bold border transition ${
                       fixedExpenseType === "EXPENSE"
                         ? "bg-terracotta text-white border-terracotta shadow-xs"
                         : "bg-surface-card text-espresso-muted border-surface-border hover:text-espresso"
                     }`}
                   >
-                    💸 Tagihan / Biaya
+                    <ArrowUpRight className="h-3.5 w-3.5 shrink-0" />
+                    <span>Tagihan / Biaya</span>
                   </button>
                   <button
                     type="button"
@@ -2308,13 +2352,14 @@ export default function ForecastPage() {
                       const savingsWallet = wallets?.find((w: any) => w.purpose === "savings");
                       if (savingsWallet) setFixedToWalletId(savingsWallet.id);
                     }}
-                    className={`rounded-lg py-1.5 text-[11px] font-bold border transition ${
+                    className={`rounded-lg py-1.5 inline-flex items-center justify-center gap-1.5 text-[11px] font-bold border transition ${
                       fixedExpenseType === "SAVINGS_TRANSFER"
                         ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
                         : "bg-surface-card text-espresso-muted border-surface-border hover:text-espresso"
                     }`}
                   >
-                    💰 Setor Tabungan
+                    <PiggyBank className="h-3.5 w-3.5 shrink-0" />
+                    <span>Setor Tabungan</span>
                   </button>
                 </div>
               </div>
@@ -2555,7 +2600,6 @@ export default function ForecastPage() {
             <div className="flex items-center justify-between border-b border-surface-border pb-3">
               <div>
                 <h3 className="text-base font-bold text-espresso">Atur Peruntukan Dompet</h3>
-                <p className="text-xs text-espresso-muted">Pilih dompet yang jadi tabungan atau operasional</p>
               </div>
               <button
                 type="button"
@@ -2593,13 +2637,14 @@ export default function ForecastPage() {
                         queryClient.invalidateQueries({ queryKey: ["wallets"] });
                         queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
                       }}
-                      className={`rounded-xl py-1.5 px-1.5 transition text-center border ${
+                      className={`rounded-xl py-1.5 px-1.5 transition text-center border inline-flex items-center justify-center gap-1 ${
                         (w.purpose || "operational") === "operational"
                           ? "bg-terracotta text-white border-terracotta shadow-xs"
                           : "bg-surface text-espresso-muted border-surface-border hover:text-espresso"
                       }`}
                     >
-                      💼 Operasional
+                      <Wallet className="h-3 w-3 shrink-0" />
+                      <span>Operasional</span>
                     </button>
 
                     <button
@@ -2611,13 +2656,14 @@ export default function ForecastPage() {
                         queryClient.invalidateQueries({ queryKey: ["wallets"] });
                         queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
                       }}
-                      className={`rounded-xl py-1.5 px-1.5 transition text-center border ${
+                      className={`rounded-xl py-1.5 px-1.5 transition text-center border inline-flex items-center justify-center gap-1 ${
                         w.purpose === "savings"
                           ? "bg-income text-white border-income shadow-xs"
                           : "bg-surface text-espresso-muted border-surface-border hover:text-income"
                       }`}
                     >
-                      💰 Tabungan
+                      <PiggyBank className="h-3 w-3 shrink-0" />
+                      <span>Tabungan</span>
                     </button>
 
                     <button
@@ -2629,13 +2675,14 @@ export default function ForecastPage() {
                         queryClient.invalidateQueries({ queryKey: ["wallets"] });
                         queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
                       }}
-                      className={`rounded-xl py-1.5 px-1.5 transition text-center border ${
+                      className={`rounded-xl py-1.5 px-1.5 transition text-center border inline-flex items-center justify-center gap-1 ${
                         w.purpose === "subscription"
                           ? "bg-amber text-espresso border-amber shadow-xs"
                           : "bg-surface text-espresso-muted border-surface-border hover:text-terracotta"
                       }`}
                     >
-                      💳 Tagihan
+                      <Receipt className="h-3 w-3 shrink-0" />
+                      <span>Tagihan</span>
                     </button>
                   </div>
                 </div>
@@ -2663,7 +2710,6 @@ export default function ForecastPage() {
           <div className="w-full max-w-sm rounded-3xl border border-surface-border bg-surface p-6 shadow-2xl space-y-4">
             <div>
               <h3 className="text-base font-bold text-espresso">Tambah Rencana Transaksi</h3>
-              <p className="text-[11px] text-espresso-muted">Skenario transaksi masa depan untuk melihat sisa saldo</p>
             </div>
             <form onSubmit={handleCreatePlanned} className="space-y-3">
               <div>
@@ -2695,32 +2741,36 @@ export default function ForecastPage() {
                 <label className="block text-xs font-semibold text-espresso mb-1">Jenis Rencana</label>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                   {[
-                    { id: "EXPENSE", label: "💸 Pengeluaran" },
-                    { id: "INCOME", label: "💵 Pemasukan" },
-                    { id: "TRANSFER", label: "🔄 Pindah Dompet" },
-                    { id: "SAVINGS", label: "💰 Menabung" },
-                  ].map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => {
-                        setPlannedType(item.id as any);
-                        if (item.id === "SAVINGS") {
-                          const savingsWallet = wallets?.find((w: any) => w.purpose === "savings");
-                          if (savingsWallet) setPlannedToWalletId(savingsWallet.id);
-                        }
-                      }}
-                      className={`rounded-lg py-1.5 text-[10px] font-bold border transition ${
-                        plannedType === item.id
-                          ? item.id === "SAVINGS"
-                            ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
-                            : "bg-terracotta text-white border-terracotta shadow-xs"
-                          : "bg-surface-card text-espresso-muted border-surface-border hover:text-espresso"
-                      }`}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
+                    { id: "EXPENSE", label: "Pengeluaran", icon: ArrowUpRight },
+                    { id: "INCOME", label: "Pemasukan", icon: ArrowDownRight },
+                    { id: "TRANSFER", label: "Pindah Dompet", icon: ArrowRightLeft },
+                    { id: "SAVINGS", label: "Menabung", icon: PiggyBank },
+                  ].map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          setPlannedType(item.id as any);
+                          if (item.id === "SAVINGS") {
+                            const savingsWallet = wallets?.find((w: any) => w.purpose === "savings");
+                            if (savingsWallet) setPlannedToWalletId(savingsWallet.id);
+                          }
+                        }}
+                        className={`rounded-lg py-1.5 px-1 inline-flex items-center justify-center gap-1 text-[10px] font-bold border transition ${
+                          plannedType === item.id
+                            ? item.id === "SAVINGS"
+                              ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
+                              : "bg-terracotta text-white border-terracotta shadow-xs"
+                            : "bg-surface-card text-espresso-muted border-surface-border hover:text-espresso"
+                        }`}
+                      >
+                        <Icon className="h-3 w-3 shrink-0" />
+                        <span>{item.label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -2810,6 +2860,179 @@ export default function ForecastPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* MODAL 6: DETAIL TANGGAL BUKU KAS MASA DEPAN                           */}
+      {/* ===================================================================== */}
+      {selectedDayDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm sm:max-w-md rounded-3xl border border-surface-border bg-surface p-5 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
+            {/* Header Modal */}
+            <div className="flex items-center justify-between border-b border-surface-border pb-3 shrink-0">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-terracotta shrink-0" />
+                <h3 className="text-base font-bold text-espresso flex items-center gap-2">
+                  <span>{selectedDayDetail.date}</span>
+                  {selectedDayDetail.is_today && (
+                    <span className="rounded-md bg-terracotta text-white px-1.5 py-0.2 text-[9px] font-bold">
+                      Hari Ini
+                    </span>
+                  )}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedDayDetail(null)}
+                className="rounded-full p-1 text-espresso-muted hover:bg-surface-border/50 hover:text-espresso transition"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Konten Scrollable */}
+            <div className="space-y-4 overflow-y-auto pr-1">
+              {/* Ringkasan Saldo & Arus Kas */}
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="rounded-2xl border border-surface-border bg-surface-card p-2.5 flex flex-col justify-between">
+                  <span className="text-[10px] text-espresso-muted uppercase font-bold">Kas Ops Awal</span>
+                  <span className="text-sm font-extrabold text-espresso">
+                    {formatIDR(selectedDayDetail.initial_balance)}
+                  </span>
+                </div>
+
+                <div className={`rounded-2xl border p-2.5 flex flex-col justify-between ${
+                  selectedDayDetail.closing_balance >= 0
+                    ? "border-surface-border bg-surface-card"
+                    : "border-expense/30 bg-expense/10"
+                }`}>
+                  <span className="text-[10px] text-espresso-muted uppercase font-bold">Kas Ops Akhir</span>
+                  <span className={`text-sm font-extrabold ${
+                    selectedDayDetail.closing_balance >= 0 ? "text-terracotta" : "text-expense"
+                  }`}>
+                    {formatIDR(selectedDayDetail.closing_balance)}
+                  </span>
+                </div>
+
+                <div className="rounded-2xl border border-income/20 bg-income/10 p-2.5 flex flex-col justify-between">
+                  <span className="text-[10px] text-income uppercase font-bold">Pemasukan</span>
+                  <span className="text-sm font-extrabold text-income">
+                    +{formatIDR(selectedDayDetail.total_inflow)}
+                  </span>
+                </div>
+
+                <div className="rounded-2xl border border-expense/20 bg-expense/10 p-2.5 flex flex-col justify-between">
+                  <span className="text-[10px] text-expense uppercase font-bold">Pengeluaran</span>
+                  <span className="text-sm font-extrabold text-expense">
+                    -{formatIDR(selectedDayDetail.total_outflow)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Posisi Tabungan */}
+              <div className="rounded-2xl border border-emerald-300 bg-emerald-50/50 p-3 text-xs space-y-1">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-emerald-800 font-bold">
+                    <PiggyBank className="h-4 w-4 text-emerald-700 shrink-0" />
+                    <span>Tabungan Tersimpan</span>
+                  </div>
+                  {Number(selectedDayDetail.day_saved) > 0 && (
+                    <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded-md border border-emerald-300">
+                      +{formatIDR(selectedDayDetail.day_saved)} disisihkan
+                    </span>
+                  )}
+                </div>
+                <div className="text-base font-extrabold text-emerald-900">
+                  {formatIDR(selectedDayDetail.running_savings_balance ?? 0)}
+                </div>
+              </div>
+
+              {/* Rincian Transaksi & Mutasi Hari Ini */}
+              <div className="space-y-2">
+                <div className="text-xs font-bold text-espresso">
+                  Rincian Transaksi Terjadwal
+                </div>
+
+                {selectedDayDetail.events && selectedDayDetail.events.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {selectedDayDetail.events.map((ev: any, evIdx: number) => {
+                      const badgeStyleMap: Record<string, string> = {
+                        INCOME: "bg-income/10 text-income border-income/30",
+                        MEAL: "bg-amber/15 text-terracotta border-amber/30",
+                        CYCLICAL: "bg-purple-100 text-purple-800 border-purple-200",
+                        FIXED_BILL: "bg-espresso/10 text-espresso border-espresso/20",
+                        PLANNED: "bg-blue-100 text-blue-800 border-blue-200",
+                        SAVINGS: "bg-emerald-100 text-emerald-800 border-emerald-300 font-bold",
+                      };
+                      const badgeStyle = badgeStyleMap[ev.type] || "bg-surface text-espresso";
+                      const displayName = (ev.name || "")
+                        .replace(/^Setor Tabungan:\s*/i, "")
+                        .replace(/^Alokasi Pos:\s*/i, "")
+                        .replace(/^Transfer Keluar:\s*/i, "")
+                        .replace(/^Transfer Masuk:\s*/i, "")
+                        .replace(/^Pemasukan:\s*/i, "")
+                        .replace(/^\[.*?\]\s*/i, "");
+
+                      return (
+                        <div
+                          key={evIdx}
+                          className="flex items-center justify-between p-2.5 rounded-xl border border-surface-border bg-surface-card text-xs"
+                        >
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-1.5 font-bold text-espresso">
+                              {ev.type === "SAVINGS" && <PiggyBank className="h-3.5 w-3.5 text-emerald-700 shrink-0" />}
+                              <span>{displayName}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-[10px] text-espresso-muted">
+                              <span className={`rounded px-1.5 py-0.2 border text-[9px] font-semibold ${badgeStyle}`}>
+                                {ev.type === "SAVINGS"
+                                  ? "Setor Tabungan"
+                                  : ev.type === "INCOME"
+                                  ? "Pemasukan"
+                                  : ev.type === "CYCLICAL"
+                                  ? "Biaya Berkala"
+                                  : ev.type === "FIXED_BILL"
+                                  ? "Tagihan"
+                                  : ev.type === "PLANNED"
+                                  ? "Rencana"
+                                  : "Pengeluaran"}
+                              </span>
+                              {ev.wallet_name && (
+                                <span>
+                                  {ev.wallet_name}{ev.to_wallet_name ? ` ➔ ${ev.to_wallet_name}` : ""}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <span className={`font-extrabold ${
+                            ev.direction === "INFLOW" ? "text-income" : "text-expense"
+                          }`}>
+                            {ev.direction === "INFLOW" ? "+" : "-"}{formatIDR(ev.amount)}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="py-6 text-center text-xs text-espresso-muted italic rounded-xl border border-dashed border-surface-border">
+                    Tidak ada transaksi terjadwal pada tanggal ini.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer Modal */}
+            <div className="pt-2 border-t border-surface-border shrink-0">
+              <button
+                type="button"
+                onClick={() => setSelectedDayDetail(null)}
+                className="w-full rounded-xl bg-surface-card py-2.5 text-xs font-semibold text-espresso hover:bg-surface-border/50 transition"
+              >
+                Tutup
+              </button>
+            </div>
           </div>
         </div>
       )}

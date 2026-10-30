@@ -452,6 +452,9 @@ class ForecastService:
                 category_name=cat_map.get(f.category_id),
                 wallet_id=f.wallet_id,
                 wallet_name=wallet_map[f.wallet_id].name if f.wallet_id and f.wallet_id in wallet_map else None,
+                to_wallet_id=f.to_wallet_id,
+                to_wallet_name=wallet_map[f.to_wallet_id].name if f.to_wallet_id and f.to_wallet_id in wallet_map else None,
+                expense_type=f.expense_type or "EXPENSE",
                 due_day_of_month=f.due_day_of_month,
                 frequency=f.frequency,
                 interval_value=f.interval_value,
@@ -900,10 +903,10 @@ class ForecastService:
 
         if filter_type == "all_operational":
             initial_balance = sum(
-                (w.balance for w in wallets if getattr(w, "purpose", "operational") == "operational"),
+                (w.balance for w in wallets if getattr(w, "purpose", "operational") in ("operational", "subscription")),
                 Decimal("0.00"),
             )
-            filter_label = "Semua Dompet Operasional"
+            filter_label = "Semua Dompet Operasional & Tagihan"
         elif filter_type == "all_savings":
             initial_balance = sum(
                 (w.balance for w in wallets if getattr(w, "purpose", None) == "savings"),
@@ -1004,7 +1007,7 @@ class ForecastService:
                 elif filter_type == "all_operational":
                     if s.wallet_id:
                         w = wallet_map.get(s.wallet_id)
-                        stream_matches = (getattr(w, "purpose", "operational") == "operational")
+                        stream_matches = (getattr(w, "purpose", "operational") in ("operational", "subscription"))
                     else:
                         stream_matches = True
                 elif filter_type == "all_savings":
@@ -1037,7 +1040,7 @@ class ForecastService:
                             pt_matches = True
                         elif filter_type == "all_operational":
                             w = wallet_map.get(pt.wallet_id) if pt.wallet_id else None
-                            pt_matches = (not w or getattr(w, "purpose", "operational") == "operational")
+                            pt_matches = (not w or getattr(w, "purpose", "operational") in ("operational", "subscription"))
                         elif filter_type == "all_savings":
                             w = wallet_map.get(pt.wallet_id) if pt.wallet_id else None
                             pt_matches = (w and getattr(w, "purpose", None) == "savings")
@@ -1066,8 +1069,8 @@ class ForecastService:
                             to_w = wallet_map.get(pt.to_wallet_id) if pt.to_wallet_id else None
                             from_w = wallet_map.get(pt.wallet_id) if pt.wallet_id else None
                             pt_matches = (
-                                to_w and getattr(to_w, "purpose", "operational") == "operational" and
-                                from_w and getattr(from_w, "purpose", "operational") != "operational"
+                                to_w and getattr(to_w, "purpose", "operational") in ("operational", "subscription") and
+                                from_w and getattr(from_w, "purpose", "operational") not in ("operational", "subscription")
                             )
                         elif filter_type == "all_savings":
                             to_w = wallet_map.get(pt.to_wallet_id) if pt.to_wallet_id else None
@@ -1163,7 +1166,7 @@ class ForecastService:
                     from_w = wallet_map.get(fe.wallet_id) if fe.wallet_id else None
                     to_w = wallet_map.get(fe.to_wallet_id) if fe.to_wallet_id else None
 
-                    # Smart Auto-Detection untuk siklus tabungan
+                    # Smart Auto-Detection untuk siklus tabungan atau transfer antar dompet
                     name_lower = (fe.name or "").lower()
                     has_savings_keyword = any(kw in name_lower for kw in ["tabung", "saving", "invest", "celengan", "nabung"])
 
@@ -1173,26 +1176,25 @@ class ForecastService:
                         or has_savings_keyword
                     )
 
-                    # Auto-fallback ke dompet tabungan utama jika belum dispesifikasikan
-                    if is_savings_transfer and not to_w:
+                    # Auto-fallback ke dompet tabungan utama jika belum dispesifikasikan dan berbau tabungan
+                    if has_savings_keyword and not to_w:
                         primary_savings = next((w for w in wallets if getattr(w, "purpose", None) == "savings"), None)
                         if primary_savings:
                             to_w = primary_savings
 
-                    if is_savings_transfer:
-                        # Mutasi transfer tabungan rutin
+                    if is_savings_transfer and to_w and getattr(to_w, "purpose", None) == "savings":
+                        # Transfer ke tabungan terproteksi (mengurangi kas operasional, menambah tabungan)
                         if filter_type in ("all_wallets", "custom_balance"):
                             pass  # Internal transfer antar dompet
                         elif filter_type == "all_operational":
-                            if not from_w or getattr(from_w, "purpose", "operational") == "operational":
+                            if not from_w or getattr(from_w, "purpose", "operational") in ("operational", "subscription"):
                                 day_outflow += fe.amount
                         elif filter_type == "all_savings":
-                            if to_w and getattr(to_w, "purpose", None) == "savings":
-                                day_inflow += fe.amount
+                            day_inflow += fe.amount
                         else:
                             if str(fe.wallet_id) == filter_type:
                                 day_outflow += fe.amount
-                            elif to_w and str(to_w.id) == filter_type:
+                            elif str(to_w.id) == filter_type:
                                 day_inflow += fe.amount
 
                         running_savings_balance += fe.amount
@@ -1202,22 +1204,69 @@ class ForecastService:
                         events.append(
                             ProjectedDayEvent(
                                 type="SAVINGS",
-                                name=f"Setor Tabungan: {fe.name}",
+                                name=fe.name,
                                 amount=fe.amount,
                                 direction="OUTFLOW" if filter_type == "all_operational" else "INFLOW",
                                 wallet_id=fe.wallet_id,
                                 wallet_name=from_w.name if from_w else None,
-                                to_wallet_id=to_w.id if to_w else fe.to_wallet_id,
-                                to_wallet_name=to_w.name if to_w else "Tabungan",
+                                to_wallet_id=to_w.id,
+                                to_wallet_name=to_w.name,
                             )
                         )
+                    elif to_w and getattr(to_w, "purpose", None) != "savings":
+                        # Transfer antar pos/dompet belanja (misal: BCA -> Subscription)
+                        if filter_type in ("all_wallets", "custom_balance", "all_operational"):
+                            # Pergeseran pos di dalam kas operasional (net 0)
+                            events.append(
+                                ProjectedDayEvent(
+                                    type="CYCLICAL",
+                                    name=fe.name,
+                                    amount=fe.amount,
+                                    direction="NEUTRAL",
+                                    wallet_id=fe.wallet_id,
+                                    wallet_name=from_w.name if from_w else None,
+                                    to_wallet_id=to_w.id,
+                                    to_wallet_name=to_w.name,
+                                )
+                            )
+                        elif filter_type == "all_savings":
+                            pass
+                        else:
+                            if str(fe.wallet_id) == filter_type:
+                                day_outflow += fe.amount
+                                events.append(
+                                    ProjectedDayEvent(
+                                        type="CYCLICAL",
+                                        name=fe.name,
+                                        amount=fe.amount,
+                                        direction="OUTFLOW",
+                                        wallet_id=fe.wallet_id,
+                                        wallet_name=from_w.name if from_w else None,
+                                        to_wallet_id=to_w.id,
+                                        to_wallet_name=to_w.name,
+                                    )
+                                )
+                            elif str(to_w.id) == filter_type:
+                                day_inflow += fe.amount
+                                events.append(
+                                    ProjectedDayEvent(
+                                        type="CYCLICAL",
+                                        name=fe.name,
+                                        amount=fe.amount,
+                                        direction="INFLOW",
+                                        wallet_id=fe.wallet_id,
+                                        wallet_name=from_w.name if from_w else None,
+                                        to_wallet_id=to_w.id,
+                                        to_wallet_name=to_w.name,
+                                    )
+                                )
                     else:
                         # Pengeluaran rutin biasa (EXPENSE)
                         fe_matches = False
                         if filter_type in ("all_wallets", "custom_balance"):
                             fe_matches = True
                         elif filter_type == "all_operational":
-                            fe_matches = (not from_w or getattr(from_w, "purpose", "operational") == "operational")
+                            fe_matches = (not from_w or getattr(from_w, "purpose", "operational") in ("operational", "subscription"))
                         elif filter_type == "all_savings":
                             fe_matches = (from_w and getattr(from_w, "purpose", None) == "savings")
                         else:

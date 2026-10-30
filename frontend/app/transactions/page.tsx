@@ -137,7 +137,6 @@ export default function TransactionsPage() {
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-espresso">Buku Besar Transaksi</h1>
-          <p className="text-xs text-espresso-muted">Riwayat mutasi pengeluaran, pemasukan, dan transfer saldo.</p>
         </div>
 
         <button
