@@ -39,6 +39,19 @@ class FixedExpense(SQLModel, table=True):
         nullable=True,
         ondelete="SET NULL",
     )
+    to_wallet_id: Optional[uuid.UUID] = Field(
+        default=None,
+        foreign_key="wallets.id",
+        index=True,
+        nullable=True,
+        ondelete="SET NULL",
+        description="Dompet tujuan jika siklus berupa transfer tabungan rutin"
+    )
+    expense_type: str = Field(
+        default="EXPENSE",
+        max_length=20,
+        description="EXPENSE (biaya rutin keluar) atau SAVINGS_TRANSFER (transfer ke tabungan)"
+    )
     paid_transaction_id: Optional[uuid.UUID] = Field(
         default=None,
         foreign_key="transactions.id",

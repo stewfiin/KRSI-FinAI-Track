@@ -81,6 +81,8 @@ class FixedExpenseBase(BaseModel):
     amount: Decimal = Field(..., gt=0, description="Nominal tagihan per siklus")
     category_id: Optional[uuid.UUID] = None
     wallet_id: Optional[uuid.UUID] = Field(default=None, description="Dompet pembayar khusus (misal: Subscription / BCA)")
+    to_wallet_id: Optional[uuid.UUID] = Field(default=None, description="Dompet tujuan jika siklus transfer tabungan")
+    expense_type: str = Field(default="EXPENSE", description="EXPENSE (biaya keluar) atau SAVINGS_TRANSFER (transfer ke tabungan)")
     due_day_of_month: Optional[int] = Field(default=None, ge=1, le=31)
     frequency: str = Field(default="monthly", description="monthly, weekly, biweekly, every_n_days")
     interval_value: Optional[int] = Field(default=None, ge=1, description="Interval hari jika frequency=every_n_days (cth: 4 hari)")
@@ -97,6 +99,8 @@ class FixedExpenseUpdate(BaseModel):
     amount: Optional[Decimal] = None
     category_id: Optional[uuid.UUID] = None
     wallet_id: Optional[uuid.UUID] = None
+    to_wallet_id: Optional[uuid.UUID] = None
+    expense_type: Optional[str] = None
     due_day_of_month: Optional[int] = Field(default=None, ge=1, le=31)
     frequency: Optional[str] = None
     interval_value: Optional[int] = None
@@ -109,6 +113,7 @@ class FixedExpenseResponse(FixedExpenseBase):
     user_id: uuid.UUID
     category_name: Optional[str] = None
     wallet_name: Optional[str] = None
+    to_wallet_name: Optional[str] = None
     last_paid_at: Optional[datetime] = None
     created_at: datetime
 
@@ -155,9 +160,9 @@ class WishlistResponse(WishlistBase):
 # Planned Transaction Schemas (Rencana Transaksi Masa Depan)
 # ==============================================================================
 class PlannedTransactionBase(BaseModel):
-    name: str = Field(..., max_length=150, description="Nama rencana transaksi (cth: Servis Motor, Beli Buku)")
+    name: str = Field(..., max_length=150, description="Nama rencana transaksi (cth: Servis Motor, Beli Buku, Nabung)")
     amount: Decimal = Field(..., gt=0, description="Nominal rencana transaksi")
-    type: str = Field(default="EXPENSE", description="EXPENSE | INCOME | TRANSFER")
+    type: str = Field(default="EXPENSE", description="EXPENSE | INCOME | TRANSFER | SAVINGS")
     wallet_id: Optional[uuid.UUID] = Field(default=None, description="Dompet sumber pengeluaran / tujuan pemasukan")
     to_wallet_id: Optional[uuid.UUID] = Field(default=None, description="Dompet tujuan jika type=TRANSFER")
     category_id: Optional[uuid.UUID] = None
@@ -318,15 +323,23 @@ class RangeProjectionRequest(BaseModel):
     custom_daily_meal: Optional[Decimal] = Field(
         default=None, description="Override patokan belanja harian jika diinginkan"
     )
+    include_daily_savings: bool = Field(
+        default=False, description="Apakah menyertakan simulasi setoran alokasi tabungan harian"
+    )
+    custom_daily_savings: Optional[Decimal] = Field(
+        default=None, description="Override nominal setoran tabungan harian jika diinginkan (Rp/hari)"
+    )
 
 
 class ProjectedDayEvent(BaseModel):
-    type: str  # "INCOME" | "MEAL" | "CYCLICAL" | "FIXED_BILL" | "PLANNED"
+    type: str  # "INCOME" | "MEAL" | "CYCLICAL" | "FIXED_BILL" | "PLANNED" | "SAVINGS"
     name: str
     amount: Decimal
     direction: str  # "INFLOW" | "OUTFLOW"
     wallet_id: Optional[uuid.UUID] = None
     wallet_name: Optional[str] = None
+    to_wallet_id: Optional[uuid.UUID] = None
+    to_wallet_name: Optional[str] = None
 
 
 class ProjectedDayItem(BaseModel):
@@ -337,6 +350,8 @@ class ProjectedDayItem(BaseModel):
     total_inflow: Decimal
     total_outflow: Decimal
     closing_balance: Decimal
+    running_savings_balance: Decimal = Decimal("0.00")
+    day_saved: Decimal = Decimal("0.00")
     is_deficit: bool
     events: List[ProjectedDayEvent] = []
 
@@ -357,5 +372,10 @@ class RangeProjectionResponse(BaseModel):
     is_safe: bool
     is_clamped: bool = False
     max_allowed_days: int = 365
+    initial_savings_balance: Decimal = Decimal("0.00")
+    total_saved_in_range: Decimal = Decimal("0.00")
+    final_savings_balance: Decimal = Decimal("0.00")
+    target_savings: Decimal = Decimal("0.00")
+    savings_achievement_rate: Decimal = Decimal("0.00")
     timeline: List[ProjectedDayItem]
 

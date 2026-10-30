@@ -51,23 +51,27 @@ export default function ForecastPage() {
 
   // Add Fixed Expense Modal State
   const [isAddFixedModalOpen, setIsAddFixedModalOpen] = useState(false);
+  const [fixedExpenseType, setFixedExpenseType] = useState<"EXPENSE" | "SAVINGS_TRANSFER">("EXPENSE");
   const [fixedName, setFixedName] = useState("");
   const [fixedAmount, setFixedAmount] = useState("");
   const [fixedWalletId, setFixedWalletId] = useState("");
-  const [fixedFrequency, setFixedFrequency] = useState<"monthly" | "weekly" | "biweekly" | "every_n_days">("monthly");
+  const [fixedToWalletId, setFixedToWalletId] = useState("");
+  const [fixedFrequency, setFixedFrequency] = useState<"monthly" | "daily" | "weekly" | "biweekly" | "every_n_days">("monthly");
   const [fixedDueDay, setFixedDueDay] = useState(1);
   const [fixedIntervalValue, setFixedIntervalValue] = useState(4);
   const [fixedFilter, setFixedFilter] = useState<"all" | "monthly" | "cyclical">("all");
   const [isSavingFixed, setIsSavingFixed] = useState(false);
 
-  // Blueprint Cyclical Expenses State (Bensin tiap N hari, pulsa, galon)
+  // Blueprint Cyclical Expenses State (Bensin tiap N hari, pulsa, galon, setor tabungan harian)
   const [isAddCyclicalOpen, setIsAddCyclicalOpen] = useState(false);
+  const [cyclicalExpenseType, setCyclicalExpenseType] = useState<"EXPENSE" | "SAVINGS_TRANSFER">("EXPENSE");
   const [cyclicalName, setCyclicalName] = useState("");
   const [cyclicalAmount, setCyclicalAmount] = useState("");
-  const [cyclicalFrequency, setCyclicalFrequency] = useState<"every_n_days" | "weekly" | "biweekly">("every_n_days");
+  const [cyclicalFrequency, setCyclicalFrequency] = useState<"daily" | "every_n_days" | "weekly" | "biweekly">("daily");
   const [cyclicalInterval, setCyclicalInterval] = useState(4);
   const [cyclicalWeekday, setCyclicalWeekday] = useState(5); // 5=Sabtu
   const [cyclicalWalletId, setCyclicalWalletId] = useState("");
+  const [cyclicalToWalletId, setCyclicalToWalletId] = useState("");
   const [isSavingCyclical, setIsSavingCyclical] = useState(false);
 
   // Quick Wallet Purpose Config Modal State
@@ -97,12 +101,14 @@ export default function ForecastPage() {
   const [projEndDate, setProjEndDate] = useState("");
   const [projIncludeMeal, setProjIncludeMeal] = useState(true);
   const [projCustomDailyMeal, setProjCustomDailyMeal] = useState("");
+  const [projIncludeSavings, setProjIncludeSavings] = useState(false);
+  const [projCustomDailySavings, setProjCustomDailySavings] = useState("");
 
   // Planned Transaction Modal State
   const [isAddPlannedModalOpen, setIsAddPlannedModalOpen] = useState(false);
   const [plannedName, setPlannedName] = useState("");
   const [plannedAmount, setPlannedAmount] = useState("");
-  const [plannedType, setPlannedType] = useState<"EXPENSE" | "INCOME" | "TRANSFER">("EXPENSE");
+  const [plannedType, setPlannedType] = useState<"EXPENSE" | "INCOME" | "TRANSFER" | "SAVINGS">("EXPENSE");
   const [plannedDate, setPlannedDate] = useState(new Date().toISOString().split("T")[0]);
   const [plannedWalletId, setPlannedWalletId] = useState("");
   const [plannedToWalletId, setPlannedToWalletId] = useState("");
@@ -209,6 +215,8 @@ export default function ForecastPage() {
       effectiveEndDate,
       projIncludeMeal,
       projCustomDailyMeal,
+      projIncludeSavings,
+      projCustomDailySavings,
     ],
     queryFn: async () => {
       const payload: any = {
@@ -216,12 +224,16 @@ export default function ForecastPage() {
         end_date: effectiveEndDate || null,
         wallet_filter: projWalletFilter,
         include_daily_meal: projIncludeMeal,
+        include_daily_savings: projIncludeSavings,
       };
       if (projWalletFilter === "custom_balance" && projCustomInitialBalance) {
         payload.custom_initial_balance = parseFloat(projCustomInitialBalance);
       }
       if (projCustomDailyMeal) {
         payload.custom_daily_meal = parseFloat(projCustomDailyMeal);
+      }
+      if (projCustomDailySavings) {
+        payload.custom_daily_savings = parseFloat(projCustomDailySavings);
       }
       return (await api.post("/api/v1/forecast/range-projection", payload)).data;
     },
@@ -256,7 +268,7 @@ export default function ForecastPage() {
         type: plannedType,
         planned_date: plannedDate,
         wallet_id: plannedWalletId || null,
-        to_wallet_id: plannedType === "TRANSFER" ? (plannedToWalletId || null) : null,
+        to_wallet_id: (plannedType === "TRANSFER" || plannedType === "SAVINGS") ? (plannedToWalletId || null) : null,
         notes: plannedNotes.trim() || null,
       });
       setIsAddPlannedModalOpen(false);
@@ -384,20 +396,24 @@ export default function ForecastPage() {
         name: fixedName.trim(),
         amount: parseFloat(fixedAmount),
         wallet_id: fixedWalletId || null,
+        to_wallet_id: fixedExpenseType === "SAVINGS_TRANSFER" ? (fixedToWalletId || null) : null,
+        expense_type: fixedExpenseType,
         frequency: fixedFrequency,
         due_day_of_month: fixedFrequency === "monthly" ? fixedDueDay : null,
-        interval_value: fixedFrequency === "every_n_days" ? fixedIntervalValue : (fixedFrequency === "weekly" ? fixedIntervalValue : null),
+        interval_value: fixedFrequency === "every_n_days" ? fixedIntervalValue : (fixedFrequency === "weekly" ? fixedIntervalValue : 1),
         anchor_date: new Date().toISOString(),
       });
       setIsAddFixedModalOpen(false);
       setFixedName("");
       setFixedAmount("");
       setFixedWalletId("");
+      setFixedToWalletId("");
       setFixedFrequency("monthly");
       setFixedDueDay(1);
       setFixedIntervalValue(4);
       refetchSummary();
       refetchLedger();
+      refetchRangeProjection();
     } catch (err: any) {
       alert(err.response?.data?.detail || "Gagal menambah tagihan pasti.");
     } finally {
@@ -414,17 +430,21 @@ export default function ForecastPage() {
         name: cyclicalName.trim(),
         amount: parseFloat(cyclicalAmount),
         wallet_id: cyclicalWalletId || null,
+        to_wallet_id: cyclicalExpenseType === "SAVINGS_TRANSFER" ? (cyclicalToWalletId || null) : null,
+        expense_type: cyclicalExpenseType,
         frequency: cyclicalFrequency,
-        interval_value: cyclicalFrequency === "every_n_days" ? cyclicalInterval : cyclicalWeekday,
+        interval_value: cyclicalFrequency === "every_n_days" ? cyclicalInterval : (cyclicalFrequency === "weekly" ? cyclicalWeekday : 1),
         anchor_date: new Date().toISOString(),
       });
       setCyclicalName("");
       setCyclicalAmount("");
       setCyclicalWalletId("");
+      setCyclicalToWalletId("");
       setCyclicalInterval(4);
       setIsAddCyclicalOpen(false);
       refetchSummary();
       refetchLedger();
+      refetchRangeProjection();
     } catch (err: any) {
       alert(err.response?.data?.detail || "Gagal menambah siklus biaya berkala.");
     } finally {
@@ -829,20 +849,55 @@ export default function ForecastPage() {
                   </div>
                 )}
 
-                {/* Opsi Jatah Makan Harian */}
+                {/* Opsi Jatah Makan Harian & Simulasi Alokasi Tabungan */}
                 {projWalletFilter !== "all_savings" && (
-                  <div className="flex items-center justify-between pt-1 border-t border-surface-border text-xs">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={projIncludeMeal}
-                        onChange={(e) => setProjIncludeMeal(e.target.checked)}
-                        className="rounded border-surface-border text-terracotta focus:ring-terracotta"
-                      />
-                      <span className="text-espresso font-medium text-[11px]">
-                        Hitung Patokan Makan Harian ({formatIDR(plan?.daily_living_budget || 0)}/hari)
-                      </span>
-                    </label>
+                  <div className="space-y-2 pt-2 border-t border-surface-border text-xs">
+                    <div className="flex items-center justify-between">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={projIncludeMeal}
+                          onChange={(e) => setProjIncludeMeal(e.target.checked)}
+                          className="rounded border-surface-border text-terracotta focus:ring-terracotta"
+                        />
+                        <span className="text-espresso font-medium text-[11px]">
+                          Hitung Patokan Makan Harian ({formatIDR(plan?.daily_living_budget || 0)}/hari)
+                        </span>
+                      </label>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={projIncludeSavings}
+                          onChange={(e) => setProjIncludeSavings(e.target.checked)}
+                          className="rounded border-emerald-500 text-emerald-600 focus:ring-emerald-500"
+                        />
+                        <div>
+                          <span className="text-emerald-900 font-bold text-[11px] block">
+                            💰 Simulasikan Alokasi Setor Tabungan
+                          </span>
+                          <span className="text-emerald-700 text-[10px] block">
+                            Alokasikan {formatIDR(projCustomDailySavings || (plan?.monthly_savings_target ? Math.round(plan.monthly_savings_target / 30) : 0))}/hari dari kas operasional ke tabungan
+                          </span>
+                        </div>
+                      </label>
+
+                      {projIncludeSavings && (
+                        <div className="flex items-center gap-1.5 pl-6 sm:pl-0">
+                          <span className="text-[10px] text-emerald-800 font-semibold whitespace-nowrap">Rp/hari:</span>
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder={String(plan?.monthly_savings_target ? Math.round(plan.monthly_savings_target / 30) : 25000)}
+                            value={projCustomDailySavings}
+                            onChange={(e) => setProjCustomDailySavings(e.target.value)}
+                            className="w-28 rounded-lg border border-emerald-400 bg-surface px-2 py-1 text-xs font-bold text-emerald-900 text-right focus:outline-none focus:border-emerald-600"
+                          />
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -863,10 +918,10 @@ export default function ForecastPage() {
                     </span>
                   </div>
 
-                  {/* 4 Metrik Utama Grid */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                  {/* 5 Metrik Utama Grid */}
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 text-xs">
                     <div className="rounded-2xl bg-surface p-2.5 border border-surface-border">
-                      <span className="text-[10px] text-espresso-muted uppercase font-bold block">Saldo Awal</span>
+                      <span className="text-[10px] text-espresso-muted uppercase font-bold block">Saldo Kas Awal</span>
                       <span className="text-sm font-extrabold text-espresso block mt-0.5">
                         {formatIDR(rangeProjection.initial_balance)}
                       </span>
@@ -891,12 +946,33 @@ export default function ForecastPage() {
                         ? "bg-surface border-surface-border"
                         : "bg-expense/15 border-expense/30"
                     }`}>
-                      <span className="text-[10px] text-espresso-muted uppercase font-bold block">Prediksi Sisa Akhir</span>
+                      <span className="text-[10px] text-espresso-muted uppercase font-bold block">Sisa Kas Operasional</span>
                       <span className={`text-sm font-extrabold block mt-0.5 ${
                         rangeProjection.final_balance >= 0 ? "text-terracotta" : "text-expense"
                       }`}>
                         {formatIDR(rangeProjection.final_balance)}
                       </span>
+                    </div>
+
+                    <div className="rounded-2xl bg-emerald-500/10 p-2.5 border border-emerald-500/25 col-span-2 md:col-span-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] text-emerald-800 uppercase font-bold block">Prediksi Tabungan</span>
+                        {rangeProjection.target_savings > 0 && (
+                          <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded-md bg-emerald-600 text-white" title={`Target: ${formatIDR(rangeProjection.target_savings)}`}>
+                            {rangeProjection.savings_achievement_rate}%
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-sm font-extrabold text-emerald-900 block mt-0.5">
+                        {formatIDR(rangeProjection.final_savings_balance ?? rangeProjection.initial_savings_balance ?? 0)}
+                      </span>
+                      <div className="text-[10px] text-emerald-700 block mt-0.5 font-medium leading-tight">
+                        {rangeProjection.total_saved_in_range > 0 ? (
+                          <span>+{formatIDR(rangeProjection.total_saved_in_range)} disisihkan</span>
+                        ) : (
+                          <span>Saldo tabungan saat ini</span>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -971,12 +1047,24 @@ export default function ForecastPage() {
                           </div>
 
                           <div className="text-right">
-                            <span className="text-[10px] text-espresso-muted block">Sisa Saldo:</span>
-                            <span className={`text-xs font-black ${
-                              day.closing_balance >= 0 ? "text-espresso" : "text-expense"
-                            }`}>
-                              {formatIDR(day.closing_balance)}
-                            </span>
+                            <div className="flex items-center justify-end gap-2 text-right">
+                              <div>
+                                <span className="text-[9px] text-espresso-muted block">Kas Ops:</span>
+                                <span className={`text-xs font-black ${
+                                  day.closing_balance >= 0 ? "text-espresso" : "text-expense"
+                                }`}>
+                                  {formatIDR(day.closing_balance)}
+                                </span>
+                              </div>
+                              {day.running_savings_balance !== undefined && (
+                                <div className="pl-2 border-l border-surface-border">
+                                  <span className="text-[9px] text-emerald-800 block">Tabungan:</span>
+                                  <span className="text-xs font-bold text-emerald-900">
+                                    {formatIDR(day.running_savings_balance)}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
 
@@ -990,6 +1078,7 @@ export default function ForecastPage() {
                                 CYCLICAL: "bg-purple-100 text-purple-800 border-purple-200",
                                 FIXED_BILL: "bg-espresso/10 text-espresso border-espresso/20",
                                 PLANNED: "bg-blue-100 text-blue-800 border-blue-200",
+                                SAVINGS: "bg-emerald-100 text-emerald-800 border-emerald-300 font-bold",
                               };
                               const badgeStyle = badgeStyleMap[ev.type] || "bg-surface text-espresso";
 
@@ -998,12 +1087,15 @@ export default function ForecastPage() {
                                   key={evIdx}
                                   className={`inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 text-[10px] font-semibold ${badgeStyle}`}
                                 >
+                                  {ev.type === "SAVINGS" && <span>💰</span>}
                                   <span>{ev.name}</span>
                                   <span className="font-bold">
                                     {ev.direction === "INFLOW" ? "+" : "-"}{formatIDR(ev.amount)}
                                   </span>
                                   {ev.wallet_name && (
-                                    <span className="opacity-75">({ev.wallet_name})</span>
+                                    <span className="opacity-75">
+                                      ({ev.wallet_name}{ev.to_wallet_name ? ` ➔ ${ev.to_wallet_name}` : ""})
+                                    </span>
                                   )}
                                 </span>
                               );
@@ -1054,9 +1146,11 @@ export default function ForecastPage() {
                                 ? "bg-income/10 text-income border-income/30"
                                 : pt.type === "TRANSFER"
                                 ? "bg-blue-100 text-blue-800 border-blue-200"
+                                : pt.type === "SAVINGS"
+                                ? "bg-emerald-100 text-emerald-800 border-emerald-300"
                                 : "bg-expense/10 text-expense border-expense/30"
                             }`}>
-                              {pt.type === "INCOME" ? "Pemasukan" : pt.type === "TRANSFER" ? "Pindah Dompet" : "Pengeluaran"}
+                              {pt.type === "INCOME" ? "Pemasukan" : pt.type === "TRANSFER" ? "Pindah Dompet" : pt.type === "SAVINGS" ? "💰 Menabung" : "Pengeluaran"}
                             </span>
                             {pt.is_completed && (
                               <span className="rounded-md bg-income text-white px-1.5 py-0.2 text-[9px] font-bold">
@@ -1259,9 +1353,12 @@ export default function ForecastPage() {
               })
               .map((item: any) => {
                 const isCyclical = item.frequency && item.frequency !== "monthly";
+                const isSavings = item.expense_type === "SAVINGS_TRANSFER";
                 const daysOfWeek = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"];
                 const freqBadge =
-                  item.frequency === "every_n_days"
+                  item.frequency === "daily"
+                    ? "🔄 Harian (Tiap Hari)"
+                    : item.frequency === "every_n_days"
                     ? `🔄 Tiap ${item.interval_value || 1} Hari`
                     : item.frequency === "weekly"
                     ? `🔄 Mingguan (${daysOfWeek[item.interval_value || 0] || "Sabtu"})`
@@ -1275,7 +1372,11 @@ export default function ForecastPage() {
                     className="flex items-center justify-between rounded-2xl border border-surface-border bg-surface-card p-3 transition hover:border-terracotta/40"
                   >
                     <div className="flex items-center gap-3">
-                      {!isCyclical ? (
+                      {isSavings ? (
+                        <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
+                          <span className="text-xs">💰</span>
+                        </div>
+                      ) : !isCyclical ? (
                         <button
                           type="button"
                           onClick={() => handleToggleFixed(item.id)}
@@ -1302,17 +1403,28 @@ export default function ForecastPage() {
                           >
                             {item.name}
                           </span>
-                          <span className="rounded-md border border-amber/30 bg-amber/15 px-1.5 py-0.2 text-[9px] font-semibold text-terracotta">
+                          <span className={`rounded-md border px-1.5 py-0.2 text-[9px] font-semibold ${
+                            isSavings
+                              ? "border-emerald-300 bg-emerald-100 text-emerald-800"
+                              : "border-amber/30 bg-amber/15 text-terracotta"
+                          }`}>
                             {freqBadge}
                           </span>
+                          {isSavings && (
+                            <span className="rounded-md border border-emerald-300 bg-emerald-50 px-1.5 py-0.2 text-[9px] font-bold text-emerald-700">
+                              💰 Setor Tabungan
+                            </span>
+                          )}
                           {item.wallet_name && (
                             <span className="rounded-md bg-espresso/10 px-1.5 py-0.2 text-[9px] font-bold text-espresso border border-espresso/20">
-                              💳 {item.wallet_name}
+                              💳 {item.wallet_name}{item.to_wallet_name ? ` ➔ 🏦 ${item.to_wallet_name}` : ""}
                             </span>
                           )}
                         </div>
                         <span className="text-[10px] text-espresso-muted">
-                          {isCyclical
+                          {isSavings
+                            ? `💰 Pindah otomatis ke tabungan (tidak dihitung defisit)`
+                            : isCyclical
                             ? `🔄 Siklus otomatis dicadangkan di Safe-to-Spend`
                             : item.is_paid_this_cycle
                             ? `✅ Lunas bulan ini${item.wallet_name ? ` (dari ${item.wallet_name})` : ""}`
@@ -1809,38 +1921,80 @@ export default function ForecastPage() {
                 {isAddCyclicalOpen && (
                   <form onSubmit={handleCreateCyclical} className="rounded-xl border border-terracotta/30 bg-surface p-3 space-y-2.5 shadow-sm">
                     <span className="text-[11px] font-bold text-terracotta block">
-                      + Tambah Siklus Biaya Berkala
+                      + Tambah Siklus Biaya Berkala / Setor Tabungan
                     </span>
 
+                    {/* Toggle Jenis Siklus: Pengeluaran vs Tabungan */}
                     <div>
-                      <label className="block text-[10px] font-semibold text-espresso mb-0.5">Nama Kebutuhan</label>
+                      <label className="block text-[10px] font-semibold text-espresso mb-1">Tipe Siklus</label>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setCyclicalExpenseType("EXPENSE")}
+                          className={`rounded-lg py-1.5 text-[11px] font-bold border transition ${
+                            cyclicalExpenseType === "EXPENSE"
+                              ? "bg-terracotta text-white border-terracotta shadow-xs"
+                              : "bg-surface-card text-espresso-muted border-surface-border hover:text-espresso"
+                          }`}
+                        >
+                          💸 Pengeluaran Rutin
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCyclicalExpenseType("SAVINGS_TRANSFER");
+                            const savingsWallet = wallets?.find((w: any) => w.purpose === "savings");
+                            if (savingsWallet) setCyclicalToWalletId(savingsWallet.id);
+                          }}
+                          className={`rounded-lg py-1.5 text-[11px] font-bold border transition ${
+                            cyclicalExpenseType === "SAVINGS_TRANSFER"
+                              ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
+                              : "bg-surface-card text-espresso-muted border-surface-border hover:text-espresso"
+                          }`}
+                        >
+                          💰 Setor Tabungan Rutin
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-semibold text-espresso mb-0.5">
+                        {cyclicalExpenseType === "SAVINGS_TRANSFER" ? "Nama Rencana Tabungan" : "Nama Kebutuhan"}
+                      </label>
                       <input
                         type="text"
                         required
                         value={cyclicalName}
                         onChange={(e) => setCyclicalName(e.target.value)}
-                        placeholder="Contoh: Bensin Motor, Pulsa & Kuota, Galon Mingguan"
+                        placeholder={
+                          cyclicalExpenseType === "SAVINGS_TRANSFER"
+                            ? "Contoh: Tabungan Harian, Setor Celengan, Dana Darurat"
+                            : "Contoh: Bensin Motor, Pulsa & Kuota, Galon Mingguan"
+                        }
                         className="w-full rounded-lg border border-surface-border bg-surface-card px-2.5 py-1.5 text-xs text-espresso focus:outline-none focus:border-terracotta"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-[10px] font-semibold text-espresso mb-0.5">Nominal per Siklus (Rp)</label>
+                      <label className="block text-[10px] font-semibold text-espresso mb-0.5">
+                        {cyclicalExpenseType === "SAVINGS_TRANSFER" ? "Nominal Setor per Siklus (Rp)" : "Nominal per Siklus (Rp)"}
+                      </label>
                       <input
                         type="number"
                         required
                         min="1"
                         value={cyclicalAmount}
                         onChange={(e) => setCyclicalAmount(e.target.value)}
-                        placeholder="Contoh: 35000"
+                        placeholder="Contoh: 25000"
                         className="w-full rounded-lg border border-surface-border bg-surface-card px-2.5 py-1.5 text-xs font-bold text-espresso focus:outline-none focus:border-terracotta"
                       />
                     </div>
 
                     <div>
                       <label className="block text-[10px] font-semibold text-espresso mb-1">Pola Interval Siklus</label>
-                      <div className="grid grid-cols-3 gap-1.5">
+                      <div className="grid grid-cols-4 gap-1.5">
                         {[
+                          { id: "daily", label: "Harian" },
                           { id: "every_n_days", label: "Tiap N Hari" },
                           { id: "weekly", label: "Mingguan" },
                           { id: "biweekly", label: "2-Mingguan" },
@@ -1851,7 +2005,9 @@ export default function ForecastPage() {
                             onClick={() => setCyclicalFrequency(item.id as any)}
                             className={`rounded-lg py-1 text-[11px] font-bold border transition ${
                               cyclicalFrequency === item.id
-                                ? "bg-terracotta text-white border-terracotta shadow-xs"
+                                ? cyclicalExpenseType === "SAVINGS_TRANSFER"
+                                  ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
+                                  : "bg-terracotta text-white border-terracotta shadow-xs"
                                 : "bg-surface-card text-espresso-muted border-surface-border hover:text-espresso"
                             }`}
                           >
@@ -1875,14 +2031,14 @@ export default function ForecastPage() {
                             onChange={(e) => setCyclicalInterval(parseInt(e.target.value) || 1)}
                             className="w-20 rounded-lg border border-surface-border bg-surface-card px-2.5 py-1.5 text-xs font-bold text-espresso text-center focus:outline-none focus:border-terracotta"
                           />
-                          <span className="text-xs text-espresso-muted">hari sekali (misal isi bensin tiap 3-5 hari)</span>
+                          <span className="text-xs text-espresso-muted">hari sekali (misal tiap 3-5 hari)</span>
                         </div>
                       </div>
                     )}
 
                     {cyclicalFrequency === "weekly" && (
                       <div>
-                        <label className="block text-[10px] font-semibold text-espresso mb-0.5">Hari Pembelian Rutin</label>
+                        <label className="block text-[10px] font-semibold text-espresso mb-0.5">Hari Pelaksanaan Rutin</label>
                         <select
                           value={cyclicalWeekday}
                           onChange={(e) => setCyclicalWeekday(parseInt(e.target.value))}
@@ -1890,7 +2046,7 @@ export default function ForecastPage() {
                         >
                           {daysOfWeek.map((day, idx) => (
                             <option key={idx} value={idx}>
-                              Setiap hari {day} (misal belanja pasar / galon)
+                              Setiap hari {day}
                             </option>
                           ))}
                         </select>
@@ -1898,20 +2054,47 @@ export default function ForecastPage() {
                     )}
 
                     <div>
-                      <label className="block text-[10px] font-semibold text-espresso mb-0.5">Dipotong dari Dompet</label>
+                      <label className="block text-[10px] font-semibold text-espresso mb-0.5">
+                        {cyclicalExpenseType === "SAVINGS_TRANSFER" ? "Dari Dompet (Sumber Operasional)" : "Dipotong dari Dompet"}
+                      </label>
                       <select
                         value={cyclicalWalletId}
                         onChange={(e) => setCyclicalWalletId(e.target.value)}
                         className="w-full rounded-lg border border-surface-border bg-surface-card px-2.5 py-1.5 text-xs text-espresso focus:outline-none focus:border-terracotta"
                       >
                         <option value="">-- Otomatis Operasional Utama --</option>
-                        {wallets?.map((w: any) => (
-                          <option key={w.id} value={w.id}>
-                            {w.name} ({w.purpose === "savings" ? "Tabungan" : w.purpose === "subscription" ? "Tagihan" : "Operasional"}) - {formatIDR(w.balance)}
-                          </option>
-                        ))}
+                        {wallets
+                          ?.filter((w: any) => cyclicalExpenseType !== "SAVINGS_TRANSFER" || w.purpose !== "savings")
+                          ?.map((w: any) => (
+                            <option key={w.id} value={w.id}>
+                              {w.name} ({w.purpose === "savings" ? "Tabungan" : w.purpose === "subscription" ? "Tagihan" : "Operasional"}) - {formatIDR(w.balance)}
+                            </option>
+                          ))}
                       </select>
                     </div>
+
+                    {cyclicalExpenseType === "SAVINGS_TRANSFER" && (
+                      <div>
+                        <label className="block text-[10px] font-semibold text-espresso mb-0.5">
+                          Ke Dompet (Tujuan Tabungan)
+                        </label>
+                        <select
+                          value={cyclicalToWalletId}
+                          onChange={(e) => setCyclicalToWalletId(e.target.value)}
+                          required
+                          className="w-full rounded-lg border border-surface-border bg-surface-card px-2.5 py-1.5 text-xs text-espresso focus:outline-none focus:border-terracotta"
+                        >
+                          <option value="">-- Pilih Dompet Tabungan Tujuan --</option>
+                          {wallets
+                            ?.filter((w: any) => w.purpose === "savings")
+                            ?.map((w: any) => (
+                              <option key={w.id} value={w.id}>
+                                {w.name} (Tabungan) - {formatIDR(w.balance)}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                    )}
 
                     <div className="flex gap-2 pt-1">
                       <button
@@ -1924,7 +2107,11 @@ export default function ForecastPage() {
                       <button
                         type="submit"
                         disabled={isSavingCyclical}
-                        className="flex-1 rounded-lg bg-terracotta py-1.5 text-[11px] font-bold text-white hover:bg-terracotta-hover transition disabled:opacity-50"
+                        className={`flex-1 rounded-lg py-1.5 text-[11px] font-bold text-white transition disabled:opacity-50 ${
+                          cyclicalExpenseType === "SAVINGS_TRANSFER"
+                            ? "bg-emerald-600 hover:bg-emerald-700"
+                            : "bg-terracotta hover:bg-terracotta-hover"
+                        }`}
                       >
                         {isSavingCyclical ? "Menyimpan..." : "Simpan Siklus"}
                       </button>
@@ -1938,8 +2125,11 @@ export default function ForecastPage() {
                     {summary.fixed_obligations.items
                       .filter((f: any) => f.frequency && f.frequency !== "monthly")
                       .map((c: any) => {
+                        const isSavingsTransfer = c.expense_type === "SAVINGS_TRANSFER";
                         const label =
-                          c.frequency === "every_n_days"
+                          c.frequency === "daily"
+                            ? "Harian (Tiap Hari)"
+                            : c.frequency === "every_n_days"
                             ? `Tiap ${c.interval_value || 1} Hari`
                             : c.frequency === "weekly"
                             ? `Mingguan (${daysOfWeek[c.interval_value || 0] || "Sabtu"})`
@@ -1948,12 +2138,20 @@ export default function ForecastPage() {
                         return (
                           <div
                             key={c.id}
-                            className="flex items-center justify-between rounded-xl border border-surface-border bg-surface px-3 py-2 text-xs shadow-2xs"
+                            className={`flex items-center justify-between rounded-xl border px-3 py-2 text-xs shadow-2xs ${
+                              isSavingsTransfer
+                                ? "border-emerald-200 bg-emerald-50/40"
+                                : "border-surface-border bg-surface"
+                            }`}
                           >
                             <div>
                               <div className="flex items-center gap-1.5 font-bold text-espresso">
-                                <span>{c.name}</span>
-                                <span className="rounded-md border border-amber/30 bg-amber/15 px-1.5 py-0.2 text-[9px] font-semibold text-terracotta">
+                                <span>{isSavingsTransfer ? "💰 " : ""}{c.name}</span>
+                                <span className={`rounded-md border px-1.5 py-0.2 text-[9px] font-semibold ${
+                                  isSavingsTransfer
+                                    ? "border-emerald-300 bg-emerald-100 text-emerald-800"
+                                    : "border-amber/30 bg-amber/15 text-terracotta"
+                                }`}>
                                   {label}
                                 </span>
                               </div>
@@ -1961,6 +2159,9 @@ export default function ForecastPage() {
                                 <span className="font-semibold text-espresso">{formatIDR(c.amount)}/siklus</span>
                                 <span>•</span>
                                 <span>💳 {c.wallet_name || "Operasional"}</span>
+                                {c.to_wallet_name && (
+                                  <span> ➔ 🏦 {c.to_wallet_name}</span>
+                                )}
                               </div>
                             </div>
                             <button
@@ -2083,17 +2284,55 @@ export default function ForecastPage() {
           <div className="w-full max-w-sm rounded-3xl border border-surface-border bg-surface p-6 shadow-2xl space-y-4">
             <div>
               <h3 className="text-base font-bold text-espresso">Tambah Tagihan / Siklus Biaya</h3>
-              <p className="text-[11px] text-espresso-muted">Tagihan bulanan atau siklus berkala (bensin, pulsa, dll)</p>
+              <p className="text-[11px] text-espresso-muted">Tagihan bulanan, siklus berkala, atau setoran tabungan rutin</p>
             </div>
             <form onSubmit={handleCreateFixed} className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-espresso mb-1">Nama Tagihan / Pengeluaran</label>
+                <label className="block text-xs font-semibold text-espresso mb-1">Tipe</label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setFixedExpenseType("EXPENSE")}
+                    className={`rounded-lg py-1.5 text-[11px] font-bold border transition ${
+                      fixedExpenseType === "EXPENSE"
+                        ? "bg-terracotta text-white border-terracotta shadow-xs"
+                        : "bg-surface-card text-espresso-muted border-surface-border hover:text-espresso"
+                    }`}
+                  >
+                    💸 Tagihan / Biaya
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFixedExpenseType("SAVINGS_TRANSFER");
+                      const savingsWallet = wallets?.find((w: any) => w.purpose === "savings");
+                      if (savingsWallet) setFixedToWalletId(savingsWallet.id);
+                    }}
+                    className={`rounded-lg py-1.5 text-[11px] font-bold border transition ${
+                      fixedExpenseType === "SAVINGS_TRANSFER"
+                        ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
+                        : "bg-surface-card text-espresso-muted border-surface-border hover:text-espresso"
+                    }`}
+                  >
+                    💰 Setor Tabungan
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-espresso mb-1">
+                  {fixedExpenseType === "SAVINGS_TRANSFER" ? "Nama Rencana Tabungan" : "Nama Tagihan / Pengeluaran"}
+                </label>
                 <input
                   type="text"
                   required
                   value={fixedName}
                   onChange={(e) => setFixedName(e.target.value)}
-                  placeholder="Misal: Bensin, iCloud, Wifi, Pulsa, Galon..."
+                  placeholder={
+                    fixedExpenseType === "SAVINGS_TRANSFER"
+                      ? "Misal: Tabungan Harian, Investasi Rutin"
+                      : "Misal: Bensin, iCloud, Wifi, Pulsa, Galon..."
+                  }
                   className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs font-medium text-espresso focus:outline-none focus:border-terracotta"
                 />
               </div>
@@ -2113,9 +2352,10 @@ export default function ForecastPage() {
 
               <div>
                 <label className="block text-xs font-semibold text-espresso mb-1">Pola Siklus</label>
-                <div className="grid grid-cols-4 gap-1">
+                <div className="grid grid-cols-5 gap-1">
                   {[
                     { id: "monthly", label: "Bulanan" },
+                    { id: "daily", label: "Harian" },
                     { id: "every_n_days", label: "Tiap N Hari" },
                     { id: "weekly", label: "Mingguan" },
                     { id: "biweekly", label: "2-Mgg" },
@@ -2126,7 +2366,9 @@ export default function ForecastPage() {
                       onClick={() => setFixedFrequency(item.id as any)}
                       className={`rounded-lg py-1.5 text-[10px] font-bold border transition ${
                         fixedFrequency === item.id
-                          ? "bg-terracotta text-white border-terracotta shadow-xs"
+                          ? fixedExpenseType === "SAVINGS_TRANSFER"
+                            ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
+                            : "bg-terracotta text-white border-terracotta shadow-xs"
                           : "bg-surface-card text-espresso-muted border-surface-border hover:text-espresso"
                       }`}
                     >
@@ -2165,7 +2407,7 @@ export default function ForecastPage() {
                       onChange={(e) => setFixedIntervalValue(parseInt(e.target.value) || 1)}
                       className="w-20 rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs font-bold text-espresso text-center focus:outline-none focus:border-terracotta"
                     />
-                    <span className="text-xs text-espresso-muted">hari sekali (misal isi bensin tiap 4 hari)</span>
+                    <span className="text-xs text-espresso-muted">hari sekali</span>
                   </div>
                 </div>
               )}
@@ -2189,7 +2431,7 @@ export default function ForecastPage() {
 
               <div>
                 <label className="block text-xs font-semibold text-espresso mb-1">
-                  Dompet Pembayar (Opsional)
+                  {fixedExpenseType === "SAVINGS_TRANSFER" ? "Dari Dompet (Sumber Pengirim)" : "Dompet Pembayar (Opsional)"}
                 </label>
                 <select
                   value={fixedWalletId}
@@ -2197,16 +2439,38 @@ export default function ForecastPage() {
                   className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs font-medium text-espresso focus:outline-none focus:border-terracotta"
                 >
                   <option value="">-- Bebas / Otomatis dari Operasional --</option>
-                  {wallets?.map((w: any) => (
-                    <option key={w.id} value={w.id}>
-                      {w.name} ({w.purpose === "subscription" ? "Tagihan" : w.purpose === "savings" ? "Tabungan" : "Operasional"}) - {formatIDR(w.balance)}
-                    </option>
-                  ))}
+                  {wallets
+                    ?.filter((w: any) => fixedExpenseType !== "SAVINGS_TRANSFER" || w.purpose !== "savings")
+                    ?.map((w: any) => (
+                      <option key={w.id} value={w.id}>
+                        {w.name} ({w.purpose === "subscription" ? "Tagihan" : w.purpose === "savings" ? "Tabungan" : "Operasional"}) - {formatIDR(w.balance)}
+                      </option>
+                    ))}
                 </select>
-                <span className="text-[10px] text-espresso-muted mt-1 block">
-                  Pilih dompet khusus tagihan (misal: Subscription/BCA) agar dicadangkan dari dompet tersebut.
-                </span>
               </div>
+
+              {fixedExpenseType === "SAVINGS_TRANSFER" && (
+                <div>
+                  <label className="block text-xs font-semibold text-espresso mb-1">
+                    Ke Dompet (Tujuan Tabungan)
+                  </label>
+                  <select
+                    value={fixedToWalletId}
+                    onChange={(e) => setFixedToWalletId(e.target.value)}
+                    required
+                    className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs font-medium text-espresso focus:outline-none focus:border-terracotta"
+                  >
+                    <option value="">-- Pilih Dompet Tabungan Tujuan --</option>
+                    {wallets
+                      ?.filter((w: any) => w.purpose === "savings")
+                      ?.map((w: any) => (
+                        <option key={w.id} value={w.id}>
+                          {w.name} (Tabungan) - {formatIDR(w.balance)}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              )}
 
               <div className="flex gap-2 pt-2">
                 <button
@@ -2429,19 +2693,28 @@ export default function ForecastPage() {
 
               <div>
                 <label className="block text-xs font-semibold text-espresso mb-1">Jenis Rencana</label>
-                <div className="grid grid-cols-3 gap-1">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                   {[
-                    { id: "EXPENSE", label: "Pengeluaran" },
-                    { id: "INCOME", label: "Pemasukan" },
-                    { id: "TRANSFER", label: "Pindah Dompet" },
+                    { id: "EXPENSE", label: "💸 Pengeluaran" },
+                    { id: "INCOME", label: "💵 Pemasukan" },
+                    { id: "TRANSFER", label: "🔄 Pindah Dompet" },
+                    { id: "SAVINGS", label: "💰 Menabung" },
                   ].map((item) => (
                     <button
                       key={item.id}
                       type="button"
-                      onClick={() => setPlannedType(item.id as any)}
+                      onClick={() => {
+                        setPlannedType(item.id as any);
+                        if (item.id === "SAVINGS") {
+                          const savingsWallet = wallets?.find((w: any) => w.purpose === "savings");
+                          if (savingsWallet) setPlannedToWalletId(savingsWallet.id);
+                        }
+                      }}
                       className={`rounded-lg py-1.5 text-[10px] font-bold border transition ${
                         plannedType === item.id
-                          ? "bg-terracotta text-white border-terracotta shadow-xs"
+                          ? item.id === "SAVINGS"
+                            ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
+                            : "bg-terracotta text-white border-terracotta shadow-xs"
                           : "bg-surface-card text-espresso-muted border-surface-border hover:text-espresso"
                       }`}
                     >
@@ -2464,7 +2737,11 @@ export default function ForecastPage() {
 
               <div>
                 <label className="block text-xs font-semibold text-espresso mb-1">
-                  {plannedType === "TRANSFER" ? "Dari Dompet (Sumber)" : "Dompet Terkait"}
+                  {plannedType === "TRANSFER"
+                    ? "Dari Dompet (Sumber)"
+                    : plannedType === "SAVINGS"
+                    ? "Dari Dompet (Sumber Operasional)"
+                    : "Dompet Terkait"}
                 </label>
                 <select
                   value={plannedWalletId}
@@ -2472,29 +2749,35 @@ export default function ForecastPage() {
                   className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs font-medium text-espresso focus:outline-none focus:border-terracotta"
                 >
                   <option value="">-- Otomatis Operasional Utama --</option>
-                  {wallets?.map((w: any) => (
-                    <option key={w.id} value={w.id}>
-                      {w.name} ({w.purpose === "savings" ? "Tabungan" : w.purpose === "subscription" ? "Tagihan" : "Operasional"}) - {formatIDR(w.balance)}
-                    </option>
-                  ))}
+                  {wallets
+                    ?.filter((w: any) => plannedType !== "SAVINGS" || w.purpose !== "savings")
+                    ?.map((w: any) => (
+                      <option key={w.id} value={w.id}>
+                        {w.name} ({w.purpose === "savings" ? "Tabungan" : w.purpose === "subscription" ? "Tagihan" : "Operasional"}) - {formatIDR(w.balance)}
+                      </option>
+                    ))}
                 </select>
               </div>
 
-              {plannedType === "TRANSFER" && (
+              {(plannedType === "TRANSFER" || plannedType === "SAVINGS") && (
                 <div>
-                  <label className="block text-xs font-semibold text-espresso mb-1">Ke Dompet (Tujuan)</label>
+                  <label className="block text-xs font-semibold text-espresso mb-1">
+                    {plannedType === "SAVINGS" ? "Ke Dompet (Tujuan Tabungan)" : "Ke Dompet (Tujuan)"}
+                  </label>
                   <select
                     value={plannedToWalletId}
                     onChange={(e) => setPlannedToWalletId(e.target.value)}
                     required
                     className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs font-medium text-espresso focus:outline-none focus:border-terracotta"
                   >
-                    <option value="">-- Pilih Dompet Tujuan --</option>
-                    {wallets?.map((w: any) => (
-                      <option key={w.id} value={w.id}>
-                        {w.name} ({w.purpose === "savings" ? "Tabungan" : w.purpose === "subscription" ? "Tagihan" : "Operasional"})
-                      </option>
-                    ))}
+                    <option value="">-- Pilih Dompet {plannedType === "SAVINGS" ? "Tabungan" : "Tujuan"} --</option>
+                    {wallets
+                      ?.filter((w: any) => plannedType !== "SAVINGS" || w.purpose === "savings")
+                      ?.map((w: any) => (
+                        <option key={w.id} value={w.id}>
+                          {w.name} ({w.purpose === "savings" ? "Tabungan" : w.purpose === "subscription" ? "Tagihan" : "Operasional"}) - {formatIDR(w.balance)}
+                        </option>
+                      ))}
                   </select>
                 </div>
               )}

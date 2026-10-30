@@ -49,7 +49,7 @@ class PlannedTransaction(SQLModel, table=True):
     amount: Decimal = Field(
         sa_column=Column(Numeric(15, 2), nullable=False),
     )
-    type: str = Field(default="EXPENSE", max_length=20)  # INCOME, EXPENSE, TRANSFER
+    type: str = Field(default="EXPENSE", max_length=20)  # INCOME, EXPENSE, TRANSFER, SAVINGS
     planned_date: date = Field(
         sa_column=Column(Date, nullable=False, index=True),
     )

@@ -148,6 +148,9 @@ async def list_fixed_expenses(
                 category_name=cat_name,
                 wallet_id=item.wallet_id,
                 wallet_name=wallet_map.get(item.wallet_id),
+                to_wallet_id=item.to_wallet_id,
+                to_wallet_name=wallet_map.get(item.to_wallet_id) if item.to_wallet_id else None,
+                expense_type=item.expense_type or "EXPENSE",
                 due_day_of_month=item.due_day_of_month,
                 frequency=item.frequency,
                 interval_value=item.interval_value,
@@ -170,12 +173,25 @@ async def create_fixed_expense(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
+    exp_type = payload.expense_type or "EXPENSE"
+    to_w_id = payload.to_wallet_id
+    name_lower = (payload.name or "").lower()
+    if any(kw in name_lower for kw in ["tabung", "saving", "invest", "celengan", "nabung"]) or exp_type == "SAVINGS_TRANSFER":
+        exp_type = "SAVINGS_TRANSFER"
+        if not to_w_id:
+            wallets_res = await session.exec(select(Wallet).where(Wallet.user_id == current_user.id))
+            savings_w = next((w for w in wallets_res.all() if getattr(w, "purpose", None) == "savings"), None)
+            if savings_w:
+                to_w_id = savings_w.id
+
     item = FixedExpense(
         user_id=current_user.id,
         name=payload.name,
         amount=payload.amount,
         category_id=payload.category_id,
         wallet_id=payload.wallet_id,
+        to_wallet_id=to_w_id,
+        expense_type=exp_type,
         due_day_of_month=payload.due_day_of_month,
         frequency=payload.frequency,
         interval_value=payload.interval_value,
@@ -196,6 +212,11 @@ async def create_fixed_expense(
         w = await session.get(Wallet, item.wallet_id)
         wallet_name = w.name if w else None
 
+    to_wallet_name = None
+    if item.to_wallet_id:
+        to_w = await session.get(Wallet, item.to_wallet_id)
+        to_wallet_name = to_w.name if to_w else None
+
     return FixedExpenseResponse(
         id=item.id,
         user_id=item.user_id,
@@ -205,6 +226,9 @@ async def create_fixed_expense(
         category_name=cat_name,
         wallet_id=item.wallet_id,
         wallet_name=wallet_name,
+        to_wallet_id=item.to_wallet_id,
+        to_wallet_name=to_wallet_name,
+        expense_type=item.expense_type or "EXPENSE",
         due_day_of_month=item.due_day_of_month,
         frequency=item.frequency,
         interval_value=item.interval_value,
@@ -234,6 +258,15 @@ async def update_fixed_expense(
     for key, value in update_data.items():
         setattr(item, key, value)
 
+    name_lower = (item.name or "").lower()
+    if any(kw in name_lower for kw in ["tabung", "saving", "invest", "celengan", "nabung"]) or item.expense_type == "SAVINGS_TRANSFER":
+        item.expense_type = "SAVINGS_TRANSFER"
+        if not item.to_wallet_id:
+            wallets_res = await session.exec(select(Wallet).where(Wallet.user_id == current_user.id))
+            savings_w = next((w for w in wallets_res.all() if getattr(w, "purpose", None) == "savings"), None)
+            if savings_w:
+                item.to_wallet_id = savings_w.id
+
     session.add(item)
     await session.commit()
     await session.refresh(item)
@@ -248,6 +281,11 @@ async def update_fixed_expense(
         w = await session.get(Wallet, item.wallet_id)
         wallet_name = w.name if w else None
 
+    to_wallet_name = None
+    if item.to_wallet_id:
+        to_w = await session.get(Wallet, item.to_wallet_id)
+        to_wallet_name = to_w.name if to_w else None
+
     return FixedExpenseResponse(
         id=item.id,
         user_id=item.user_id,
@@ -257,6 +295,9 @@ async def update_fixed_expense(
         category_name=cat_name,
         wallet_id=item.wallet_id,
         wallet_name=wallet_name,
+        to_wallet_id=item.to_wallet_id,
+        to_wallet_name=to_wallet_name,
+        expense_type=item.expense_type or "EXPENSE",
         due_day_of_month=item.due_day_of_month,
         frequency=item.frequency,
         interval_value=item.interval_value,
