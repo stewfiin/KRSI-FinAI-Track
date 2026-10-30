@@ -20,6 +20,9 @@ import {
   Loader2,
   Check,
   Zap,
+  ArrowRightLeft,
+  ArrowDownRight,
+  ArrowUpRight,
 } from "lucide-react";
 import { api } from "@/lib/api";
 
@@ -40,6 +43,7 @@ export default function ForecastPage() {
   const [streamAmount, setStreamAmount] = useState("");
   const [streamFrequency, setStreamFrequency] = useState<"daily" | "weekly" | "biweekly" | "monthly">("weekly");
   const [streamReceiveDay, setStreamReceiveDay] = useState(0); // 0=Senin, 1..31=Tanggal
+  const [streamWalletId, setStreamWalletId] = useState("");
   const [isSavingStream, setIsSavingStream] = useState(false);
 
   const queryClient = useQueryClient();
@@ -49,7 +53,21 @@ export default function ForecastPage() {
   const [fixedName, setFixedName] = useState("");
   const [fixedAmount, setFixedAmount] = useState("");
   const [fixedWalletId, setFixedWalletId] = useState("");
+  const [fixedFrequency, setFixedFrequency] = useState<"monthly" | "weekly" | "biweekly" | "every_n_days">("monthly");
+  const [fixedDueDay, setFixedDueDay] = useState(1);
+  const [fixedIntervalValue, setFixedIntervalValue] = useState(4);
+  const [fixedFilter, setFixedFilter] = useState<"all" | "monthly" | "cyclical">("all");
   const [isSavingFixed, setIsSavingFixed] = useState(false);
+
+  // Blueprint Cyclical Expenses State (Bensin tiap N hari, pulsa, galon)
+  const [isAddCyclicalOpen, setIsAddCyclicalOpen] = useState(false);
+  const [cyclicalName, setCyclicalName] = useState("");
+  const [cyclicalAmount, setCyclicalAmount] = useState("");
+  const [cyclicalFrequency, setCyclicalFrequency] = useState<"every_n_days" | "weekly" | "biweekly">("every_n_days");
+  const [cyclicalInterval, setCyclicalInterval] = useState(4);
+  const [cyclicalWeekday, setCyclicalWeekday] = useState(5); // 5=Sabtu
+  const [cyclicalWalletId, setCyclicalWalletId] = useState("");
+  const [isSavingCyclical, setIsSavingCyclical] = useState(false);
 
   // Quick Wallet Purpose Config Modal State
   const [isWalletConfigModalOpen, setIsWalletConfigModalOpen] = useState(false);
@@ -66,6 +84,30 @@ export default function ForecastPage() {
   const [simSource, setSimSource] = useState<"savings_pool" | "operational_wallet">("savings_pool");
   const [isSimulating, setIsSimulating] = useState(false);
   const [simResult, setSimResult] = useState<any | null>(null);
+
+  // Tab 1 Sub-View (Forward Prediction vs Past Realization)
+  const [timelineView, setTimelineView] = useState<"forward" | "history">("forward");
+
+  // Forward Range Projection Filters
+  const [projWalletFilter, setProjWalletFilter] = useState("all_operational");
+  const [projCustomInitialBalance, setProjCustomInitialBalance] = useState("");
+  const [projRangePreset, setProjRangePreset] = useState<"7days" | "14days" | "end_of_cycle" | "custom">("14days");
+  const [projStartDate, setProjStartDate] = useState(new Date().toISOString().split("T")[0]);
+  const [projEndDate, setProjEndDate] = useState("");
+  const [projIncludeMeal, setProjIncludeMeal] = useState(true);
+  const [projCustomDailyMeal, setProjCustomDailyMeal] = useState("");
+
+  // Planned Transaction Modal State
+  const [isAddPlannedModalOpen, setIsAddPlannedModalOpen] = useState(false);
+  const [plannedName, setPlannedName] = useState("");
+  const [plannedAmount, setPlannedAmount] = useState("");
+  const [plannedType, setPlannedType] = useState<"EXPENSE" | "INCOME" | "TRANSFER">("EXPENSE");
+  const [plannedDate, setPlannedDate] = useState(new Date().toISOString().split("T")[0]);
+  const [plannedWalletId, setPlannedWalletId] = useState("");
+  const [plannedToWalletId, setPlannedToWalletId] = useState("");
+  const [plannedNotes, setPlannedNotes] = useState("");
+  const [isSavingPlanned, setIsSavingPlanned] = useState(false);
+  const [isExecutingPlanned, setIsExecutingPlanned] = useState<string | null>(null);
 
   // ===========================================================================
   // 1. Data Fetching
@@ -125,6 +167,66 @@ export default function ForecastPage() {
     queryFn: async () => (await api.get("/api/v1/wallets")).data,
   });
 
+  // Hitung tanggal akhir efektif berdasarkan preset yang dipilih
+  let effectiveEndDate = projEndDate;
+  if (projRangePreset === "7days") {
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    effectiveEndDate = d.toISOString().split("T")[0];
+  } else if (projRangePreset === "14days") {
+    const d = new Date();
+    d.setDate(d.getDate() + 14);
+    effectiveEndDate = d.toISOString().split("T")[0];
+  } else if (projRangePreset === "end_of_cycle") {
+    if (summary?.cycle_info?.cycle_end_date) {
+      effectiveEndDate = summary.cycle_info.cycle_end_date;
+    } else {
+      const d = new Date();
+      d.setDate(d.getDate() + 30);
+      effectiveEndDate = d.toISOString().split("T")[0];
+    }
+  }
+
+  const {
+    data: rangeProjection,
+    isLoading: isProjectionLoading,
+    refetch: refetchRangeProjection,
+  } = useQuery({
+    queryKey: [
+      "forecast-range-projection",
+      projWalletFilter,
+      projCustomInitialBalance,
+      projStartDate,
+      effectiveEndDate,
+      projIncludeMeal,
+      projCustomDailyMeal,
+    ],
+    queryFn: async () => {
+      const payload: any = {
+        start_date: projStartDate || null,
+        end_date: effectiveEndDate || null,
+        wallet_filter: projWalletFilter,
+        include_daily_meal: projIncludeMeal,
+      };
+      if (projWalletFilter === "custom_balance" && projCustomInitialBalance) {
+        payload.custom_initial_balance = parseFloat(projCustomInitialBalance);
+      }
+      if (projCustomDailyMeal) {
+        payload.custom_daily_meal = parseFloat(projCustomDailyMeal);
+      }
+      return (await api.post("/api/v1/forecast/range-projection", payload)).data;
+    },
+    enabled: !!summary,
+  });
+
+  const {
+    data: plannedTransactions,
+    refetch: refetchPlannedTransactions,
+  } = useQuery({
+    queryKey: ["planned-transactions"],
+    queryFn: async () => (await api.get("/api/v1/forecast/planned-transactions")).data,
+  });
+
   const formatIDR = (val: number | string | undefined) => {
     if (val === undefined || val === null) return "Rp0";
     const num = typeof val === "string" ? parseFloat(val) : val;
@@ -134,6 +236,64 @@ export default function ForecastPage() {
   // ===========================================================================
   // 2. Handlers
   // ===========================================================================
+  const handleCreatePlanned = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!plannedName.trim() || !plannedAmount || !plannedDate) return;
+    setIsSavingPlanned(true);
+    try {
+      await api.post("/api/v1/forecast/planned-transactions", {
+        name: plannedName.trim(),
+        amount: parseFloat(plannedAmount),
+        type: plannedType,
+        planned_date: plannedDate,
+        wallet_id: plannedWalletId || null,
+        to_wallet_id: plannedType === "TRANSFER" ? (plannedToWalletId || null) : null,
+        notes: plannedNotes.trim() || null,
+      });
+      setIsAddPlannedModalOpen(false);
+      setPlannedName("");
+      setPlannedAmount("");
+      setPlannedWalletId("");
+      setPlannedToWalletId("");
+      setPlannedNotes("");
+      refetchPlannedTransactions();
+      refetchRangeProjection();
+    } catch (err: any) {
+      alert(err.response?.data?.detail || "Gagal menambah rencana transaksi.");
+    } finally {
+      setIsSavingPlanned(false);
+    }
+  };
+
+  const handleDeletePlanned = async (id: string) => {
+    if (!confirm("Hapus rencana transaksi ini?")) return;
+    try {
+      await api.delete(`/api/v1/forecast/planned-transactions/${id}`);
+      refetchPlannedTransactions();
+      refetchRangeProjection();
+    } catch (err: any) {
+      alert("Gagal menghapus rencana transaksi.");
+    }
+  };
+
+  const handleExecutePlanned = async (id: string, name: string) => {
+    if (!confirm(`Eksekusi "${name}" sekarang menjadi mutasi transaksi riil? Saldo dompet terkait akan langsung disesuaikan.`)) return;
+    setIsExecutingPlanned(id);
+    try {
+      await api.post(`/api/v1/forecast/planned-transactions/${id}/execute`);
+      refetchPlannedTransactions();
+      refetchRangeProjection();
+      refetchSummary();
+      refetchLedger();
+      queryClient.invalidateQueries({ queryKey: ["wallets"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+      alert("✅ Rencana berhasil dieksekusi menjadi transaksi riil!");
+    } catch (err: any) {
+      alert(err.response?.data?.detail || "Gagal mengeksekusi rencana.");
+    } finally {
+      setIsExecutingPlanned(null);
+    }
+  };
   const handleSavePlan = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSavingPlan(true);
@@ -165,9 +325,11 @@ export default function ForecastPage() {
         amount: parseFloat(streamAmount),
         frequency: streamFrequency,
         receive_day: streamFrequency === "weekly" ? streamReceiveDay : (streamFrequency === "monthly" ? streamReceiveDay : null),
+        wallet_id: streamWalletId || null,
       });
       setStreamName("");
       setStreamAmount("");
+      setStreamWalletId("");
       setIsAddStreamOpen(false);
       refetchIncomeStreams();
       refetchSummary();
@@ -213,16 +375,51 @@ export default function ForecastPage() {
         name: fixedName.trim(),
         amount: parseFloat(fixedAmount),
         wallet_id: fixedWalletId || null,
+        frequency: fixedFrequency,
+        due_day_of_month: fixedFrequency === "monthly" ? fixedDueDay : null,
+        interval_value: fixedFrequency === "every_n_days" ? fixedIntervalValue : (fixedFrequency === "weekly" ? fixedIntervalValue : null),
+        anchor_date: new Date().toISOString(),
       });
       setIsAddFixedModalOpen(false);
       setFixedName("");
       setFixedAmount("");
       setFixedWalletId("");
+      setFixedFrequency("monthly");
+      setFixedDueDay(1);
+      setFixedIntervalValue(4);
       refetchSummary();
+      refetchLedger();
     } catch (err: any) {
       alert(err.response?.data?.detail || "Gagal menambah tagihan pasti.");
     } finally {
       setIsSavingFixed(false);
+    }
+  };
+
+  const handleCreateCyclical = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cyclicalName.trim() || !cyclicalAmount) return;
+    setIsSavingCyclical(true);
+    try {
+      await api.post("/api/v1/forecast/fixed-expenses", {
+        name: cyclicalName.trim(),
+        amount: parseFloat(cyclicalAmount),
+        wallet_id: cyclicalWalletId || null,
+        frequency: cyclicalFrequency,
+        interval_value: cyclicalFrequency === "every_n_days" ? cyclicalInterval : cyclicalWeekday,
+        anchor_date: new Date().toISOString(),
+      });
+      setCyclicalName("");
+      setCyclicalAmount("");
+      setCyclicalWalletId("");
+      setCyclicalInterval(4);
+      setIsAddCyclicalOpen(false);
+      refetchSummary();
+      refetchLedger();
+    } catch (err: any) {
+      alert(err.response?.data?.detail || "Gagal menambah siklus biaya berkala.");
+    } finally {
+      setIsSavingCyclical(false);
     }
   };
 
@@ -443,7 +640,7 @@ export default function ForecastPage() {
               : "text-espresso-muted hover:text-espresso"
           }`}
         >
-          📅 Harian
+          🔮 Proyeksi & Harian
         </button>
         <button
           type="button"
@@ -454,7 +651,7 @@ export default function ForecastPage() {
               : "text-espresso-muted hover:text-espresso"
           }`}
         >
-          📋 Tagihan Pasti
+          📋 Tagihan & Siklus
         </button>
         <button
           type="button"
@@ -470,79 +667,505 @@ export default function ForecastPage() {
       </div>
 
       {/* ===================================================================== */}
-      {/* TAB 1: HARIAN VS IDEAL (SESUAI SPREADSHEET 1 TABEL KANAN)             */}
+      {/* TAB 1: PREDIKSI MASA DEPAN (TIME-SERIES) & REALISASI HARIAN           */}
       {/* ===================================================================== */}
       {activeTab === "ledger" && (
-        <div className="rounded-3xl border border-surface-border bg-surface p-4 shadow-sm space-y-3">
-          <div className="flex items-center justify-between pb-2 border-b border-surface-border">
-            <div>
-              <h3 className="text-sm font-bold text-espresso">Rekap Pengeluaran Harian</h3>
-              <p className="text-[11px] text-espresso-muted">Realisasi belanja vs jatah ideal per tanggal</p>
-            </div>
-            {ledger && (
-              <span className="rounded-lg bg-surface-card px-2 py-1 text-[11px] font-bold text-espresso border border-surface-border">
-                Net: {ledger.net_variance >= 0 ? "+" : ""}{formatIDR(ledger.net_variance)}
-              </span>
-            )}
+        <div className="space-y-4">
+          {/* Sub-View Switcher: Forward Time-Series Projection vs Realisasi Harian */}
+          <div className="flex gap-1.5 p-1 rounded-2xl bg-surface-card border border-surface-border text-xs font-bold shadow-2xs">
+            <button
+              type="button"
+              onClick={() => setTimelineView("forward")}
+              className={`flex-1 py-2 rounded-xl transition flex items-center justify-center gap-1.5 ${
+                timelineView === "forward"
+                  ? "bg-surface text-terracotta shadow-xs border border-surface-border"
+                  : "text-espresso-muted hover:text-espresso"
+              }`}
+            >
+              <Sparkles className="h-3.5 w-3.5 text-terracotta" />
+              <span>Prediksi Saldo Masa Depan</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setTimelineView("history")}
+              className={`flex-1 py-2 rounded-xl transition flex items-center justify-center gap-1.5 ${
+                timelineView === "history"
+                  ? "bg-surface text-terracotta shadow-xs border border-surface-border"
+                  : "text-espresso-muted hover:text-espresso"
+              }`}
+            >
+              <Clock className="h-3.5 w-3.5 text-espresso-muted" />
+              <span>Realisasi Siklus Berjalan</span>
+            </button>
           </div>
 
-          {isLedgerLoading ? (
-            <div className="py-12 flex items-center justify-center">
-              <Loader2 className="h-6 w-6 animate-spin text-terracotta" />
-            </div>
-          ) : ledger && ledger.items.length > 0 ? (
-            <div className="divide-y divide-surface-border">
-              {ledger.items.map((item: any, idx: number) => (
-                <div key={idx} className="py-2.5 flex items-center justify-between text-xs">
+          {/* ================================================================= */}
+          {/* A. TIME-SERIES FORWARD-LOOKING LEDGER & PREDICTOR                 */}
+          {/* ================================================================= */}
+          {timelineView === "forward" && (
+            <div className="space-y-4">
+              {/* 1. KONTROL FILTER PROYEKSI & RENCANA */}
+              <div className="rounded-3xl border border-surface-border bg-surface p-4 shadow-sm space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-surface-border">
                   <div>
-                    <div className="flex items-center gap-1.5 font-bold text-espresso">
-                      <span>{item.date}</span>
-                      <span className="text-[10px] font-normal text-espresso-muted">({item.day_name})</span>
-                    </div>
-                    <span className="text-[11px] text-espresso-muted block">
-                      Plafon Ideal: {formatIDR(item.ideal_spending)}
-                    </span>
-                    {item.scheduled_income && (
-                      <span className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-semibold text-income bg-income/10 px-1.5 py-0.5 rounded-md">
-                        <TrendingUp className="h-3 w-3" />
-                        +{formatIDR(item.scheduled_income)} ({item.scheduled_income_names?.join(", ")})
-                      </span>
-                    )}
+                    <h3 className="text-sm font-bold text-espresso">Filter Proyeksi Arus Kas</h3>
+                    <p className="text-[11px] text-espresso-muted">Pilih dompet, rentang waktu & simulasikan transaksi</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsAddPlannedModalOpen(true)}
+                    className="flex items-center gap-1 rounded-xl bg-terracotta px-2.5 py-1 text-xs font-bold text-white hover:bg-terracotta-hover transition shadow-xs"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>+ Rencana</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  {/* Dompet Filter */}
+                  <div>
+                    <label className="block text-[11px] font-semibold text-espresso mb-1">
+                      Pilih Dompet / Basis Saldo
+                    </label>
+                    <select
+                      value={projWalletFilter}
+                      onChange={(e) => setProjWalletFilter(e.target.value)}
+                      className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs font-semibold text-espresso focus:outline-none focus:border-terracotta"
+                    >
+                      <option value="all_operational">💼 Semua Dompet Operasional</option>
+                      <option value="all_savings">💰 Semua Tabungan (Savings)</option>
+                      <option value="all_wallets">🌐 Seluruh Dompet (Konsolidasi)</option>
+                      <option value="custom_balance">🧪 Mode Simulasi Saldo Kustom</option>
+                      {wallets?.map((w: any) => (
+                        <option key={w.id} value={w.id}>
+                          {w.name} ({w.purpose === "savings" ? "Tabungan" : w.purpose === "subscription" ? "Tagihan" : "Operasional"}) - {formatIDR(w.balance)}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
-                  <div className="text-right">
-                    <span className="font-bold text-espresso block">
-                      {formatIDR(item.total_spent)}
-                    </span>
-                    <span
-                      className={`text-[10px] font-semibold ${
-                        item.daily_variance >= 0 ? "text-income" : "text-expense"
-                      }`}
-                    >
-                      {item.daily_variance >= 0 ? "+" : ""}{formatIDR(item.daily_variance)}
-                    </span>
+                  {/* Rentang Waktu Preset */}
+                  <div>
+                    <label className="block text-[11px] font-semibold text-espresso mb-1">
+                      Rentang Waktu Prediksi
+                    </label>
+                    <div className="grid grid-cols-4 gap-1">
+                      {[
+                        { id: "14days", label: "14 Hari" },
+                        { id: "end_of_cycle", label: "Akhir Siklus" },
+                        { id: "7days", label: "7 Hari" },
+                        { id: "custom", label: "Kustom" },
+                      ].map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => setProjRangePreset(item.id as any)}
+                          className={`rounded-lg py-1.5 text-[10px] font-bold border transition ${
+                            projRangePreset === item.id
+                              ? "bg-terracotta text-white border-terracotta shadow-xs"
+                              : "bg-surface-card text-espresso-muted border-surface-border hover:text-espresso"
+                          }`}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              ))}
+
+                {/* Input Saldo Kustom jika memilih custom_balance */}
+                {projWalletFilter === "custom_balance" && (
+                  <div className="rounded-xl border border-amber/30 bg-amber/10 p-2.5 space-y-1">
+                    <label className="block text-[11px] font-semibold text-terracotta">
+                      Saldo Awal Bayangan untuk Uji Coba (Rp)
+                    </label>
+                    <input
+                      type="number"
+                      value={projCustomInitialBalance}
+                      onChange={(e) => setProjCustomInitialBalance(e.target.value)}
+                      placeholder="Contoh: 1500000"
+                      className="w-full rounded-lg border border-surface-border bg-surface px-3 py-1.5 text-xs font-bold text-espresso focus:outline-none focus:border-terracotta"
+                    />
+                    <span className="text-[10px] text-espresso-muted block">
+                      Saldo riil di database tidak akan berubah sama sekali saat melakukan simulasi ini.
+                    </span>
+                  </div>
+                )}
+
+                {/* Input Tanggal Kustom jika memilih custom */}
+                {projRangePreset === "custom" && (
+                  <div className="grid grid-cols-2 gap-2 text-xs pt-1">
+                    <div>
+                      <label className="block text-[10px] font-semibold text-espresso mb-0.5">Mulai Tanggal</label>
+                      <input
+                        type="date"
+                        value={projStartDate}
+                        onChange={(e) => setProjStartDate(e.target.value)}
+                        className="w-full rounded-lg border border-surface-border bg-surface-card px-2.5 py-1 text-xs text-espresso focus:outline-none focus:border-terracotta"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-espresso mb-0.5">Sampai Tanggal</label>
+                      <input
+                        type="date"
+                        value={projEndDate}
+                        onChange={(e) => setProjEndDate(e.target.value)}
+                        className="w-full rounded-lg border border-surface-border bg-surface-card px-2.5 py-1 text-xs text-espresso focus:outline-none focus:border-terracotta"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Opsi Jatah Makan Harian */}
+                {projWalletFilter !== "all_savings" && (
+                  <div className="flex items-center justify-between pt-1 border-t border-surface-border text-xs">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={projIncludeMeal}
+                        onChange={(e) => setProjIncludeMeal(e.target.checked)}
+                        className="rounded border-surface-border text-terracotta focus:ring-terracotta"
+                      />
+                      <span className="text-espresso font-medium text-[11px]">
+                        Hitung Patokan Makan Harian ({formatIDR(plan?.daily_living_budget || 0)}/hari)
+                      </span>
+                    </label>
+                  </div>
+                )}
+              </div>
+
+              {/* 2. KARTU RINGKASAN HASIL PROYEKSI RENTANG WAKTU */}
+              {isProjectionLoading ? (
+                <div className="rounded-3xl border border-surface-border bg-surface p-8 flex items-center justify-center">
+                  <Loader2 className="h-6 w-6 animate-spin text-terracotta" />
+                </div>
+              ) : rangeProjection && (
+                <div className="rounded-3xl border border-surface-border bg-gradient-to-br from-surface to-surface-card p-4 shadow-sm space-y-3">
+                  <div className="flex items-center justify-between text-xs pb-2 border-b border-surface-border">
+                    <span className="font-bold text-espresso">
+                      Proyeksi {rangeProjection.total_days} Hari ({rangeProjection.start_date} s/d {rangeProjection.end_date})
+                    </span>
+                    <span className="text-[10px] text-espresso-muted font-medium bg-surface-card px-2 py-0.5 rounded-md border border-surface-border">
+                      {rangeProjection.wallet_filter_label}
+                    </span>
+                  </div>
+
+                  {/* 4 Metrik Utama Grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                    <div className="rounded-2xl bg-surface p-2.5 border border-surface-border">
+                      <span className="text-[10px] text-espresso-muted uppercase font-bold block">Saldo Awal</span>
+                      <span className="text-sm font-extrabold text-espresso block mt-0.5">
+                        {formatIDR(rangeProjection.initial_balance)}
+                      </span>
+                    </div>
+
+                    <div className="rounded-2xl bg-income/10 p-2.5 border border-income/20">
+                      <span className="text-[10px] text-income uppercase font-bold block">Estimasi Masuk</span>
+                      <span className="text-sm font-extrabold text-income block mt-0.5">
+                        +{formatIDR(rangeProjection.total_inflow)}
+                      </span>
+                    </div>
+
+                    <div className="rounded-2xl bg-expense/10 p-2.5 border border-expense/20">
+                      <span className="text-[10px] text-expense uppercase font-bold block">Estimasi Keluar</span>
+                      <span className="text-sm font-extrabold text-expense block mt-0.5">
+                        -{formatIDR(rangeProjection.total_outflow)}
+                      </span>
+                    </div>
+
+                    <div className={`rounded-2xl p-2.5 border ${
+                      rangeProjection.final_balance >= 0
+                        ? "bg-surface border-surface-border"
+                        : "bg-expense/15 border-expense/30"
+                    }`}>
+                      <span className="text-[10px] text-espresso-muted uppercase font-bold block">Prediksi Sisa Akhir</span>
+                      <span className={`text-sm font-extrabold block mt-0.5 ${
+                        rangeProjection.final_balance >= 0 ? "text-terracotta" : "text-expense"
+                      }`}>
+                        {formatIDR(rangeProjection.final_balance)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Banner Status Aman / Defisit */}
+                  <div className={`rounded-2xl p-3 border text-xs font-semibold flex items-center gap-2 ${
+                    rangeProjection.is_safe
+                      ? "bg-income/10 border-income/30 text-income"
+                      : "bg-expense/15 border-expense/30 text-expense"
+                  }`}>
+                    {rangeProjection.is_safe ? (
+                      <>
+                        <CheckCircle2 className="h-4 w-4 shrink-0" />
+                        <div>
+                          <span>Arus kas aman terjaga! Saldo diproyeksikan bertahan di atas Rp0.</span>
+                          <span className="block text-[10px] text-espresso-muted mt-0.5">
+                            Saldo terendah: {formatIDR(rangeProjection.lowest_balance)} (pada tanggal {rangeProjection.lowest_balance_date})
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <AlertTriangle className="h-4 w-4 shrink-0" />
+                        <div>
+                          <span>Waspada Defisit! Saldo diprediksi minus mulai tanggal {rangeProjection.critical_deficit_date}.</span>
+                          <span className="block text-[10px] text-espresso-muted mt-0.5">
+                            Titik defisit terdalam mencapai {formatIDR(rangeProjection.lowest_balance)}. Siapkan dana darurat atau tunda pengeluaran rencana!
+                          </span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* 3. TIMELINE HARIAN MASA DEPAN (FORWARD LEDGER) */}
+              <div className="rounded-3xl border border-surface-border bg-surface p-4 shadow-sm space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-surface-border">
+                  <div>
+                    <h4 className="text-sm font-bold text-espresso">Buku Kas Masa Depan (Daily Timeline)</h4>
+                    <p className="text-[11px] text-espresso-muted">Mutasi harian & saldo berjalan hari demi hari</p>
+                  </div>
+                </div>
+
+                {isProjectionLoading ? (
+                  <div className="py-8 flex items-center justify-center">
+                    <Loader2 className="h-5 w-5 animate-spin text-terracotta" />
+                  </div>
+                ) : rangeProjection && rangeProjection.timeline.length > 0 ? (
+                  <div className="divide-y divide-surface-border">
+                    {rangeProjection.timeline.map((day: any, idx: number) => (
+                      <div key={idx} className="py-3 space-y-1.5 text-xs">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 font-bold text-espresso">
+                            <span>{day.date}</span>
+                            <span className="text-[10px] font-normal text-espresso-muted">({day.day_name})</span>
+                            {day.is_today && (
+                              <span className="rounded-md bg-terracotta text-white px-1.5 py-0.2 text-[9px] font-bold">
+                                Hari Ini
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="text-right">
+                            <span className="text-[10px] text-espresso-muted block">Sisa Saldo:</span>
+                            <span className={`text-xs font-black ${
+                              day.closing_balance >= 0 ? "text-espresso" : "text-expense"
+                            }`}>
+                              {formatIDR(day.closing_balance)}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Badges Kejadian / Events di hari ini */}
+                        {day.events && day.events.length > 0 ? (
+                          <div className="flex flex-wrap gap-1.5 pt-0.5">
+                            {day.events.map((ev: any, evIdx: number) => {
+                              const badgeStyleMap: Record<string, string> = {
+                                INCOME: "bg-income/10 text-income border-income/30",
+                                MEAL: "bg-amber/15 text-terracotta border-amber/30",
+                                CYCLICAL: "bg-purple-100 text-purple-800 border-purple-200",
+                                FIXED_BILL: "bg-espresso/10 text-espresso border-espresso/20",
+                                PLANNED: "bg-blue-100 text-blue-800 border-blue-200",
+                              };
+                              const badgeStyle = badgeStyleMap[ev.type] || "bg-surface text-espresso";
+
+                              return (
+                                <span
+                                  key={evIdx}
+                                  className={`inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 text-[10px] font-semibold ${badgeStyle}`}
+                                >
+                                  <span>{ev.name}</span>
+                                  <span className="font-bold">
+                                    {ev.direction === "INFLOW" ? "+" : "-"}{formatIDR(ev.amount)}
+                                  </span>
+                                  {ev.wallet_name && (
+                                    <span className="opacity-75">({ev.wallet_name})</span>
+                                  )}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <span className="text-[10px] text-espresso-muted italic">Tidak ada mutasi terjadwal</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="py-8 text-center text-xs text-espresso-muted">
+                    Tidak ada timeline dalam rentang waktu ini.
+                  </div>
+                )}
+              </div>
+
+              {/* 4. DAFTAR RENCANA TRANSAKSI MASA DEPAN (PLANNED TRANSACTIONS) */}
+              <div className="rounded-3xl border border-surface-border bg-surface p-4 shadow-sm space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-surface-border">
+                  <div>
+                    <h4 className="text-sm font-bold text-espresso">Rencana Transaksi Terdaftar</h4>
+                    <p className="text-[11px] text-espresso-muted">Disuntikkan ke timeline untuk menguji dampaknya sebelum dieksekusi</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsAddPlannedModalOpen(true)}
+                    className="flex items-center gap-1 rounded-xl bg-terracotta/10 px-2.5 py-1 text-xs font-bold text-terracotta hover:bg-terracotta/20"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Tambah
+                  </button>
+                </div>
+
+                {plannedTransactions && plannedTransactions.length > 0 ? (
+                  <div className="space-y-2">
+                    {plannedTransactions.map((pt: any) => (
+                      <div
+                        key={pt.id}
+                        className="flex items-center justify-between rounded-2xl border border-surface-border bg-surface-card p-3 text-xs"
+                      >
+                        <div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-bold text-espresso">{pt.name}</span>
+                            <span className={`rounded-md border px-1.5 py-0.2 text-[9px] font-bold ${
+                              pt.type === "INCOME"
+                                ? "bg-income/10 text-income border-income/30"
+                                : pt.type === "TRANSFER"
+                                ? "bg-blue-100 text-blue-800 border-blue-200"
+                                : "bg-expense/10 text-expense border-expense/30"
+                            }`}>
+                              {pt.type === "INCOME" ? "Pemasukan" : pt.type === "TRANSFER" ? "Pindah Dompet" : "Pengeluaran"}
+                            </span>
+                            {pt.is_completed && (
+                              <span className="rounded-md bg-income text-white px-1.5 py-0.2 text-[9px] font-bold">
+                                Selesai
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-espresso-muted flex-wrap">
+                            <span>📅 {pt.planned_date}</span>
+                            <span>•</span>
+                            <span>Nominal: <strong>{formatIDR(pt.amount)}</strong></span>
+                            {pt.wallet_name && (
+                              <>
+                                <span>•</span>
+                                <span>💳 {pt.wallet_name}</span>
+                              </>
+                            )}
+                            {pt.to_wallet_name && (
+                              <span> ➔ {pt.to_wallet_name}</span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          {!pt.is_completed && (
+                            <button
+                              type="button"
+                              onClick={() => handleExecutePlanned(pt.id, pt.name)}
+                              disabled={isExecutingPlanned === pt.id}
+                              className="rounded-xl bg-terracotta/15 px-2.5 py-1 text-[11px] font-bold text-terracotta hover:bg-terracotta/25 transition disabled:opacity-50 flex items-center gap-1"
+                              title="Eksekusi menjadi transaksi riil & debit dompet"
+                            >
+                              <Zap className="h-3 w-3" />
+                              <span>{isExecutingPlanned === pt.id ? "Memproses..." : "Eksekusi"}</span>
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleDeletePlanned(pt.id)}
+                            className="rounded-lg p-1.5 text-espresso-muted hover:bg-expense/10 hover:text-expense transition"
+                            title="Hapus rencana ini"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-espresso-muted italic">
+                    Belum ada rencana transaksi. Tambahkan rencana servis motor, beli kado, atau transfer tabungan untuk melihat efeknya terhadap sisa saldo ke depan.
+                  </p>
+                )}
+              </div>
             </div>
-          ) : (
-            <div className="py-8 text-center text-xs text-espresso-muted">
-              Belum ada riwayat transaksi pada siklus ini.
+          )}
+
+          {/* ================================================================= */}
+          {/* B. HISTORICAL LEDGER VIEW (REKAP REALISASI HARIAN SIKLUS INI)     */}
+          {/* ================================================================= */}
+          {timelineView === "history" && (
+            <div className="rounded-3xl border border-surface-border bg-surface p-4 shadow-sm space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-surface-border">
+                <div>
+                  <h3 className="text-sm font-bold text-espresso">Rekap Realisasi Harian</h3>
+                  <p className="text-[11px] text-espresso-muted">Realisasi belanja vs jatah ideal per tanggal</p>
+                </div>
+                {ledger && (
+                  <span className="rounded-lg bg-surface-card px-2 py-1 text-[11px] font-bold text-espresso border border-surface-border">
+                    Net: {ledger.net_variance >= 0 ? "+" : ""}{formatIDR(ledger.net_variance)}
+                  </span>
+                )}
+              </div>
+
+              {isLedgerLoading ? (
+                <div className="py-12 flex items-center justify-center">
+                  <Loader2 className="h-6 w-6 animate-spin text-terracotta" />
+                </div>
+              ) : ledger && ledger.items.length > 0 ? (
+                <div className="divide-y divide-surface-border">
+                  {ledger.items.map((item: any, idx: number) => (
+                    <div key={idx} className="py-2.5 flex items-center justify-between text-xs">
+                      <div>
+                        <div className="flex items-center gap-1.5 font-bold text-espresso">
+                          <span>{item.date}</span>
+                          <span className="text-[10px] font-normal text-espresso-muted">({item.day_name})</span>
+                        </div>
+                        <span className="text-[11px] text-espresso-muted block">
+                          Plafon Ideal: {formatIDR(item.ideal_spending)}
+                        </span>
+                        {item.scheduled_income && (
+                          <span className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-semibold text-income bg-income/10 px-1.5 py-0.5 rounded-md">
+                            <TrendingUp className="h-3 w-3" />
+                            +{formatIDR(item.scheduled_income)} ({item.scheduled_income_names?.join(", ")})
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="text-right">
+                        <span className="font-bold text-espresso block">
+                          {formatIDR(item.total_spent)}
+                        </span>
+                        <span
+                          className={`text-[10px] font-semibold ${
+                            item.daily_variance >= 0 ? "text-income" : "text-expense"
+                          }`}
+                        >
+                          {item.daily_variance >= 0 ? "+" : ""}{formatIDR(item.daily_variance)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="py-8 text-center text-xs text-espresso-muted">
+                  Belum ada riwayat transaksi pada siklus ini.
+                </div>
+              )}
             </div>
           )}
         </div>
       )}
 
       {/* ===================================================================== */}
-      {/* TAB 2: TAGIHAN PASTI / FIXED OBLIGATIONS (SESUAI SPREADSHEET 2 KIRI)   */}
+      {/* TAB 2: TAGIHAN PASTI & SIKLUS BERKALA (FIXED & CYCLICAL EXPENSES)     */}
       {/* ===================================================================== */}
       {activeTab === "fixed" && (
         <div className="rounded-3xl border border-surface-border bg-surface p-4 shadow-sm space-y-4">
           <div className="flex items-center justify-between pb-2 border-b border-surface-border">
             <div>
-              <h3 className="text-sm font-bold text-espresso">Pengeluaran Pasti / Rutin</h3>
+              <h3 className="text-sm font-bold text-espresso">Tagihan & Siklus Hidup Berkala</h3>
               <p className="text-[11px] text-espresso-muted">
-                Otomatis dicadangkan dari saldo agar jatah belanja tidak terpakai
+                Otomatis dicadangkan dari saldo agar jatah makan harian tidak terganggu
               </p>
             </div>
             <button
@@ -572,63 +1195,124 @@ export default function ForecastPage() {
             </div>
           )}
 
-          <div className="space-y-2">
-            {summary?.fixed_obligations.items.map((item: any) => (
-              <div
-                key={item.id}
-                className="flex items-center justify-between rounded-2xl border border-surface-border bg-surface-card p-3 transition hover:border-terracotta/40"
-              >
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => handleToggleFixed(item.id)}
-                    className={`flex h-6 w-6 items-center justify-center rounded-lg border transition ${
-                      item.is_paid_this_cycle
-                        ? "border-income bg-income text-white shadow-sm"
-                        : "border-espresso-muted/40 bg-surface text-transparent"
-                    }`}
-                    title={item.is_paid_this_cycle ? "Tandai Belum Lunas" : "Tandai Sudah Lunas"}
-                  >
-                    <Check className="h-4 w-4" />
-                  </button>
-                  <div>
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className={`text-xs font-bold block ${
-                          item.is_paid_this_cycle ? "line-through text-espresso-muted" : "text-espresso"
-                        }`}
-                      >
-                        {item.name}
-                      </span>
-                      {item.wallet_name && (
-                        <span className="rounded-md bg-amber/20 px-1.5 py-0.2 text-[9px] font-bold text-terracotta border border-amber/30">
-                          💳 {item.wallet_name}
-                        </span>
-                      )}
-                    </div>
-                    <span className="text-[10px] text-espresso-muted">
-                      {item.is_paid_this_cycle
-                        ? `✅ Lunas bulan ini${item.wallet_name ? ` (dari ${item.wallet_name})` : ""}`
-                        : "⏳ Belum dibayar (Dicadangkan)"}
-                    </span>
-                  </div>
-                </div>
+          {/* Sub-Filter: Semua / Tagihan Bulanan / Siklus Biaya Hidup */}
+          <div className="flex gap-1.5 p-1 rounded-xl bg-surface-card border border-surface-border text-[11px] font-bold">
+            <button
+              type="button"
+              onClick={() => setFixedFilter("all")}
+              className={`flex-1 py-1 rounded-lg transition ${
+                fixedFilter === "all" ? "bg-surface text-terracotta shadow-xs" : "text-espresso-muted hover:text-espresso"
+              }`}
+            >
+              Semua ({summary?.fixed_obligations?.items?.length || 0})
+            </button>
+            <button
+              type="button"
+              onClick={() => setFixedFilter("monthly")}
+              className={`flex-1 py-1 rounded-lg transition ${
+                fixedFilter === "monthly" ? "bg-surface text-terracotta shadow-xs" : "text-espresso-muted hover:text-espresso"
+              }`}
+            >
+              📅 Bulanan ({summary?.fixed_obligations?.items?.filter((f: any) => !f.frequency || f.frequency === "monthly").length || 0})
+            </button>
+            <button
+              type="button"
+              onClick={() => setFixedFilter("cyclical")}
+              className={`flex-1 py-1 rounded-lg transition ${
+                fixedFilter === "cyclical" ? "bg-surface text-terracotta shadow-xs" : "text-espresso-muted hover:text-espresso"
+              }`}
+            >
+              🔄 Siklus ({summary?.fixed_obligations?.items?.filter((f: any) => f.frequency && f.frequency !== "monthly").length || 0})
+            </button>
+          </div>
 
-                <div className="flex items-center gap-3">
-                  <span className="text-xs font-bold text-espresso">
-                    {formatIDR(item.amount)}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteFixed(item.id)}
-                    className="text-espresso-muted/40 hover:text-expense transition p-1"
-                    title="Hapus Tagihan"
+          <div className="space-y-2">
+            {summary?.fixed_obligations.items
+              .filter((item: any) => {
+                if (fixedFilter === "monthly") return !item.frequency || item.frequency === "monthly";
+                if (fixedFilter === "cyclical") return item.frequency && item.frequency !== "monthly";
+                return true;
+              })
+              .map((item: any) => {
+                const isCyclical = item.frequency && item.frequency !== "monthly";
+                const daysOfWeek = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"];
+                const freqBadge =
+                  item.frequency === "every_n_days"
+                    ? `🔄 Tiap ${item.interval_value || 1} Hari`
+                    : item.frequency === "weekly"
+                    ? `🔄 Mingguan (${daysOfWeek[item.interval_value || 0] || "Sabtu"})`
+                    : item.frequency === "biweekly"
+                    ? "🔄 2-Mingguan"
+                    : `📅 Bulanan (Tgl ${item.due_day_of_month || 1})`;
+
+                return (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between rounded-2xl border border-surface-border bg-surface-card p-3 transition hover:border-terracotta/40"
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              </div>
-            ))}
+                    <div className="flex items-center gap-3">
+                      {!isCyclical ? (
+                        <button
+                          type="button"
+                          onClick={() => handleToggleFixed(item.id)}
+                          className={`flex h-6 w-6 items-center justify-center rounded-lg border transition ${
+                            item.is_paid_this_cycle
+                              ? "border-income bg-income text-white shadow-sm"
+                              : "border-espresso-muted/40 bg-surface text-transparent"
+                          }`}
+                          title={item.is_paid_this_cycle ? "Tandai Belum Lunas" : "Tandai Sudah Lunas"}
+                        >
+                          <Check className="h-4 w-4" />
+                        </button>
+                      ) : (
+                        <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-amber/20 text-terracotta">
+                          <Zap className="h-3.5 w-3.5" />
+                        </div>
+                      )}
+                      <div>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span
+                            className={`text-xs font-bold block ${
+                              item.is_paid_this_cycle ? "line-through text-espresso-muted" : "text-espresso"
+                            }`}
+                          >
+                            {item.name}
+                          </span>
+                          <span className="rounded-md border border-amber/30 bg-amber/15 px-1.5 py-0.2 text-[9px] font-semibold text-terracotta">
+                            {freqBadge}
+                          </span>
+                          {item.wallet_name && (
+                            <span className="rounded-md bg-espresso/10 px-1.5 py-0.2 text-[9px] font-bold text-espresso border border-espresso/20">
+                              💳 {item.wallet_name}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[10px] text-espresso-muted">
+                          {isCyclical
+                            ? `🔄 Siklus otomatis dicadangkan di Safe-to-Spend`
+                            : item.is_paid_this_cycle
+                            ? `✅ Lunas bulan ini${item.wallet_name ? ` (dari ${item.wallet_name})` : ""}`
+                            : "⏳ Belum dibayar (Dicadangkan)"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs font-bold text-espresso">
+                        {formatIDR(item.amount)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteFixed(item.id)}
+                        className="text-espresso-muted/40 hover:text-expense transition p-1"
+                        title="Hapus Tagihan / Siklus"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
           </div>
         </div>
       )}
@@ -967,6 +1651,22 @@ export default function ForecastPage() {
                       </div>
                     )}
 
+                    <div>
+                      <label className="block text-[10px] font-semibold text-espresso mb-0.5">Masuk ke Dompet (Tujuan)</label>
+                      <select
+                        value={streamWalletId}
+                        onChange={(e) => setStreamWalletId(e.target.value)}
+                        className="w-full rounded-lg border border-surface-border bg-surface-card px-2.5 py-1.5 text-xs text-espresso focus:outline-none focus:border-terracotta"
+                      >
+                        <option value="">-- Otomatis Dompet Operasional Utama --</option>
+                        {wallets?.map((w: any) => (
+                          <option key={w.id} value={w.id}>
+                            {w.name} ({w.purpose === "savings" ? "Tabungan" : w.purpose === "subscription" ? "Tagihan" : "Operasional"})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
                     {parsedAmt > 0 && (
                       <div className="rounded-lg bg-amber/15 px-2.5 py-1.5 text-[11px] text-terracotta font-semibold">
                         Estimasi setara bulanan: ~{formatIDR(estimatedStreamEquivalent)} / siklus ({cycleDays} hari)
@@ -996,19 +1696,21 @@ export default function ForecastPage() {
                 {incomeStreams && incomeStreams.length > 0 ? (
                   <div className="space-y-1.5">
                     {incomeStreams.map((s: any) => {
-                      const freqLabel = {
+                      const freqLabelMap: Record<string, string> = {
                         daily: "Harian",
                         weekly: "Mingguan",
                         biweekly: "2-Mgg",
                         monthly: "Bulanan",
-                      }[s.frequency] || s.frequency;
+                      };
+                      const freqLabel = freqLabelMap[s.frequency] || s.frequency;
 
-                      const freqBadgeColor = {
+                      const freqBadgeColorMap: Record<string, string> = {
                         daily: "bg-amber/20 text-terracotta border-amber/30",
                         weekly: "bg-income/15 text-income border-income/30",
                         biweekly: "bg-purple-100 text-purple-800 border-purple-200",
                         monthly: "bg-espresso/10 text-espresso border-espresso/20",
-                      }[s.frequency] || "bg-surface text-espresso";
+                      };
+                      const freqBadgeColor = freqBadgeColorMap[s.frequency] || "bg-surface text-espresso";
 
                       return (
                         <div
@@ -1022,12 +1724,18 @@ export default function ForecastPage() {
                                 {freqLabel}
                               </span>
                             </div>
-                            <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-espresso-muted">
+                            <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-espresso-muted flex-wrap">
                               <span className="font-semibold text-espresso">
                                 {formatIDR(s.amount)}/{s.frequency === "daily" ? "hari" : s.frequency === "weekly" ? "minggu" : s.frequency === "biweekly" ? "2-mgg" : "bln"}
                               </span>
                               <span>•</span>
                               <span>~{formatIDR(s.monthly_equivalent)}/bln</span>
+                              {s.wallet_name && (
+                                <>
+                                  <span>•</span>
+                                  <span className="font-semibold text-terracotta">💳 {s.wallet_name}</span>
+                                </>
+                              )}
                             </div>
                           </div>
                           <button
@@ -1054,7 +1762,203 @@ export default function ForecastPage() {
                 )}
               </div>
 
-              {/* 2. FORM BLUEPRINT KEUANGAN */}
+              {/* 2. SEKSI SIKLUS BIAYA HIDUP BERKALA (PERIODIC LIVING CYCLES) */}
+              <div className="rounded-2xl border border-surface-border bg-surface-card/60 p-3.5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-bold text-espresso block">Siklus Biaya Hidup Berkala</span>
+                    <span className="text-[10px] text-espresso-muted">
+                      Biaya rutin jarak pendek (bensin tiap 4 hari, pulsa, galon, dll)
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsAddCyclicalOpen(!isAddCyclicalOpen)}
+                    className="flex items-center gap-1 rounded-xl bg-terracotta/15 px-2.5 py-1 text-[11px] font-bold text-terracotta hover:bg-terracotta/25 transition"
+                  >
+                    <Plus className="h-3 w-3" />
+                    <span>{isAddCyclicalOpen ? "Tutup Form" : "Tambah"}</span>
+                  </button>
+                </div>
+
+                {/* Form Tambah Siklus Baru */}
+                {isAddCyclicalOpen && (
+                  <form onSubmit={handleCreateCyclical} className="rounded-xl border border-terracotta/30 bg-surface p-3 space-y-2.5 shadow-sm">
+                    <span className="text-[11px] font-bold text-terracotta block">
+                      + Tambah Siklus Biaya Berkala
+                    </span>
+
+                    <div>
+                      <label className="block text-[10px] font-semibold text-espresso mb-0.5">Nama Kebutuhan</label>
+                      <input
+                        type="text"
+                        required
+                        value={cyclicalName}
+                        onChange={(e) => setCyclicalName(e.target.value)}
+                        placeholder="Contoh: Bensin Motor, Pulsa & Kuota, Galon Mingguan"
+                        className="w-full rounded-lg border border-surface-border bg-surface-card px-2.5 py-1.5 text-xs text-espresso focus:outline-none focus:border-terracotta"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-semibold text-espresso mb-0.5">Nominal per Siklus (Rp)</label>
+                      <input
+                        type="number"
+                        required
+                        min="1"
+                        value={cyclicalAmount}
+                        onChange={(e) => setCyclicalAmount(e.target.value)}
+                        placeholder="Contoh: 35000"
+                        className="w-full rounded-lg border border-surface-border bg-surface-card px-2.5 py-1.5 text-xs font-bold text-espresso focus:outline-none focus:border-terracotta"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-semibold text-espresso mb-1">Pola Interval Siklus</label>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {[
+                          { id: "every_n_days", label: "Tiap N Hari" },
+                          { id: "weekly", label: "Mingguan" },
+                          { id: "biweekly", label: "2-Mingguan" },
+                        ].map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => setCyclicalFrequency(item.id as any)}
+                            className={`rounded-lg py-1 text-[11px] font-bold border transition ${
+                              cyclicalFrequency === item.id
+                                ? "bg-terracotta text-white border-terracotta shadow-xs"
+                                : "bg-surface-card text-espresso-muted border-surface-border hover:text-espresso"
+                            }`}
+                          >
+                            {item.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {cyclicalFrequency === "every_n_days" && (
+                      <div>
+                        <label className="block text-[10px] font-semibold text-espresso mb-0.5">Interval Hari</label>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-espresso-muted">Setiap</span>
+                          <input
+                            type="number"
+                            min="1"
+                            max="365"
+                            required
+                            value={cyclicalInterval}
+                            onChange={(e) => setCyclicalInterval(parseInt(e.target.value) || 1)}
+                            className="w-20 rounded-lg border border-surface-border bg-surface-card px-2.5 py-1.5 text-xs font-bold text-espresso text-center focus:outline-none focus:border-terracotta"
+                          />
+                          <span className="text-xs text-espresso-muted">hari sekali (misal isi bensin tiap 3-5 hari)</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {cyclicalFrequency === "weekly" && (
+                      <div>
+                        <label className="block text-[10px] font-semibold text-espresso mb-0.5">Hari Pembelian Rutin</label>
+                        <select
+                          value={cyclicalWeekday}
+                          onChange={(e) => setCyclicalWeekday(parseInt(e.target.value))}
+                          className="w-full rounded-lg border border-surface-border bg-surface-card px-2.5 py-1.5 text-xs text-espresso focus:outline-none focus:border-terracotta"
+                        >
+                          {daysOfWeek.map((day, idx) => (
+                            <option key={idx} value={idx}>
+                              Setiap hari {day} (misal belanja pasar / galon)
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="block text-[10px] font-semibold text-espresso mb-0.5">Dipotong dari Dompet</label>
+                      <select
+                        value={cyclicalWalletId}
+                        onChange={(e) => setCyclicalWalletId(e.target.value)}
+                        className="w-full rounded-lg border border-surface-border bg-surface-card px-2.5 py-1.5 text-xs text-espresso focus:outline-none focus:border-terracotta"
+                      >
+                        <option value="">-- Otomatis Operasional Utama --</option>
+                        {wallets?.map((w: any) => (
+                          <option key={w.id} value={w.id}>
+                            {w.name} ({w.purpose === "savings" ? "Tabungan" : w.purpose === "subscription" ? "Tagihan" : "Operasional"}) - {formatIDR(w.balance)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setIsAddCyclicalOpen(false)}
+                        className="flex-1 rounded-lg bg-surface-card py-1.5 text-[11px] font-semibold text-espresso-muted"
+                      >
+                        Batal
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isSavingCyclical}
+                        className="flex-1 rounded-lg bg-terracotta py-1.5 text-[11px] font-bold text-white hover:bg-terracotta-hover transition disabled:opacity-50"
+                      >
+                        {isSavingCyclical ? "Menyimpan..." : "Simpan Siklus"}
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {/* List Siklus Berkala yang ada */}
+                {summary?.fixed_obligations?.items?.filter((f: any) => f.frequency && f.frequency !== "monthly").length > 0 ? (
+                  <div className="space-y-1.5">
+                    {summary.fixed_obligations.items
+                      .filter((f: any) => f.frequency && f.frequency !== "monthly")
+                      .map((c: any) => {
+                        const label =
+                          c.frequency === "every_n_days"
+                            ? `Tiap ${c.interval_value || 1} Hari`
+                            : c.frequency === "weekly"
+                            ? `Mingguan (${daysOfWeek[c.interval_value || 0] || "Sabtu"})`
+                            : "2-Mingguan";
+
+                        return (
+                          <div
+                            key={c.id}
+                            className="flex items-center justify-between rounded-xl border border-surface-border bg-surface px-3 py-2 text-xs shadow-2xs"
+                          >
+                            <div>
+                              <div className="flex items-center gap-1.5 font-bold text-espresso">
+                                <span>{c.name}</span>
+                                <span className="rounded-md border border-amber/30 bg-amber/15 px-1.5 py-0.2 text-[9px] font-semibold text-terracotta">
+                                  {label}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-espresso-muted">
+                                <span className="font-semibold text-espresso">{formatIDR(c.amount)}/siklus</span>
+                                <span>•</span>
+                                <span>💳 {c.wallet_name || "Operasional"}</span>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteFixed(c.id)}
+                              className="rounded-lg p-1.5 text-espresso-muted hover:bg-expense/10 hover:text-expense transition"
+                              title="Hapus siklus ini"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        );
+                      })}
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-espresso-muted italic">
+                    Belum ada siklus berkala. Tambahkan bensin tiap 3-5 hari atau pulsa di sini agar tidak memotong jatah makan harian!
+                  </p>
+                )}
+              </div>
+
+              {/* 3. FORM BLUEPRINT KEUANGAN */}
               <form onSubmit={handleSavePlan} className="space-y-3 pt-1">
                 <div>
                   <label className="block text-xs font-semibold text-espresso mb-1">
@@ -1082,7 +1986,7 @@ export default function ForecastPage() {
 
                 <div>
                   <label className="block text-xs font-semibold text-espresso mb-1">
-                    Patokan Belanja Harian Normal (Rp)
+                    Patokan Makan & Jajan Harian Dasar (Rp)
                   </label>
                   <input
                     type="number"
@@ -1093,7 +1997,7 @@ export default function ForecastPage() {
                     className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs font-bold text-espresso focus:outline-none focus:border-terracotta"
                   />
                   <span className="text-[10px] text-espresso-muted mt-0.5 block">
-                    Misal: Makan Rp45.000 x 28 hari = Rp1.260.000
+                    Murni kebutuhan makan & minum per hari. Biaya bensin, pulsa, dan galon sudah diamankan terpisah pada Siklus Berkala di atas.
                   </span>
                 </div>
 
@@ -1148,12 +2052,15 @@ export default function ForecastPage() {
       })()}
 
       {/* ===================================================================== */}
-      {/* MODAL 2: TAMBAH TAGIHAN PASTI                                         */}
+      {/* MODAL 2: TAMBAH TAGIHAN PASTI & SIKLUS BERKALA                        */}
       {/* ===================================================================== */}
       {isAddFixedModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="w-full max-w-sm rounded-3xl border border-surface-border bg-surface p-6 shadow-2xl space-y-4">
-            <h3 className="text-base font-bold text-espresso">Tambah Tagihan Pasti</h3>
+            <div>
+              <h3 className="text-base font-bold text-espresso">Tambah Tagihan / Siklus Biaya</h3>
+              <p className="text-[11px] text-espresso-muted">Tagihan bulanan atau siklus berkala (bensin, pulsa, dll)</p>
+            </div>
             <form onSubmit={handleCreateFixed} className="space-y-3">
               <div>
                 <label className="block text-xs font-semibold text-espresso mb-1">Nama Tagihan / Pengeluaran</label>
@@ -1162,7 +2069,7 @@ export default function ForecastPage() {
                   required
                   value={fixedName}
                   onChange={(e) => setFixedName(e.target.value)}
-                  placeholder="Misal: iCloud, Pulsa, Galon, Token..."
+                  placeholder="Misal: Bensin, iCloud, Wifi, Pulsa, Galon..."
                   className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs font-medium text-espresso focus:outline-none focus:border-terracotta"
                 />
               </div>
@@ -1175,10 +2082,86 @@ export default function ForecastPage() {
                   min="1"
                   value={fixedAmount}
                   onChange={(e) => setFixedAmount(e.target.value)}
-                  placeholder="170000"
+                  placeholder="Contoh: 35000"
                   className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-sm font-bold text-espresso focus:outline-none focus:border-terracotta"
                 />
               </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-espresso mb-1">Pola Siklus</label>
+                <div className="grid grid-cols-4 gap-1">
+                  {[
+                    { id: "monthly", label: "Bulanan" },
+                    { id: "every_n_days", label: "Tiap N Hari" },
+                    { id: "weekly", label: "Mingguan" },
+                    { id: "biweekly", label: "2-Mgg" },
+                  ].map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setFixedFrequency(item.id as any)}
+                      className={`rounded-lg py-1.5 text-[10px] font-bold border transition ${
+                        fixedFrequency === item.id
+                          ? "bg-terracotta text-white border-terracotta shadow-xs"
+                          : "bg-surface-card text-espresso-muted border-surface-border hover:text-espresso"
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {fixedFrequency === "monthly" && (
+                <div>
+                  <label className="block text-xs font-semibold text-espresso mb-1">Tanggal Jatuh Tempo (1-31)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="31"
+                    required
+                    value={fixedDueDay}
+                    onChange={(e) => setFixedDueDay(parseInt(e.target.value) || 1)}
+                    className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs font-medium text-espresso focus:outline-none focus:border-terracotta"
+                  />
+                </div>
+              )}
+
+              {fixedFrequency === "every_n_days" && (
+                <div>
+                  <label className="block text-xs font-semibold text-espresso mb-1">Interval Hari</label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-espresso-muted">Setiap</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="365"
+                      required
+                      value={fixedIntervalValue}
+                      onChange={(e) => setFixedIntervalValue(parseInt(e.target.value) || 1)}
+                      className="w-20 rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs font-bold text-espresso text-center focus:outline-none focus:border-terracotta"
+                    />
+                    <span className="text-xs text-espresso-muted">hari sekali (misal isi bensin tiap 4 hari)</span>
+                  </div>
+                </div>
+              )}
+
+              {fixedFrequency === "weekly" && (
+                <div>
+                  <label className="block text-xs font-semibold text-espresso mb-1">Hari Pembelian</label>
+                  <select
+                    value={fixedIntervalValue}
+                    onChange={(e) => setFixedIntervalValue(parseInt(e.target.value))}
+                    className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs font-medium text-espresso focus:outline-none focus:border-terracotta"
+                  >
+                    {["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"].map((day, idx) => (
+                      <option key={idx} value={idx}>
+                        Setiap hari {day}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs font-semibold text-espresso mb-1">
@@ -1197,7 +2180,7 @@ export default function ForecastPage() {
                   ))}
                 </select>
                 <span className="text-[10px] text-espresso-muted mt-1 block">
-                  Pilih dompet khusus tagihan (misal: Subscription) agar dicadangkan dari dompet tersebut dan dipotong saat ditandai lunas.
+                  Pilih dompet khusus tagihan (misal: Subscription/BCA) agar dicadangkan dari dompet tersebut.
                 </span>
               </div>
 
@@ -1214,7 +2197,7 @@ export default function ForecastPage() {
                   disabled={isSavingFixed}
                   className="flex-1 rounded-xl bg-terracotta py-2 text-xs font-bold text-white hover:bg-terracotta-hover transition disabled:opacity-50"
                 >
-                  {isSavingFixed ? "Menyimpan..." : "Simpan Tagihan"}
+                  {isSavingFixed ? "Menyimpan..." : "Simpan"}
                 </button>
               </div>
             </form>
@@ -1380,6 +2363,146 @@ export default function ForecastPage() {
                 Selesai
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* MODAL 5: TAMBAH RENCANA TRANSAKSI MASA DEPAN                           */}
+      {/* ===================================================================== */}
+      {isAddPlannedModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm rounded-3xl border border-surface-border bg-surface p-6 shadow-2xl space-y-4">
+            <div>
+              <h3 className="text-base font-bold text-espresso">Tambah Rencana Transaksi</h3>
+              <p className="text-[11px] text-espresso-muted">Skenario transaksi masa depan untuk melihat sisa saldo</p>
+            </div>
+            <form onSubmit={handleCreatePlanned} className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-espresso mb-1">Nama Rencana</label>
+                <input
+                  type="text"
+                  required
+                  value={plannedName}
+                  onChange={(e) => setPlannedName(e.target.value)}
+                  placeholder="Misal: Servis Motor, Beli Kado, Tabungan..."
+                  className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs font-medium text-espresso focus:outline-none focus:border-terracotta"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-espresso mb-1">Nominal (Rp)</label>
+                <input
+                  type="number"
+                  required
+                  min="1"
+                  value={plannedAmount}
+                  onChange={(e) => setPlannedAmount(e.target.value)}
+                  placeholder="Contoh: 150000"
+                  className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-sm font-bold text-espresso focus:outline-none focus:border-terracotta"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-espresso mb-1">Jenis Rencana</label>
+                <div className="grid grid-cols-3 gap-1">
+                  {[
+                    { id: "EXPENSE", label: "Pengeluaran" },
+                    { id: "INCOME", label: "Pemasukan" },
+                    { id: "TRANSFER", label: "Pindah Dompet" },
+                  ].map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setPlannedType(item.id as any)}
+                      className={`rounded-lg py-1.5 text-[10px] font-bold border transition ${
+                        plannedType === item.id
+                          ? "bg-terracotta text-white border-terracotta shadow-xs"
+                          : "bg-surface-card text-espresso-muted border-surface-border hover:text-espresso"
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-espresso mb-1">Rencana Tanggal Pelaksanaan</label>
+                <input
+                  type="date"
+                  required
+                  value={plannedDate}
+                  onChange={(e) => setPlannedDate(e.target.value)}
+                  className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs text-espresso focus:outline-none focus:border-terracotta"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-espresso mb-1">
+                  {plannedType === "TRANSFER" ? "Dari Dompet (Sumber)" : "Dompet Terkait"}
+                </label>
+                <select
+                  value={plannedWalletId}
+                  onChange={(e) => setPlannedWalletId(e.target.value)}
+                  className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs font-medium text-espresso focus:outline-none focus:border-terracotta"
+                >
+                  <option value="">-- Otomatis Operasional Utama --</option>
+                  {wallets?.map((w: any) => (
+                    <option key={w.id} value={w.id}>
+                      {w.name} ({w.purpose === "savings" ? "Tabungan" : w.purpose === "subscription" ? "Tagihan" : "Operasional"}) - {formatIDR(w.balance)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {plannedType === "TRANSFER" && (
+                <div>
+                  <label className="block text-xs font-semibold text-espresso mb-1">Ke Dompet (Tujuan)</label>
+                  <select
+                    value={plannedToWalletId}
+                    onChange={(e) => setPlannedToWalletId(e.target.value)}
+                    required
+                    className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs font-medium text-espresso focus:outline-none focus:border-terracotta"
+                  >
+                    <option value="">-- Pilih Dompet Tujuan --</option>
+                    {wallets?.map((w: any) => (
+                      <option key={w.id} value={w.id}>
+                        {w.name} ({w.purpose === "savings" ? "Tabungan" : w.purpose === "subscription" ? "Tagihan" : "Operasional"})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-semibold text-espresso mb-1">Catatan Tambahan (Opsional)</label>
+                <input
+                  type="text"
+                  value={plannedNotes}
+                  onChange={(e) => setPlannedNotes(e.target.value)}
+                  placeholder="Catatan kecil..."
+                  className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs font-medium text-espresso focus:outline-none focus:border-terracotta"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAddPlannedModalOpen(false)}
+                  className="flex-1 rounded-xl bg-surface-card py-2 text-xs font-semibold text-espresso-muted hover:text-espresso"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingPlanned}
+                  className="flex-1 rounded-xl bg-terracotta py-2 text-xs font-bold text-white hover:bg-terracotta-hover transition disabled:opacity-50"
+                >
+                  {isSavingPlanned ? "Menyimpan..." : "Simpan Rencana"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
