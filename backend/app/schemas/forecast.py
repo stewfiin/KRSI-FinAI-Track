@@ -298,3 +298,62 @@ class ForecastSummaryResponse(BaseModel):
     income_streams: List[IncomeStreamResponse] = []
     total_monthly_income_estimated: Decimal = Decimal("0.00")
 
+
+# ==============================================================================
+# Range Projection Schemas (Simulasi Arus Kas Rentang Waktu & Multi-Dompet)
+# ==============================================================================
+class RangeProjectionRequest(BaseModel):
+    start_date: Optional[date] = Field(default=None, description="Tanggal mulai prediksi (default: hari ini)")
+    end_date: Optional[date] = Field(default=None, description="Tanggal akhir prediksi")
+    wallet_filter: str = Field(
+        default="all_operational",
+        description="'all_operational' | 'all_savings' | 'all_wallets' | 'custom_balance' | <UUID string wallet_id>",
+    )
+    custom_initial_balance: Optional[Decimal] = Field(
+        default=None, description="Saldo awal bayangan untuk simulasi saldo kustom"
+    )
+    include_daily_meal: bool = Field(
+        default=True, description="Apakah memperhitungkan patokan belanja/makan harian dasar"
+    )
+    custom_daily_meal: Optional[Decimal] = Field(
+        default=None, description="Override patokan belanja harian jika diinginkan"
+    )
+
+
+class ProjectedDayEvent(BaseModel):
+    type: str  # "INCOME" | "MEAL" | "CYCLICAL" | "FIXED_BILL" | "PLANNED"
+    name: str
+    amount: Decimal
+    direction: str  # "INFLOW" | "OUTFLOW"
+    wallet_id: Optional[uuid.UUID] = None
+    wallet_name: Optional[str] = None
+
+
+class ProjectedDayItem(BaseModel):
+    date: date
+    day_name: str
+    is_today: bool
+    initial_balance: Decimal
+    total_inflow: Decimal
+    total_outflow: Decimal
+    closing_balance: Decimal
+    is_deficit: bool
+    events: List[ProjectedDayEvent] = []
+
+
+class RangeProjectionResponse(BaseModel):
+    start_date: date
+    end_date: date
+    total_days: int
+    wallet_filter: str
+    wallet_filter_label: str
+    initial_balance: Decimal
+    total_inflow: Decimal
+    total_outflow: Decimal
+    final_balance: Decimal
+    lowest_balance: Decimal
+    lowest_balance_date: Optional[date] = None
+    critical_deficit_date: Optional[date] = None
+    is_safe: bool
+    timeline: List[ProjectedDayItem]
+

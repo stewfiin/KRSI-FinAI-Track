@@ -11,7 +11,9 @@ from app.models.category import Category
 from app.models.financial_plan import FinancialPlan
 from app.models.fixed_expense import FixedExpense
 from app.models.income_stream import IncomeStream
+from app.models.planned_transaction import PlannedTransaction
 from app.models.user import User
+from app.models.wallet import Wallet
 from app.models.wishlist import Wishlist
 from app.schemas.forecast import (
     DailyLedgerResponse,
@@ -24,6 +26,11 @@ from app.schemas.forecast import (
     IncomeStreamCreate,
     IncomeStreamResponse,
     IncomeStreamUpdate,
+    PlannedTransactionCreate,
+    PlannedTransactionResponse,
+    PlannedTransactionUpdate,
+    RangeProjectionRequest,
+    RangeProjectionResponse,
     SimulationRequest,
     SimulationResponse,
     WishlistCreate,
@@ -143,6 +150,8 @@ async def list_fixed_expenses(
                 wallet_name=wallet_map.get(item.wallet_id),
                 due_day_of_month=item.due_day_of_month,
                 frequency=item.frequency,
+                interval_value=item.interval_value,
+                anchor_date=item.anchor_date,
                 is_paid_this_cycle=item.is_paid_this_cycle,
                 last_paid_at=item.last_paid_at,
                 created_at=item.created_at,
@@ -154,7 +163,7 @@ async def list_fixed_expenses(
 @router.post(
     "/fixed-expenses",
     response_model=FixedExpenseResponse,
-    summary="Tambah Tagihan Pasti Baru",
+    summary="Tambah Tagihan Pasti / Siklus Berkala Baru",
 )
 async def create_fixed_expense(
     payload: FixedExpenseCreate,
@@ -169,6 +178,8 @@ async def create_fixed_expense(
         wallet_id=payload.wallet_id,
         due_day_of_month=payload.due_day_of_month,
         frequency=payload.frequency,
+        interval_value=payload.interval_value,
+        anchor_date=payload.anchor_date,
         is_paid_this_cycle=payload.is_paid_this_cycle,
     )
     session.add(item)
@@ -196,6 +207,60 @@ async def create_fixed_expense(
         wallet_name=wallet_name,
         due_day_of_month=item.due_day_of_month,
         frequency=item.frequency,
+        interval_value=item.interval_value,
+        anchor_date=item.anchor_date,
+        is_paid_this_cycle=item.is_paid_this_cycle,
+        last_paid_at=item.last_paid_at,
+        created_at=item.created_at,
+    )
+
+
+@router.put(
+    "/fixed-expenses/{expense_id}",
+    response_model=FixedExpenseResponse,
+    summary="Perbarui Tagihan Pasti / Siklus Berkala",
+)
+async def update_fixed_expense(
+    expense_id: uuid.UUID,
+    payload: FixedExpenseUpdate,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    item = await session.get(FixedExpense, expense_id)
+    if not item or item.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tagihan tidak ditemukan.")
+
+    update_data = payload.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(item, key, value)
+
+    session.add(item)
+    await session.commit()
+    await session.refresh(item)
+
+    cat_name = None
+    if item.category_id:
+        cat = await session.get(Category, item.category_id)
+        cat_name = cat.name if cat else None
+
+    wallet_name = None
+    if item.wallet_id:
+        w = await session.get(Wallet, item.wallet_id)
+        wallet_name = w.name if w else None
+
+    return FixedExpenseResponse(
+        id=item.id,
+        user_id=item.user_id,
+        name=item.name,
+        amount=item.amount,
+        category_id=item.category_id,
+        category_name=cat_name,
+        wallet_id=item.wallet_id,
+        wallet_name=wallet_name,
+        due_day_of_month=item.due_day_of_month,
+        frequency=item.frequency,
+        interval_value=item.interval_value,
+        anchor_date=item.anchor_date,
         is_paid_this_cycle=item.is_paid_this_cycle,
         last_paid_at=item.last_paid_at,
         created_at=item.created_at,
@@ -341,6 +406,9 @@ async def list_income_streams(
     start_date, end_date = ForecastService.get_cycle_dates(plan.cycle_start_day)
     total_cycle_days = (end_date - start_date).days + 1
 
+    wallets_res = await session.exec(select(Wallet).where(Wallet.user_id == current_user.id))
+    wallet_map = {w.id: w.name for w in wallets_res.all()}
+
     query = select(IncomeStream).where(IncomeStream.user_id == current_user.id).order_by(IncomeStream.created_at)
     res = (await session.exec(query)).all()
 
@@ -352,6 +420,8 @@ async def list_income_streams(
             amount=s.amount,
             frequency=s.frequency,
             receive_day=s.receive_day,
+            wallet_id=s.wallet_id,
+            wallet_name=wallet_map.get(s.wallet_id),
             is_active=s.is_active,
             monthly_equivalent=ForecastService.calculate_monthly_equivalent(s, total_cycle_days),
             created_at=s.created_at,
@@ -377,6 +447,7 @@ async def create_income_stream(
         amount=payload.amount,
         frequency=payload.frequency,
         receive_day=payload.receive_day,
+        wallet_id=payload.wallet_id,
         is_active=payload.is_active,
     )
     session.add(item)
@@ -390,6 +461,11 @@ async def create_income_stream(
     start_date, end_date = ForecastService.get_cycle_dates(plan.cycle_start_day)
     total_cycle_days = (end_date - start_date).days + 1
 
+    wallet_name = None
+    if item.wallet_id:
+        w = await session.get(Wallet, item.wallet_id)
+        wallet_name = w.name if w else None
+
     return IncomeStreamResponse(
         id=item.id,
         user_id=item.user_id,
@@ -397,6 +473,8 @@ async def create_income_stream(
         amount=item.amount,
         frequency=item.frequency,
         receive_day=item.receive_day,
+        wallet_id=item.wallet_id,
+        wallet_name=wallet_name,
         is_active=item.is_active,
         monthly_equivalent=ForecastService.calculate_monthly_equivalent(item, total_cycle_days),
         created_at=item.created_at,
@@ -427,6 +505,8 @@ async def update_income_stream(
         item.frequency = payload.frequency
     if payload.receive_day is not None:
         item.receive_day = payload.receive_day
+    if payload.wallet_id is not None:
+        item.wallet_id = payload.wallet_id
     if payload.is_active is not None:
         item.is_active = payload.is_active
 
@@ -442,6 +522,11 @@ async def update_income_stream(
     start_date, end_date = ForecastService.get_cycle_dates(plan.cycle_start_day)
     total_cycle_days = (end_date - start_date).days + 1
 
+    wallet_name = None
+    if item.wallet_id:
+        w = await session.get(Wallet, item.wallet_id)
+        wallet_name = w.name if w else None
+
     return IncomeStreamResponse(
         id=item.id,
         user_id=item.user_id,
@@ -449,6 +534,8 @@ async def update_income_stream(
         amount=item.amount,
         frequency=item.frequency,
         receive_day=item.receive_day,
+        wallet_id=item.wallet_id,
+        wallet_name=wallet_name,
         is_active=item.is_active,
         monthly_equivalent=ForecastService.calculate_monthly_equivalent(item, total_cycle_days),
         created_at=item.created_at,
@@ -475,4 +562,112 @@ async def delete_income_stream(
     # Sinkronisasi ulang blueprint
     await ForecastService.sync_financial_plan_income(session, current_user.id)
     return {"ok": True}
+
+
+# ==============================================================================
+# 6. Prediksi Arus Kas Rentang Waktu (Forward-Looking Time-Series Ledger)
+# ==============================================================================
+@router.post(
+    "/range-projection",
+    response_model=RangeProjectionResponse,
+    summary="Simulasi Arus Kas & Saldo Berjalan Rentang Waktu Multi-Dompet",
+)
+async def get_range_projection(
+    payload: RangeProjectionRequest,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    return await ForecastService.calculate_range_projection(
+        session=session,
+        user_id=current_user.id,
+        req=payload,
+    )
+
+
+# ==============================================================================
+# 7. Rencana Transaksi Masa Depan (Planned Transactions)
+# ==============================================================================
+@router.get(
+    "/planned-transactions",
+    response_model=List[PlannedTransactionResponse],
+    summary="Daftar Rencana Transaksi Masa Depan",
+)
+async def list_planned_transactions(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    return await ForecastService.get_planned_transactions(
+        session=session,
+        user_id=current_user.id,
+    )
+
+
+@router.post(
+    "/planned-transactions",
+    response_model=PlannedTransactionResponse,
+    summary="Tambah Rencana Transaksi Baru",
+)
+async def create_planned_transaction(
+    payload: PlannedTransactionCreate,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    return await ForecastService.create_planned_transaction(
+        session=session,
+        user_id=current_user.id,
+        payload=payload,
+    )
+
+
+@router.put(
+    "/planned-transactions/{planned_id}",
+    response_model=PlannedTransactionResponse,
+    summary="Perbarui Rencana Transaksi",
+)
+async def update_planned_transaction(
+    planned_id: uuid.UUID,
+    payload: PlannedTransactionUpdate,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    return await ForecastService.update_planned_transaction(
+        session=session,
+        user_id=current_user.id,
+        planned_id=planned_id,
+        payload=payload,
+    )
+
+
+@router.delete(
+    "/planned-transactions/{planned_id}",
+    summary="Hapus Rencana Transaksi",
+)
+async def delete_planned_transaction(
+    planned_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    await ForecastService.delete_planned_transaction(
+        session=session,
+        user_id=current_user.id,
+        planned_id=planned_id,
+    )
+    return {"ok": True}
+
+
+@router.post(
+    "/planned-transactions/{planned_id}/execute",
+    response_model=PlannedTransactionResponse,
+    summary="Eksekusi Rencana Transaksi Menjadi Transaksi Riil & Potong/Tambah Saldo Dompet",
+)
+async def execute_planned_transaction(
+    planned_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    return await ForecastService.execute_planned_transaction(
+        session=session,
+        user_id=current_user.id,
+        planned_id=planned_id,
+    )
 

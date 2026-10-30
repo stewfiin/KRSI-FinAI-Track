@@ -14,6 +14,7 @@ from app.models.enums import TransactionType
 from app.models.financial_plan import FinancialPlan
 from app.models.fixed_expense import FixedExpense
 from app.models.income_stream import IncomeStream
+from app.models.planned_transaction import PlannedTransaction
 from app.models.transaction import Transaction
 from app.models.wallet import Wallet
 from app.models.wishlist import Wishlist
@@ -30,6 +31,13 @@ from app.schemas.forecast import (
     IncomeStreamCreate,
     IncomeStreamResponse,
     IncomeStreamUpdate,
+    PlannedTransactionCreate,
+    PlannedTransactionResponse,
+    PlannedTransactionUpdate,
+    ProjectedDayEvent,
+    ProjectedDayItem,
+    RangeProjectionRequest,
+    RangeProjectionResponse,
     RunwayPrediction,
     SimulationRequest,
     SimulationResponse,
@@ -129,6 +137,48 @@ class ForecastService:
             return amt.quantize(Decimal("1.00"))
 
     @staticmethod
+    def is_income_due_on_date(stream: IncomeStream, target_date: date, cycle_start_day: int = 1) -> bool:
+        """Menentukan apakah sumber pendapatan cair pada tanggal target tertentu."""
+        freq = (stream.frequency or "monthly").lower()
+        if freq == "daily":
+            return True
+        elif freq == "weekly":
+            rec_day = stream.receive_day if stream.receive_day is not None else 0  # 0=Senin, 6=Minggu
+            return target_date.weekday() == rec_day
+        elif freq == "biweekly":
+            anchor = stream.created_at.date() if stream.created_at else date(target_date.year, 1, 1)
+            diff = (target_date - anchor).days
+            return diff >= 0 and (diff % 14 == 0)
+        elif freq == "monthly":
+            rec_day = stream.receive_day if stream.receive_day is not None else cycle_start_day
+            return target_date.day == rec_day
+        return False
+
+    @staticmethod
+    def is_fixed_expense_due_on_date(expense: FixedExpense, target_date: date) -> bool:
+        """Menentukan apakah tagihan bulanan atau siklus biaya berkala jatuh tempo pada tanggal target tertentu."""
+        freq = (expense.frequency or "monthly").lower()
+        if freq == "monthly":
+            return target_date.day == (expense.due_day_of_month or 1)
+        elif freq == "weekly":
+            day_idx = expense.interval_value if expense.interval_value is not None else 5  # default Sabtu (5)
+            return target_date.weekday() == day_idx
+        elif freq == "biweekly":
+            anchor = expense.anchor_date.date() if expense.anchor_date else (
+                expense.created_at.date() if expense.created_at else date(target_date.year, 1, 1)
+            )
+            diff = (target_date - anchor).days
+            return diff >= 0 and (diff % 14 == 0)
+        elif freq == "every_n_days":
+            interval = max(1, expense.interval_value or 1)
+            anchor = expense.anchor_date.date() if expense.anchor_date else (
+                expense.created_at.date() if expense.created_at else target_date
+            )
+            diff = (target_date - anchor).days
+            return diff >= 0 and (diff % interval == 0)
+        return False
+
+    @staticmethod
     async def get_forecast_summary(
         session: AsyncSession,
         user_id: uuid.UUID,
@@ -136,7 +186,7 @@ class ForecastService:
         """
         Engine Prediksi Utama: Menghitung seluruh metrik proyeksi dan runway finansial.
         - Dynamic Daily Runway (Batas Belanja Ideal Hari Ini)
-        - Cadangan Tagihan Pasti (Fixed Buffer)
+        - Cadangan Tagihan Pasti (Fixed Buffer) & Cadangan Siklus Berkala (Cyclical Buffer)
         - Estimasi Daya Tahan Uang (Runway Days)
         - Proyeksi Tabungan Akhir Bulan
         """
@@ -148,36 +198,7 @@ class ForecastService:
         days_elapsed = (today - start_date).days
         days_remaining = max(1, (end_date - today).days + 1)  # Termasuk hari ini
 
-        # 1. Multi-Stream Income: Ambil semua sumber pendapatan aktif
-        income_res = await session.exec(
-            select(IncomeStream).where(IncomeStream.user_id == user_id, IncomeStream.is_active == True)
-        )
-        active_streams = income_res.all()
-
-        stream_responses = []
-        total_stream_equivalent = Decimal("0.00")
-        for s in active_streams:
-            equiv = ForecastService.calculate_monthly_equivalent(s, total_cycle_days)
-            total_stream_equivalent += equiv
-            stream_responses.append(
-                IncomeStreamResponse(
-                    id=s.id,
-                    user_id=s.user_id,
-                    name=s.name,
-                    amount=s.amount,
-                    frequency=s.frequency,
-                    receive_day=s.receive_day,
-                    is_active=s.is_active,
-                    monthly_equivalent=equiv,
-                    created_at=s.created_at,
-                    updated_at=s.updated_at,
-                )
-            )
-
-        # Pendapatan efektif: Jika user mendefinisikan income streams, gunakan total setara bulanan; jika tidak, gunakan blueprint lama
-        effective_monthly_income = total_stream_equivalent if total_stream_equivalent > 0 else plan.monthly_income
-
-        # 2. Dompet Operasional vs Pool Tabungan vs Pool Tagihan (Subscription)
+        # 1. Dompet Pengguna (Operasional vs Tabungan vs Tagihan)
         wallets_res = await session.exec(select(Wallet).where(Wallet.user_id == user_id))
         wallets = wallets_res.all()
         wallet_map = {w.id: w for w in wallets}
@@ -204,19 +225,56 @@ class ForecastService:
                 else:
                     operational_balance += w.balance
 
-        # 3. Tagihan Pasti / Fixed Obligations
+        # 2. Multi-Stream Income: Ambil semua sumber pendapatan aktif
+        income_res = await session.exec(
+            select(IncomeStream).where(IncomeStream.user_id == user_id, IncomeStream.is_active == True)
+        )
+        active_streams = income_res.all()
+
+        stream_responses = []
+        total_stream_equivalent = Decimal("0.00")
+        for s in active_streams:
+            equiv = ForecastService.calculate_monthly_equivalent(s, total_cycle_days)
+            total_stream_equivalent += equiv
+            w_obj = wallet_map.get(s.wallet_id) if s.wallet_id else None
+            stream_responses.append(
+                IncomeStreamResponse(
+                    id=s.id,
+                    user_id=s.user_id,
+                    name=s.name,
+                    amount=s.amount,
+                    frequency=s.frequency,
+                    receive_day=s.receive_day,
+                    wallet_id=s.wallet_id,
+                    wallet_name=w_obj.name if w_obj else None,
+                    is_active=s.is_active,
+                    monthly_equivalent=equiv,
+                    created_at=s.created_at,
+                    updated_at=s.updated_at,
+                )
+            )
+
+        # Pendapatan efektif: Jika user mendefinisikan income streams, gunakan total setara bulanan; jika tidak, gunakan blueprint lama
+        effective_monthly_income = total_stream_equivalent if total_stream_equivalent > 0 else plan.monthly_income
+
+        # 3. Tagihan Pasti Bulanan & Siklus Biaya Hidup Berkala (Cyclical Expenses)
         fixed_res = await session.exec(select(FixedExpense).where(FixedExpense.user_id == user_id))
         fixed_items = fixed_res.all()
 
-        total_monthly_fixed = sum((f.amount for f in fixed_items), Decimal("0.00"))
-        unpaid_fixed_items = [f for f in fixed_items if not f.is_paid_this_cycle]
-        paid_fixed = total_monthly_fixed - sum((f.amount for f in unpaid_fixed_items), Decimal("0.00"))
+        monthly_bills = [f for f in fixed_items if (f.frequency or "monthly").lower() == "monthly"]
+        cyclical_expenses = [
+            f for f in fixed_items if (f.frequency or "monthly").lower() in ("weekly", "biweekly", "every_n_days")
+        ]
 
-        # Pisahkan buffer tagihan: apakah ditanggung dompet subscription atau dompet operasional?
+        total_monthly_fixed = sum((f.amount for f in fixed_items), Decimal("0.00"))
+        unpaid_monthly_items = [f for f in monthly_bills if not f.is_paid_this_cycle]
+        paid_fixed = total_monthly_fixed - sum((f.amount for f in unpaid_monthly_items), Decimal("0.00"))
+
+        # Pisahkan buffer tagihan bulanan
         unpaid_sub_buffer = Decimal("0.00")
         unpaid_op_buffer = Decimal("0.00")
 
-        for f in unpaid_fixed_items:
+        for f in unpaid_monthly_items:
             assigned_wallet = wallet_map.get(f.wallet_id) if f.wallet_id else None
             is_sub_wallet = False
             if assigned_wallet:
@@ -232,12 +290,32 @@ class ForecastService:
             else:
                 unpaid_op_buffer += f.amount
 
-        # Jika saldo subscription kurang untuk tagihannya, kekurangannya meluber ke operasional
-        sub_deficit = max(Decimal("0.00"), unpaid_sub_buffer - subscription_balance)
-        effective_op_unpaid_buffer = unpaid_op_buffer + sub_deficit
-        unpaid_fixed_buffer = unpaid_sub_buffer + unpaid_op_buffer
+        # Hitung estimasi pengeluaran siklus berkala untuk sisa hari dalam siklus (dari today s/d end_date)
+        cyclical_op_buffer = Decimal("0.00")
+        cyclical_sub_buffer = Decimal("0.00")
 
-        # Saldo Operasional Bebas (setelah mencadangkan tagihan pasti yang memotong operasional)
+        curr_d = today
+        while curr_d <= end_date:
+            for ce in cyclical_expenses:
+                if ForecastService.is_fixed_expense_due_on_date(ce, curr_d):
+                    assigned_wallet = wallet_map.get(ce.wallet_id) if ce.wallet_id else None
+                    is_sub = False
+                    if assigned_wallet:
+                        p = getattr(assigned_wallet, "purpose", None)
+                        is_sub = (p == "subscription")
+                    if is_sub or (ce.wallet_id is None and subscription_balance > 0):
+                        cyclical_sub_buffer += ce.amount
+                    else:
+                        cyclical_op_buffer += ce.amount
+            curr_d += timedelta(days=1)
+
+        # Jika saldo subscription kurang untuk total tagihan & siklusnya, kekurangan meluber ke operasional
+        total_sub_obligations = unpaid_sub_buffer + cyclical_sub_buffer
+        sub_deficit = max(Decimal("0.00"), total_sub_obligations - subscription_balance)
+        effective_op_unpaid_buffer = unpaid_op_buffer + cyclical_op_buffer + sub_deficit
+        unpaid_fixed_buffer = unpaid_sub_buffer + unpaid_op_buffer + cyclical_sub_buffer + cyclical_op_buffer
+
+        # Saldo Operasional Bebas (Safe-to-Spend Murni setelah mencadangkan tagihan bulanan + siklus berkala sisa bulan)
         safe_to_spend_total = max(Decimal("0.00"), operational_balance - effective_op_unpaid_buffer)
 
         # 4. Transaksi Pengeluaran Siklus Berjalan
@@ -371,6 +449,8 @@ class ForecastService:
                 wallet_name=wallet_map[f.wallet_id].name if f.wallet_id and f.wallet_id in wallet_map else None,
                 due_day_of_month=f.due_day_of_month,
                 frequency=f.frequency,
+                interval_value=f.interval_value,
+                anchor_date=f.anchor_date,
                 is_paid_this_cycle=f.is_paid_this_cycle,
                 last_paid_at=f.last_paid_at,
                 created_at=f.created_at,
@@ -773,4 +853,687 @@ class ForecastService:
             await session.refresh(plan)
             return total_monthly
         return plan.monthly_income
+
+    @staticmethod
+    async def calculate_range_projection(
+        session: AsyncSession,
+        user_id: uuid.UUID,
+        req: RangeProjectionRequest,
+    ) -> RangeProjectionResponse:
+        """
+        Mesin Simulasi Buku Besar Masa Depan (Forward-Looking Time-Series Ledger).
+        Menghitung mutasi harian dan rolling balance per tanggal dari start_date s/d end_date
+        berdasarkan filter dompet (operasional, savings, spesifik, atau saldo bayangan simulasi).
+        """
+        today = date.today()
+        plan = await ForecastService.get_or_create_financial_plan(session, user_id)
+        start_date, end_cycle_date = ForecastService.get_cycle_dates(plan.cycle_start_day, today)
+
+        start_d = req.start_date or today
+        end_d = req.end_date or end_cycle_date
+        if end_d < start_d:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Tanggal akhir prediksi tidak boleh lebih awal dari tanggal mulai.",
+            )
+
+        # Batasi rentang maksimal 90 hari untuk efisiensi komputasi
+        if (end_d - start_d).days > 90:
+            end_d = start_d + timedelta(days=90)
+
+        # 1. Ambil data dompet user
+        wallets_res = await session.exec(select(Wallet).where(Wallet.user_id == user_id))
+        wallets = wallets_res.all()
+        wallet_map = {w.id: w for w in wallets}
+
+        filter_type = req.wallet_filter or "all_operational"
+        initial_balance = Decimal("0.00")
+        filter_label = "Semua Dompet Operasional"
+
+        if filter_type == "all_operational":
+            initial_balance = sum(
+                (w.balance for w in wallets if getattr(w, "purpose", "operational") == "operational"),
+                Decimal("0.00"),
+            )
+            filter_label = "Semua Dompet Operasional"
+        elif filter_type == "all_savings":
+            initial_balance = sum(
+                (w.balance for w in wallets if getattr(w, "purpose", None) == "savings"),
+                Decimal("0.00"),
+            )
+            filter_label = "Semua Tabungan (Savings)"
+        elif filter_type == "all_wallets":
+            initial_balance = sum((w.balance for w in wallets), Decimal("0.00"))
+            filter_label = "Seluruh Dompet (Konsolidasi)"
+        elif filter_type == "custom_balance":
+            initial_balance = req.custom_initial_balance or Decimal("0.00")
+            filter_label = f"Simulasi Saldo Kustom (Rp{initial_balance:,.0f})"
+        else:
+            # Asumsi UUID dompet spesifik
+            try:
+                target_uuid = uuid.UUID(filter_type)
+                target_w = wallet_map.get(target_uuid)
+                if target_w:
+                    initial_balance = target_w.balance
+                    filter_label = f"Dompet: {target_w.name}"
+                else:
+                    filter_label = "Dompet Tidak Dikenal"
+            except ValueError:
+                filter_label = "Dompet Kustom"
+
+        # 2. Patokan Jatah Makan Harian Dasar
+        daily_meal = Decimal("0.00")
+        if req.include_daily_meal and filter_type != "all_savings":
+            if req.custom_daily_meal is not None:
+                daily_meal = max(Decimal("0.00"), req.custom_daily_meal)
+            else:
+                daily_meal = max(Decimal("0.00"), plan.daily_living_budget)
+
+        # 3. Ambil Sumber Pendapatan Aktif
+        income_res = await session.exec(
+            select(IncomeStream).where(IncomeStream.user_id == user_id, IncomeStream.is_active == True)
+        )
+        active_streams = income_res.all()
+
+        # 4. Ambil Pengeluaran Pasti & Siklus Berkala
+        fixed_res = await session.exec(select(FixedExpense).where(FixedExpense.user_id == user_id))
+        fixed_items = fixed_res.all()
+
+        # 5. Ambil Rencana Transaksi Belum Selesai dalam rentang
+        pt_res = await session.exec(
+            select(PlannedTransaction).where(
+                PlannedTransaction.user_id == user_id,
+                PlannedTransaction.is_completed == False,
+                PlannedTransaction.planned_date >= start_d,
+                PlannedTransaction.planned_date <= end_d,
+            )
+        )
+        planned_txs = pt_res.all()
+
+        # 6. Pengeluaran aktual hari ini (jika start_d <= today <= end_d) untuk mencegah double-deduction (Koreksi 4)
+        today_spent_operational = Decimal("0.00")
+        if start_d <= today <= end_d:
+            tx_res = await session.exec(
+                select(Transaction).where(
+                    Transaction.user_id == user_id,
+                    Transaction.type == TransactionType.EXPENSE,
+                    Transaction.transaction_date == today,
+                )
+            )
+            today_spent_operational = sum((t.amount for t in tx_res.all()), Decimal("0.00"))
+
+        day_names = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
+
+        timeline: List[ProjectedDayItem] = []
+        running_balance = initial_balance
+        total_inflow = Decimal("0.00")
+        total_outflow = Decimal("0.00")
+        lowest_balance = initial_balance
+        lowest_balance_date = start_d
+        critical_deficit_date = None
+
+        curr = start_d
+        while curr <= end_d:
+            day_inflow = Decimal("0.00")
+            day_outflow = Decimal("0.00")
+            events: List[ProjectedDayEvent] = []
+
+            # --- A. Inflow Check ---
+            # 1. Income Streams
+            for s in active_streams:
+                stream_matches = False
+                if filter_type in ("all_wallets", "custom_balance"):
+                    stream_matches = True
+                elif filter_type == "all_operational":
+                    if s.wallet_id:
+                        w = wallet_map.get(s.wallet_id)
+                        stream_matches = (getattr(w, "purpose", "operational") == "operational")
+                    else:
+                        stream_matches = True
+                elif filter_type == "all_savings":
+                    if s.wallet_id:
+                        w = wallet_map.get(s.wallet_id)
+                        stream_matches = (getattr(w, "purpose", None) == "savings")
+                else:
+                    stream_matches = (str(s.wallet_id) == filter_type)
+
+                if stream_matches and ForecastService.is_income_due_on_date(s, curr, plan.cycle_start_day):
+                    day_inflow += s.amount
+                    w_name = wallet_map[s.wallet_id].name if s.wallet_id and s.wallet_id in wallet_map else None
+                    events.append(
+                        ProjectedDayEvent(
+                            type="INCOME",
+                            name=f"Pemasukan: {s.name}",
+                            amount=s.amount,
+                            direction="INFLOW",
+                            wallet_id=s.wallet_id,
+                            wallet_name=w_name,
+                        )
+                    )
+
+            # 2. Planned Transactions (INCOME / TRANSFER IN)
+            for pt in planned_txs:
+                if pt.planned_date == curr:
+                    if pt.type == "INCOME":
+                        pt_matches = False
+                        if filter_type in ("all_wallets", "custom_balance"):
+                            pt_matches = True
+                        elif filter_type == "all_operational":
+                            w = wallet_map.get(pt.wallet_id) if pt.wallet_id else None
+                            pt_matches = (not w or getattr(w, "purpose", "operational") == "operational")
+                        elif filter_type == "all_savings":
+                            w = wallet_map.get(pt.wallet_id) if pt.wallet_id else None
+                            pt_matches = (w and getattr(w, "purpose", None) == "savings")
+                        else:
+                            pt_matches = (str(pt.wallet_id) == filter_type)
+
+                        if pt_matches:
+                            day_inflow += pt.amount
+                            w_name = wallet_map[pt.wallet_id].name if pt.wallet_id and pt.wallet_id in wallet_map else None
+                            events.append(
+                                ProjectedDayEvent(
+                                    type="PLANNED",
+                                    name=f"[Rencana Masuk] {pt.name}",
+                                    amount=pt.amount,
+                                    direction="INFLOW",
+                                    wallet_id=pt.wallet_id,
+                                    wallet_name=w_name,
+                                )
+                            )
+
+                    elif pt.type == "TRANSFER":
+                        pt_matches = False
+                        if filter_type in ("all_wallets", "custom_balance"):
+                            pt_matches = False
+                        elif filter_type == "all_operational":
+                            to_w = wallet_map.get(pt.to_wallet_id) if pt.to_wallet_id else None
+                            from_w = wallet_map.get(pt.wallet_id) if pt.wallet_id else None
+                            pt_matches = (
+                                to_w and getattr(to_w, "purpose", "operational") == "operational" and
+                                from_w and getattr(from_w, "purpose", "operational") != "operational"
+                            )
+                        elif filter_type == "all_savings":
+                            to_w = wallet_map.get(pt.to_wallet_id) if pt.to_wallet_id else None
+                            from_w = wallet_map.get(pt.wallet_id) if pt.wallet_id else None
+                            pt_matches = (
+                                to_w and getattr(to_w, "purpose", None) == "savings" and
+                                from_w and getattr(from_w, "purpose", None) != "savings"
+                            )
+                        else:
+                            pt_matches = (str(pt.to_wallet_id) == filter_type)
+
+                        if pt_matches:
+                            day_inflow += pt.amount
+                            w_name = wallet_map[pt.to_wallet_id].name if pt.to_wallet_id and pt.to_wallet_id in wallet_map else None
+                            events.append(
+                                ProjectedDayEvent(
+                                    type="PLANNED",
+                                    name=f"[Transfer Masuk] {pt.name}",
+                                    amount=pt.amount,
+                                    direction="INFLOW",
+                                    wallet_id=pt.to_wallet_id,
+                                    wallet_name=w_name,
+                                )
+                            )
+
+            # --- B. Outflow Check ---
+            # 1. Patokan Makan Harian Dasar (Koreksi 4: sisa jatah hari ini jika curr == today)
+            if daily_meal > 0:
+                meal_cost = daily_meal
+                if curr == today:
+                    meal_cost = max(Decimal("0.00"), daily_meal - today_spent_operational)
+
+                if meal_cost > 0:
+                    day_outflow += meal_cost
+                    events.append(
+                        ProjectedDayEvent(
+                            type="MEAL",
+                            name="Patokan Makan & Jajan Harian",
+                            amount=meal_cost,
+                            direction="OUTFLOW",
+                            wallet_id=None,
+                            wallet_name=None,
+                        )
+                    )
+
+            # 2. Tagihan Pasti Bulanan & Siklus Biaya Berkala
+            for fe in fixed_items:
+                fe_matches = False
+                if filter_type in ("all_wallets", "custom_balance"):
+                    fe_matches = True
+                elif filter_type == "all_operational":
+                    w = wallet_map.get(fe.wallet_id) if fe.wallet_id else None
+                    fe_matches = (not w or getattr(w, "purpose", "operational") == "operational")
+                elif filter_type == "all_savings":
+                    w = wallet_map.get(fe.wallet_id) if fe.wallet_id else None
+                    fe_matches = (w and getattr(w, "purpose", None) == "savings")
+                else:
+                    fe_matches = (str(fe.wallet_id) == filter_type)
+
+                if fe_matches and ForecastService.is_fixed_expense_due_on_date(fe, curr):
+                    freq = (fe.frequency or "monthly").lower()
+                    if freq == "monthly" and curr == today and fe.is_paid_this_cycle:
+                        continue  # Sudah lunas hari ini/sebelumnya pada siklus ini
+
+                    day_outflow += fe.amount
+                    w_name = wallet_map[fe.wallet_id].name if fe.wallet_id and fe.wallet_id in wallet_map else None
+                    ev_type = "CYCLICAL" if freq in ("weekly", "biweekly", "every_n_days") else "FIXED_BILL"
+                    events.append(
+                        ProjectedDayEvent(
+                            type=ev_type,
+                            name=fe.name,
+                            amount=fe.amount,
+                            direction="OUTFLOW",
+                            wallet_id=fe.wallet_id,
+                            wallet_name=w_name,
+                        )
+                    )
+
+            # 3. Planned Transactions (EXPENSE / TRANSFER OUT)
+            for pt in planned_txs:
+                if pt.planned_date == curr:
+                    if pt.type == "EXPENSE":
+                        pt_matches = False
+                        if filter_type in ("all_wallets", "custom_balance"):
+                            pt_matches = True
+                        elif filter_type == "all_operational":
+                            w = wallet_map.get(pt.wallet_id) if pt.wallet_id else None
+                            pt_matches = (not w or getattr(w, "purpose", "operational") == "operational")
+                        elif filter_type == "all_savings":
+                            w = wallet_map.get(pt.wallet_id) if pt.wallet_id else None
+                            pt_matches = (w and getattr(w, "purpose", None) == "savings")
+                        else:
+                            pt_matches = (str(pt.wallet_id) == filter_type)
+
+                        if pt_matches:
+                            day_outflow += pt.amount
+                            w_name = wallet_map[pt.wallet_id].name if pt.wallet_id and pt.wallet_id in wallet_map else None
+                            events.append(
+                                ProjectedDayEvent(
+                                    type="PLANNED",
+                                    name=f"[Rencana Keluar] {pt.name}",
+                                    amount=pt.amount,
+                                    direction="OUTFLOW",
+                                    wallet_id=pt.wallet_id,
+                                    wallet_name=w_name,
+                                )
+                            )
+
+                    elif pt.type == "TRANSFER":
+                        pt_matches = False
+                        if filter_type in ("all_wallets", "custom_balance"):
+                            pt_matches = False
+                        elif filter_type == "all_operational":
+                            from_w = wallet_map.get(pt.wallet_id) if pt.wallet_id else None
+                            to_w = wallet_map.get(pt.to_wallet_id) if pt.to_wallet_id else None
+                            pt_matches = (
+                                from_w and getattr(from_w, "purpose", "operational") == "operational" and
+                                to_w and getattr(to_w, "purpose", "operational") != "operational"
+                            )
+                        elif filter_type == "all_savings":
+                            from_w = wallet_map.get(pt.wallet_id) if pt.wallet_id else None
+                            to_w = wallet_map.get(pt.to_wallet_id) if pt.to_wallet_id else None
+                            pt_matches = (
+                                from_w and getattr(from_w, "purpose", None) == "savings" and
+                                to_w and getattr(to_w, "purpose", None) != "savings"
+                            )
+                        else:
+                            pt_matches = (str(pt.wallet_id) == filter_type)
+
+                        if pt_matches:
+                            day_outflow += pt.amount
+                            w_name = wallet_map[pt.wallet_id].name if pt.wallet_id and pt.wallet_id in wallet_map else None
+                            events.append(
+                                ProjectedDayEvent(
+                                    type="PLANNED",
+                                    name=f"[Transfer Keluar] {pt.name}",
+                                    amount=pt.amount,
+                                    direction="OUTFLOW",
+                                    wallet_id=pt.wallet_id,
+                                    wallet_name=w_name,
+                                )
+                            )
+
+            closing_balance = running_balance + day_inflow - day_outflow
+            is_def = closing_balance < 0
+            if is_def and critical_deficit_date is None:
+                critical_deficit_date = curr
+
+            if closing_balance < lowest_balance:
+                lowest_balance = closing_balance
+                lowest_balance_date = curr
+
+            timeline.append(
+                ProjectedDayItem(
+                    date=curr,
+                    day_name=day_names[curr.weekday()],
+                    is_today=(curr == today),
+                    initial_balance=running_balance,
+                    total_inflow=day_inflow,
+                    total_outflow=day_outflow,
+                    closing_balance=closing_balance,
+                    is_deficit=is_def,
+                    events=events,
+                )
+            )
+
+            total_inflow += day_inflow
+            total_outflow += day_outflow
+            running_balance = closing_balance
+            curr += timedelta(days=1)
+
+        total_days = (end_d - start_d).days + 1
+        is_safe = (critical_deficit_date is None) and (running_balance >= 0)
+
+        return RangeProjectionResponse(
+            start_date=start_d,
+            end_date=end_d,
+            total_days=total_days,
+            wallet_filter=filter_type,
+            wallet_filter_label=filter_label,
+            initial_balance=initial_balance,
+            total_inflow=total_inflow,
+            total_outflow=total_outflow,
+            final_balance=running_balance,
+            lowest_balance=lowest_balance,
+            lowest_balance_date=lowest_balance_date,
+            critical_deficit_date=critical_deficit_date,
+            is_safe=is_safe,
+            timeline=timeline,
+        )
+
+    @staticmethod
+    async def get_planned_transactions(
+        session: AsyncSession,
+        user_id: uuid.UUID,
+    ) -> List[PlannedTransactionResponse]:
+        """Ambil seluruh daftar rencana transaksi masa depan user."""
+        wallets_res = await session.exec(select(Wallet).where(Wallet.user_id == user_id))
+        wallet_map = {w.id: w.name for w in wallets_res.all()}
+
+        cat_res = await session.exec(select(Category).where(Category.user_id == user_id))
+        cat_map = {c.id: c.name for c in cat_res.all()}
+
+        query = (
+            select(PlannedTransaction)
+            .where(PlannedTransaction.user_id == user_id)
+            .order_by(PlannedTransaction.planned_date, PlannedTransaction.created_at)
+        )
+        items = (await session.exec(query)).all()
+
+        return [
+            PlannedTransactionResponse(
+                id=item.id,
+                user_id=item.user_id,
+                name=item.name,
+                amount=item.amount,
+                type=item.type,
+                wallet_id=item.wallet_id,
+                wallet_name=wallet_map.get(item.wallet_id),
+                to_wallet_id=item.to_wallet_id,
+                to_wallet_name=wallet_map.get(item.to_wallet_id),
+                category_id=item.category_id,
+                category_name=cat_map.get(item.category_id),
+                planned_date=item.planned_date,
+                is_completed=item.is_completed,
+                notes=item.notes,
+                created_at=item.created_at,
+            )
+            for item in items
+        ]
+
+    @staticmethod
+    async def create_planned_transaction(
+        session: AsyncSession,
+        user_id: uuid.UUID,
+        payload: PlannedTransactionCreate,
+    ) -> PlannedTransactionResponse:
+        """Tambah rencana transaksi masa depan baru."""
+        item = PlannedTransaction(
+            user_id=user_id,
+            name=payload.name,
+            amount=payload.amount,
+            type=payload.type.upper(),
+            wallet_id=payload.wallet_id,
+            to_wallet_id=payload.to_wallet_id,
+            category_id=payload.category_id,
+            planned_date=payload.planned_date,
+            is_completed=payload.is_completed,
+            notes=payload.notes,
+        )
+        session.add(item)
+        await session.commit()
+        await session.refresh(item)
+
+        w_name = None
+        if item.wallet_id:
+            w = await session.get(Wallet, item.wallet_id)
+            w_name = w.name if w else None
+
+        to_w_name = None
+        if item.to_wallet_id:
+            to_w = await session.get(Wallet, item.to_wallet_id)
+            to_w_name = to_w.name if to_w else None
+
+        c_name = None
+        if item.category_id:
+            c = await session.get(Category, item.category_id)
+            c_name = c.name if c else None
+
+        return PlannedTransactionResponse(
+            id=item.id,
+            user_id=item.user_id,
+            name=item.name,
+            amount=item.amount,
+            type=item.type,
+            wallet_id=item.wallet_id,
+            wallet_name=w_name,
+            to_wallet_id=item.to_wallet_id,
+            to_wallet_name=to_w_name,
+            category_id=item.category_id,
+            category_name=c_name,
+            planned_date=item.planned_date,
+            is_completed=item.is_completed,
+            notes=item.notes,
+            created_at=item.created_at,
+        )
+
+    @staticmethod
+    async def update_planned_transaction(
+        session: AsyncSession,
+        user_id: uuid.UUID,
+        planned_id: uuid.UUID,
+        payload: PlannedTransactionUpdate,
+    ) -> PlannedTransactionResponse:
+        """Perbarui rencana transaksi masa depan."""
+        item = await session.get(PlannedTransaction, planned_id)
+        if not item or item.user_id != user_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rencana transaksi tidak ditemukan.")
+
+        update_data = payload.model_dump(exclude_unset=True)
+        for key, value in update_data.items():
+            if key == "type" and value:
+                setattr(item, key, value.upper())
+            else:
+                setattr(item, key, value)
+
+        session.add(item)
+        await session.commit()
+        await session.refresh(item)
+
+        w_name = None
+        if item.wallet_id:
+            w = await session.get(Wallet, item.wallet_id)
+            w_name = w.name if w else None
+
+        to_w_name = None
+        if item.to_wallet_id:
+            to_w = await session.get(Wallet, item.to_wallet_id)
+            to_w_name = to_w.name if to_w else None
+
+        c_name = None
+        if item.category_id:
+            c = await session.get(Category, item.category_id)
+            c_name = c.name if c else None
+
+        return PlannedTransactionResponse(
+            id=item.id,
+            user_id=item.user_id,
+            name=item.name,
+            amount=item.amount,
+            type=item.type,
+            wallet_id=item.wallet_id,
+            wallet_name=w_name,
+            to_wallet_id=item.to_wallet_id,
+            to_wallet_name=to_w_name,
+            category_id=item.category_id,
+            category_name=c_name,
+            planned_date=item.planned_date,
+            is_completed=item.is_completed,
+            notes=item.notes,
+            created_at=item.created_at,
+        )
+
+    @staticmethod
+    async def delete_planned_transaction(
+        session: AsyncSession,
+        user_id: uuid.UUID,
+        planned_id: uuid.UUID,
+    ) -> bool:
+        """Hapus rencana transaksi masa depan."""
+        item = await session.get(PlannedTransaction, planned_id)
+        if not item or item.user_id != user_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rencana transaksi tidak ditemukan.")
+
+        await session.delete(item)
+        await session.commit()
+        return True
+
+    @staticmethod
+    async def execute_planned_transaction(
+        session: AsyncSession,
+        user_id: uuid.UUID,
+        planned_id: uuid.UUID,
+    ) -> PlannedTransactionResponse:
+        """Eksekusi rencana transaksi menjadi mutasi riil (Transaction & Wallet Balance)."""
+        item = await session.get(PlannedTransaction, planned_id)
+        if not item or item.user_id != user_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rencana transaksi tidak ditemukan.")
+
+        if item.is_completed:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Rencana transaksi ini sudah pernah dieksekusi.")
+
+        # Ambil atau buat kategori default jika kosong
+        cat_id = item.category_id
+        if not cat_id:
+            cat_type = "income" if item.type == "INCOME" else "expense"
+            cat = (await session.exec(select(Category).where(Category.user_id == user_id, Category.type == cat_type))).first()
+            if not cat:
+                cat = Category(
+                    user_id=user_id,
+                    name="Lain-lain",
+                    type=cat_type,
+                    color="#4E7B6D" if cat_type == "income" else "#D96B43",
+                )
+                session.add(cat)
+                await session.flush()
+            cat_id = cat.id
+
+        if item.type == "EXPENSE":
+            if item.wallet_id:
+                w = await session.get(Wallet, item.wallet_id)
+                if w:
+                    w.balance -= item.amount
+                    session.add(w)
+
+            tx = Transaction(
+                user_id=user_id,
+                wallet_id=item.wallet_id,
+                category_id=cat_id,
+                amount=item.amount,
+                type=TransactionType.EXPENSE,
+                description=f"[Eksekusi Rencana] {item.name}",
+                transaction_date=date.today(),
+            )
+            session.add(tx)
+
+        elif item.type == "INCOME":
+            if item.wallet_id:
+                w = await session.get(Wallet, item.wallet_id)
+                if w:
+                    w.balance += item.amount
+                    session.add(w)
+
+            tx = Transaction(
+                user_id=user_id,
+                wallet_id=item.wallet_id,
+                category_id=cat_id,
+                amount=item.amount,
+                type=TransactionType.INCOME,
+                description=f"[Eksekusi Rencana] {item.name}",
+                transaction_date=date.today(),
+            )
+            session.add(tx)
+
+        elif item.type == "TRANSFER":
+            if item.wallet_id:
+                from_w = await session.get(Wallet, item.wallet_id)
+                if from_w:
+                    from_w.balance -= item.amount
+                    session.add(from_w)
+            if item.to_wallet_id:
+                to_w = await session.get(Wallet, item.to_wallet_id)
+                if to_w:
+                    to_w.balance += item.amount
+                    session.add(to_w)
+
+            tx = Transaction(
+                user_id=user_id,
+                wallet_id=item.wallet_id,
+                to_wallet_id=item.to_wallet_id,
+                category_id=cat_id,
+                amount=item.amount,
+                type=TransactionType.TRANSFER,
+                description=f"[Eksekusi Transfer Rencana] {item.name}",
+                transaction_date=date.today(),
+            )
+            session.add(tx)
+
+        item.is_completed = True
+        session.add(item)
+        await session.commit()
+        await session.refresh(item)
+
+        w_name = None
+        if item.wallet_id:
+            w = await session.get(Wallet, item.wallet_id)
+            w_name = w.name if w else None
+
+        to_w_name = None
+        if item.to_wallet_id:
+            to_w = await session.get(Wallet, item.to_wallet_id)
+            to_w_name = to_w.name if to_w else None
+
+        c_name = None
+        if item.category_id:
+            c = await session.get(Category, item.category_id)
+            c_name = c.name if c else None
+
+        return PlannedTransactionResponse(
+            id=item.id,
+            user_id=item.user_id,
+            name=item.name,
+            amount=item.amount,
+            type=item.type,
+            wallet_id=item.wallet_id,
+            wallet_name=w_name,
+            to_wallet_id=item.to_wallet_id,
+            to_wallet_name=to_w_name,
+            category_id=item.category_id,
+            category_name=c_name,
+            planned_date=item.planned_date,
+            is_completed=item.is_completed,
+            notes=item.notes,
+            created_at=item.created_at,
+        )
 
