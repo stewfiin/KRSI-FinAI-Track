@@ -30,6 +30,13 @@ class IncomeStream(SQLModel, table=True):
     )
     frequency: str = Field(default="monthly", max_length=20)  # daily, weekly, biweekly, monthly
     receive_day: Optional[int] = Field(default=None)  # Tanggal (1-31) jika bulanan, atau hari (0=Senin, 6=Minggu) jika mingguan
+    wallet_id: Optional[uuid.UUID] = Field(
+        default=None,
+        foreign_key="wallets.id",
+        index=True,
+        nullable=True,
+        ondelete="SET NULL",
+    )
     is_active: bool = Field(default=True, nullable=False)
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),

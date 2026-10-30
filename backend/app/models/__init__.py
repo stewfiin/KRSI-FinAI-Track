@@ -15,6 +15,8 @@ from app.models.ai_chat_log import AIChatLog
 from app.models.financial_plan import FinancialPlan
 from app.models.fixed_expense import FixedExpense
 from app.models.wishlist import Wishlist
+from app.models.income_stream import IncomeStream
+from app.models.planned_transaction import PlannedTransaction
 
 __all__ = [
     "WalletType",
@@ -32,5 +34,7 @@ __all__ = [
     "FinancialPlan",
     "FixedExpense",
     "Wishlist",
+    "IncomeStream",
+    "PlannedTransaction",
 ]
 

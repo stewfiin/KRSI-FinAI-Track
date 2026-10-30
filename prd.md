@@ -1,176 +1,237 @@
-# Product Requirements Document (PRD)
-# FinAI Track — Smart Personal Finance & AI Assistant
+# Product Requirements Document (PRD) & Arsitektur Proses Bisnis: FinAI Track
+
+**Nama Produk**: FinAI Track — *Smart Personal Finance & AI Runway Assistant*  
+**Versi Dokumen**: 2.0 (Full-Stack MVP + Envelope Banking & Multi-Stream Runway Engine)  
+**Target Platform**: Mobile-First Web Application (Next.js) & Omnichannel Bot (Telegram)  
 
 ---
 
-## Ringkasan Proyek (Document Overview)
+## 1. Ringkasan Eksekutif & Visi Produk
 
-| Atribut | Keterangan |
-| :--- | :--- |
-| **Nama Proyek (Working Title)** | **FinAI Track** |
-| **Tipe Produk** | B2C SaaS (*Software as a Service*) — *Personal Finance Management* |
-| **Target Platform** | • **Fase 1:** Web (PWA) & Bot Telegram<br>• **Fase 2:** Android (Flutter)<br>• **Fase 3:** iOS (Flutter) |
-| **Status Dokumen** | **Draft v1.0** (Fokus: MVP & Portofolio Teknis) |
-| **Versi Dokumen** | `1.0.0` |
+**FinAI Track** adalah aplikasi manajemen keuangan pribadi cerdas berbasis AI yang dirancang khusus untuk menjawab tiga masalah utama pengguna sehari-hari:
+1. **Friksi Pencatatan Transaksi**: Mencatat pengeluaran manual terasa merepotkan. FinAI Track menyelesaikannya dengan input bahasa alami (*Natural Language Processing*), pesan suara (*Voice Note* via Groq Whisper), dan integrasi **Bot Telegram**.
+2. **Ilusi Saldo Gabungan**: Banyak pengguna merasa uangnya masih banyak di rekening, padahal sebagian adalah uang tabungan atau uang tagihan rutin (seperti iCloud, listrik, kos). FinAI Track menerapkan **Pocket / Envelope Banking** yang memisahkan dompet `operational`, `savings`, dan `subscription`.
+3. **Ketidakpastian Bertahan Hidup Sampai Gajian (*Financial Runway*)**: Aplikasi keuangan biasa hanya mencatat masa lalu (*backward-looking*). FinAI Track memiliki **Dynamic Daily Runway Engine** (*forward-looking*) yang menghitung secara *real-time* berapa batas belanja ideal hari ini, berapa hari uang akan bertahan, dan simulasi *"Bisa Beli Nggak?"* sebelum pengguna berbelanja.
 
 ---
 
-## 1. Product Vision
+## 2. Arsitektur Proses Bisnis Utama (End-to-End Business Process)
 
-Membangun asisten manajemen keuangan pribadi cerdas berbasis **Artificial Intelligence (AI)** yang menghilangkan rasa malas mencatat keuangan melalui interaksi bahasa alami (*natural language processing* via obrolan teks dan suara), serta membantu individu mencapai target finansial secara proaktif melalui *automated budgeting* yang adaptif dan lintas platform.
+Berikut adalah diagram alur proses bisnis utama yang menghubungkan pengguna, kanal input, manajemen amplop dompet, hingga mesin proyeksi finansial:
 
----
+```mermaid
+flowchart TD
+    User(["👤 Pengguna (Web / Mobile / Telegram)"])
 
-## 2. Problem Statement
+    subgraph Onboarding["1. Onboarding & Setup Awal"]
+        Auth["🔐 Registrasi / Login JWT"]
+        Seed["🌱 Auto-Seed Dompet Tunai & Kategori Dasar"]
+        Privacy["👁️ Default Privacy Masking (Nominal Disensor)"]
+        Auth --> Seed --> Privacy
+    end
 
-1. **Friksi Input Manual yang Tinggi**  
-   Pengguna aplikasi keuangan konvensional sering berhenti mencatat di minggu kedua karena lelah harus membuka aplikasi, memilih kategori, memilih dompet/rekening, dan mengetik nominal secara manual setiap kali selesai bertransaksi.
-2. **Data Pasif & Sulit Dianalisis**  
-   Grafik standar sering kali hanya menampilkan riwayat masa lalu tanpa mampu menjawab pertanyaan spesifik pengguna secara instan (contoh: *"Kira-kira kalau saya beli barang X minggu ini, uang makan masih aman tidak?"*).
-3. **Anggaran (*Budget*) yang Kaku**  
-   Pembuatan anggaran manual tidak memperhitungkan pola historis pengguna dan sulit disesuaikan kembali (*rebalancing*) ketika terjadi pengeluaran tidak terduga di pertengahan bulan.
+    subgraph Envelope["2. Pocket / Envelope Banking"]
+        W_Op["💼 Dompet Operasional (BCA, Tunai - Kas Harian)"]
+        W_Sav["💰 Dompet Tabungan (Savings, Anniv - Dana Disimpan)"]
+        W_Sub["💳 Dompet Tagihan (Subscription - Cadangan Rutin)"]
+    end
 
----
+    subgraph InputChannels["3. Multi-Channel Transaction Input"]
+        Manual["📝 Form Manual (Masuk / Keluar / Transfer)"]
+        AIChat["✨ Quick AI Bar & FinAI Chat (NLP Gemini + Regex Fallback)"]
+        Voice["🎙️ Voice Note (Groq Whisper large-v3-turbo)"]
+        TeleBot["🤖 Bot Telegram (@FinAi_track_bot via OTP Pairing)"]
+    end
 
-## 3. User Persona
+    subgraph CoreEngine["4. Core Ledger & Forecast Engine"]
+        TxService["⚙️ Transaction Service (Atomic Balance Update)"]
+        FixedToggle["📋 1-Tap Checklist Tagihan Pasti (Auto-Debit & Refund)"]
+        MultiIncome["💵 Multi-Stream Income (Harian, Mingguan, 2-Mingguan, Bulanan)"]
+        RunwayCalc["🧭 Dynamic Daily Runway & Burn Rate Engine"]
+        Simulator["💡 Simulasi Belanja What-If (Bisa Beli Nggak?)"]
+    end
 
-| Atribut | Persona 1: "Si Sibuk & Praktis" | Persona 2: "Si Perencana Target" |
-| :--- | :--- | :--- |
-| **Segmen** | *Young Professional / Freelancer* | *Mahasiswa / First-Jobber* |
-| **Profil** | Usia 21–30 tahun, mobilitas tinggi, aktif menggunakan beberapa rekening bank dan *e-wallet*. | Usia 18–24 tahun, pemasukan bulanan terbatas, sedang menabung untuk target spesifik (misal: *upgrade gear*, dana darurat). |
-| **Pain Points** | Malas membuka aplikasi khusus hanya untuk mencatat parkir Rp5.000 atau membeli kopi di sela aktivitas. | Sering *overspending* di awal bulan untuk nongkrong, bingung membagi alokasi uang harian agar cukup hingga akhir bulan. |
-| **Kebutuhan Utama** | Mencatat pengeluaran melalui rekaman suara (*Voice Note*) atau pesan singkat di Telegram sambil beraktivitas. | Memerlukan AI yang otomatis menyusun alokasi anggaran bulanan serta memberikan peringatan proaktif saat mendekati batas anggaran. |
-
----
-
-## 4. MVP Scope (Fase 1 — Fokus Portofolio & Web/PWA)
-
-Untuk memastikan proyek selesai tepat waktu dengan kualitas arsitektur yang solid sebagai portofolio teknis, ruang lingkup MVP dibatasi sebagai berikut:
-
-### In-Scope (Dikerjakan di MVP)
-- [x] **Autentikasi Pengguna:** Registrasi, Login, dan Pengelolaan Sesi menggunakan JWT (*JSON Web Token*).
-- [x] **Manajemen Multi-Dompet & Kategori:** Pengelolaan rekening/dompet (*Cash*, Bank, *E-Wallet*) serta kategori kustom (*Income/Expense*).
-- [x] **Input Manual & Visualisasi Dashboard:** Input transaksi via form web dan visualisasi arus kas harian/bulanan (Donut Chart & Bar Chart).
-- [x] **In-App AI Chatbot:** Ekstraksi teks bahasa alami menjadi data transaksi terstruktur otomatis & Q&A analitik data keuangan pribadi.
-- [x] **AI Speech-to-Text (Voice Logging):** Rekam suara langsung dari Web/PWA untuk mencatat transaksi secara instan.
-- [x] **Integrasi Bot Telegram Dua Arah:** Penautan akun (*Account Linking* via pairing token), pencatatan transaksi via teks/suara di Telegram, dan tanya-jawab saldo/pengeluaran.
-- [x] **AI Automated Budgeting:** Pembuatan alokasi anggaran bulanan adaptif berdasarkan prompt pengguna dan data historis transaksi.
-- [x] **Konfigurasi PWA (*Progressive Web App*):** Dukungan instalasi aplikasi langsung di Android dan iOS melalui browser.
-
-### Out-of-Scope (Ditunda ke Fase Berikutnya)
-- [ ] Integrasi *Payment Gateway* / langganan berbayar (Monetisasi SaaS).
-- [ ] Sinkronisasi mutasi rekening otomatis (*Open Banking API*).
-- [ ] Fitur OCR untuk memindai foto struk belanja fisik.
-- [ ] Distribusi biner *native* ke Google Play Store & Apple App Store (akan diimplementasikan dengan Flutter pada Fase 2 & 3).
-
----
-
-## 5. Core Features
-
-### 5.1. Smart Multimodal Logging (Text & Voice)
-- Mengubah input bahasa kasual (contoh: *"Tadi beli nasi padang 25rb pakai QRIS BCA"*) atau rekaman suara menjadi entitas data terstruktur:
-  - **Tipe:** `Expense`
-  - **Nominal:** `25000`
-  - **Kategori:** `Makanan`
-  - **Dompet:** `BCA`
-  - **Tanggal:** `Hari ini`
-
-### 5.2. Contextual Financial Q&A (RAG / Function Calling)
-- Asisten AI cerdas dengan akses *read-only* ke data pengguna melalui *tool/function calling*.
-- Mampu menjawab kueri analitik seperti perbandingan pengeluaran antar-bulan, total belanja kategori tertentu, atau sisa anggaran berjalan.
-
-### 5.3. Seamless Telegram Bot Sync
-- Sinkronisasi *real-time* dua arah antara bot Telegram dan database utama.
-- Transaksi yang dicatat via obrolan Telegram langsung memperbarui saldo dompet dan grafik visual di Web Dashboard secara instan.
-
-### 5.4. AI Dynamic Budgeting Engine
-- Menerima batasan (*constraints*) dari pengguna (total pemasukan, target tabungan wajib, dan batas kategori tertentu).
-- Mendistribusikan plafon anggaran ke seluruh kategori pengeluaran secara proporsional dengan mempertimbangkan rata-rata historis.
-
-### 5.5. Core Ledger & Analytics
-- Pencatatan transaksi mutasi antar-dompet (*Transfer*), pemasukan, dan pengeluaran.
-- Rekapitulasi arus kas bersih (*Net Cashflow*) serta indikator progres pemakaian anggaran (*Aman*, *Waspada*, *Overbudget*).
+    User --> Onboarding
+    Onboarding --> Envelope
+    User --> InputChannels
+    InputChannels --> TxService
+    TxService --> Envelope
+    Envelope --> RunwayCalc
+    MultiIncome --> RunwayCalc
+    FixedToggle --> TxService
+    FixedToggle --> RunwayCalc
+    RunwayCalc --> Simulator
+```
 
 ---
 
-## 6. Tech Stack
+## 3. Spesifikasi Alur Lengkap per Modul (Detailed User & System Flows)
 
-| Lapisan Sistem | Teknologi | Justifikasi Teknis |
-| :--- | :--- | :--- |
-| **Frontend Web (Fase 1)** | Next.js (React), TypeScript, Tailwind CSS | Mendukung interaktivitas sisi klien yang tinggi untuk rekaman audio, *streaming chat* AI, dan konfigurasi PWA. |
-| **State & Data Fetching** | Zustand & TanStack Query (React Query) | Manajemen state global (*user*, dompet) yang ringan serta *caching* respons API yang optimal agar transisi antar halaman instan. |
-| **Mobile App (Fase 2 & 3)** | Flutter (Dart) | *Single codebase* untuk kompilasi *native* ke Android dan iOS menggunakan kontrak API backend yang sama. |
-| **Backend API & AI Core** | FastAPI (Python) | Kinerja *asynchronous* tinggi, validasi skema ketat menggunakan Pydantic, dan ekosistem *native* terbaik untuk manipulasi AI/Data. |
-| **Database & ORM** | PostgreSQL + SQLAlchemy / SQLModel + Alembic | Keandalan ACID untuk data transaksi finansial, dukungan kolom `JSONB` untuk log metadata AI, serta migrasi skema yang terkelola rapi. |
-| **AI & LLM Orchestration** | Gemini 2.5 Flash / GPT-4o-mini + LangChain / Instructor | Latensi ultra-rendah, efisiensi biaya, serta dukungan *Structured Outputs* (Pydantic schema) dan *Function Calling*. |
-| **Speech-to-Text (STT)** | Groq Whisper API (`whisper-large-v3-turbo`) | Transkripsi audio Bahasa Indonesia berkecepatan tinggi (< 1 detik) dengan tingkat akurasi transkripsi yang sangat baik. |
-| **Telegram Integration** | aiogram / python-telegram-bot (Webhook Mode) | Berjalan secara *asynchronous* langsung di dalam *event loop* FastAPI tanpa memblokir *request thread*. |
-| **Caching & Rate Limiter** | Redis | Penyimpanan memori percakapan singkat (*chat memory context*), *rate limiting*, dan kode OTP penautan akun Telegram. |
-| **Deployment & Infra** | Docker, Docker Compose, Vercel (FE), VPS / Render (BE) | Kontainerisasi menjamin konsistensi *environment* dari pengembangan lokal hingga ke tahap *production*. |
+### 3.1. Modul Autentikasi, Onboarding & Privasi Saldo
+* **Kode Terkait**: `backend/app/api/v1/auth.py`, `frontend/lib/store.ts`, `frontend/app/dashboard/page.tsx`
+* **Alur Proses**:
+  1. **Registrasi Akun Baru**: Saat pengguna mendaftar (`POST /api/v1/auth/register`), sistem secara atomik membuat akun, meng-hash password dengan `bcrypt`, lalu menjalankan *auto-seeding* berupa 1 dompet `Tunai` (`purpose="operational"`, saldo Rp0) serta 9 kategori standar pemasukan dan pengeluaran.
+  2. **Privasi Default (*Balance Masking*)**: Saat pengguna pertama kali membuka Dashboard, state `isBalanceHidden` bernilai `true` secara default. Seluruh nominal saldo gabungan, pemasukan, pengeluaran, dan saldo per dompet disensor menjadi `Rp •••••••` hingga pengguna menekan tombol ikon mata.
+  3. **Reset Akun Seperti Baru (*Factory Reset*)**: Di halaman Pengaturan (`POST /api/v1/auth/reset-data`), pengguna dapat mengetik kata konfirmasi `RESET` untuk menghapus seluruh transaksi, dompet tambahan, blueprint, tagihan pasti, dan wishlist, lalu mengembalikan akun ke kondisi awal (1 dompet Tunai Rp0) tanpa perlu membuat akun baru.
 
 ---
 
-## 7. Scalability Plan (Strategi Scale-Up)
+### 3.2. Modul Manajemen Dompet & Sistem Amplop (*Pocket / Envelope Banking*)
+* **Kode Terkait**: `backend/app/models/wallet.py`, `backend/app/api/v1/wallets.py`, `frontend/app/settings/page.tsx`
+* **Aturan Bisnis Peruntukan Dompet (`purpose`)**:
+  Setiap dompet memiliki atribut `purpose` yang dapat diatur/diubah kapan saja dengan 1 klik dari halaman **Pengaturan** maupun halaman **Proyeksi**:
 
-Ketika aplikasi berkembang dari proyek portofolio menjadi produk publik dengan ribuan pengguna aktif, sistem dirancang untuk dapat ditingkatkan melalui strategi berikut:
-
-1. **Pemisahan Beban Kerja Asynchronous (Message Queue)**
-   - *Tantangan:* Ketika lonjakan pengguna mengirim *Voice Note* bersamaan di Telegram, *worker thread* FastAPI dapat terhambat menunggu respons API Whisper & LLM.
-   - *Solusi:* Memasang Celery / ARQ dengan Redis Broker. FastAPI segera merespons *"Sedang diproses..."*, sementara pemrosesan audio STT dan ekstraksi AI diproses di latar belakang (*background worker*).
-2. **Optimasi Database & Indexing**
-   - Menambahkan *Composite Index* pada kolom `(user_id, transaction_date)` dan `(user_id, category_id)` di PostgreSQL agar kueri analitik bulanan tetap dieksekusi di bawah 50ms meskipun data mencapai jutaan baris.
-   - Menggunakan *Connection Pooling* (PgBouncer) untuk menangani lonjakan koneksi konkuren dari instans *serverless* atau *container* FastAPI.
-3. **Efisiensi Token AI & Semantic Caching**
-   - Menyimpan agregasi ringkasan pengeluaran bulanan pengguna di Redis. Saat pengguna menanyakan hal serupa berulang kali dalam sesi yang sama, AI membaca *cache summary* tanpa perlu menjalankan kueri SQL berat ke PostgreSQL.
-4. **Horizontal Scaling (Stateless Backend)**
-   - Autentikasi berbasis JWT (*Stateless*) dan status percakapan tersimpan di Redis memungkinkan *container* FastAPI digandakan (*replica scaling*) di belakang *Load Balancer* (Nginx / Cloudflare) tanpa risiko kehilangan status sesi pengguna.
+| Peruntukan (`purpose`) | Label UI | Fungsi dalam Proses Bisnis | Dampak ke Jatah Belanja Harian |
+| :--- | :--- | :--- | :--- |
+| **`operational`** | 💼 Operasional | Menyimpan uang kas harian/uang makan & jajan (cth: BCA, Tunai, GoPay). | **Menjadi pembilang utama** dalam perhitungan *Safe-to-Spend* & *Batas Belanja Ideal Hari Ini*. |
+| **`savings`** | 💰 Tabungan | Menyimpan tabungan riil/dana darurat/tujuan khusus (cth: Savings, Anniv). | **Dikunci & Diamankan**. Tidak boleh ikut terbagi ke jatah belanja harian; dihitung sebagai *Tabungan Tersimpan*. |
+| **`subscription`** | 💳 Tagihan | Menyimpan dana khusus pembayaran tagihan rutin bulanan (cth: Subscription). | **Dicadangkan untuk Tagihan**. Menanggung beban *Tagihan Pasti* agar tidak memotong uang makan harian. |
 
 ---
 
-## 8. Skema Database (Relational Schema)
+### 3.3. Modul Pencatatan Transaksi (Manual, Transfer, AI NLP & Voice Note)
+* **Kode Terkait**: `backend/app/services/transaction_service.py`, `backend/app/services/ai_service.py`
 
-Seluruh tabel menerapkan isolasi data ketat berbasis pengguna melalui relasi foreign key `user_id` (*Multi-tenant Ready*).
+```mermaid
+sequenceDiagram
+    actor U as Pengguna
+    participant FE as Frontend / Telegram
+    participant AI as AIService (Whisper + Gemini + Regex)
+    participant TX as TransactionService
+    participant DB as PostgreSQL
 
-### 8.1. Entity-Relationship Diagram (ERD)
+    U->>FE: Kirim Teks ("makan siang 25rb pakai BCA") atau Voice Note
+    alt Input berupa Suara (Audio/OGG/WebM)
+        FE->>AI: POST /api/v1/ai/voice
+        AI->>AI: Transkripsi via Groq Whisper (whisper-large-v3-turbo, id)
+    else Input berupa Teks
+        FE->>AI: POST /api/v1/ai/chat
+    end
+    AI->>AI: Klasifikasi Intent (record_tx / create_wallet / query_finance / general_chat)
+    AI->>AI: Ekstrak Entitas (Nominal, Tipe, Kategori, Nama Dompet, Tanggal)
+    AI->>TX: create_transaction(user_id, wallet_id, category_id, amount, type)
+    TX->>DB: Simpan baris Transaction & Update Wallet.balance secara atomik
+    DB-->>FE: Kembalikan Konfirmasi Transaksi & Saldo Terbaru
+```
+
+* **3 Jenis Transaksi**:
+  1. **Pemasukan (`INCOME`)**: Menambah saldo dompet tujuan (`wallet.balance += amount`).
+  2. **Pengeluaran (`EXPENSE`)**: Mengurangi saldo dompet asal (`wallet.balance -= amount`).
+  3. **Transfer Antar-Dompet (`TRANSFER`)**: Mengurangi saldo dompet asal dan menambah saldo dompet tujuan secara atomik (misal memindahkan gaji dari dompet `BCA` ke dompet `Savings` atau `Subscription`).
+* **Hybrid AI Engine (Zero-Downtime NLP)**:
+  - Menggunakan **Google Gemini (`gemini-flash-latest`)** untuk ekstraksi entitas kontekstual.
+  - Dilengkapi **Deterministic Regex Engine** sebagai *instant fallback* jika kuota API habis atau jaringan lambat, yang mampu memahami singkatan bahasa Indonesia sehari-hari (`25rb`, `25k`, `1,5jt`, `gajian`, `bayar kos pakai bca`, dll) hingga multi-transaksi dalam satu kalimat.
+
+---
+
+### 3.4. Modul Proyeksi, Multi-Sumber Pendapatan & Runway Finansial
+* **Kode Terkait**: `backend/app/services/forecast_service.py`, `backend/app/api/v1/forecast.py`, `frontend/app/forecast/page.tsx`
+
+Modul ini adalah inti kecerdasan finansial FinAI Track yang menggantikan pencatatan spreadsheet manual menjadi otomatis:
+
+#### A. Multi-Stream Income (Aliran Pendapatan Multi-Siklus)
+Pengguna yang memiliki lebih dari 1 sumber pemasukan dengan jadwal berbeda dapat mendaftarkan rincian aliran pendapatan (`IncomeStream`):
+- **Harian (`daily`)**: $\text{Ekuivalen Bulanan} = \text{Nominal} \times \text{Total Hari Siklus}$
+- **Mingguan (`weekly`)**: $\text{Ekuivalen Bulanan} = \text{Nominal} \times (\frac{\text{Total Hari Siklus}}{7})$ (dilengkapi penanda hari cair, misal setiap Senin).
+- **2-Mingguan (`biweekly`)**: $\text{Ekuivalen Bulanan} = \text{Nominal} \times (\frac{\text{Total Hari Siklus}}{14})$
+- **Bulanan (`monthly`)**: $\text{Ekuivalen Bulanan} = \text{Nominal}$ (dilengkapi tanggal gajian 1–31).
+
+Jadwal pencairan ini otomatis ditandai pada **Rekap Pengeluaran Harian** di tanggal uang tersebut dijadwalkan masuk.
+
+#### B. Tagihan Pasti (*Fixed Expenses*) dengan Auto-Debit Dompet
+1. Pengguna mendaftarkan tagihan rutin bulanan (misal: *iCloud Rp45.000*, *Token Listrik Rp100.000*) dan memilih **Dompet Pembayar** (misal: dompet `Subscription`).
+2. **Logika Pencadangan (*Buffer*)**:
+   - Selama tagihan berstatus **Belum Lunas**, nominalnya dicadangkan sebagai *Unpaid Buffer*.
+   - Jika tagihan ditautkan ke dompet `Subscription`, maka beban tagihan ditanggung oleh saldo dompet `Subscription` terlebih dahulu. Hanya jika saldo `Subscription` kurang, selisih kekurangannya baru memotong saldo `Operasional`.
+3. **1-Tap Toggle Lunas / Belum Lunas**:
+   - **Dicentang Lunas**: Sistem otomatis memotong saldo dompet pembayar (`wallet.balance -= expense.amount`), membuat riwayat transaksi pengeluaran (`Pembayaran tagihan: [Nama]`), dan menyimpan `paid_transaction_id`.
+   - **Centang Dibatalkan**: Sistem otomatis me-*refund* saldo kembali ke dompet pembayar (`wallet.balance += tx.amount`) dan menghapus transaksi terkait.
+
+#### C. Rumus Matematika *Dynamic Daily Runway*
+Sistem menghitung batas belanja ideal hari ini berdasarkan uang riil yang siap dipakai:
+
+$$\text{Safe to Spend Operasional} = \max\left(0, \text{Saldo Dompet Operasional} - \text{Sisa Tagihan Beban Operasional}\right)$$
+
+$$\text{Daily Cash Runway} = \frac{\text{Safe to Spend Operasional}}{\text{Sisa Hari dalam Siklus}}$$
+
+- Jika pengguna menetapkan patokan batas harian di Blueprint ($\text{Daily Living Budget} > 0$), maka:
+  $$\text{Batas Belanja Ideal Hari Ini} = \min\left(\text{Daily Living Budget}, \text{Daily Cash Runway}\right)$$
+- Jika patokan harian diatur `0`, maka sistem otomatis menggunakan **$\text{Daily Cash Runway}$** secara penuh.
+- **Daya Tahan Uang (*Runway Days*)**:
+  $$\text{Runway Days} = \frac{\text{Safe to Spend Operasional}}{\text{Rata-rata Laju Pengeluaran 7 Hari Terakhir (Burn Rate)}}$$
+
+#### D. Simulasi Belanja *"Bisa Beli Nggak?"* (*What-If Simulator*) & Wishlist
+Sebelum membeli barang (misal: *Sepatu Rp350.000*), pengguna dapat menguji dampaknya dari dua sumber dana:
+1. **Ambil dari Tabungan (`savings_pool`)**: Menguji apakah saldo dompet `Savings` mencukupi dan apakah sisa tabungan masih di atas ambang aman (minimal 50% tersisa untuk status `safe`). Tidak memotong jatah makan harian.
+2. **Ambil dari Uang Jajan Operasional (`operational_wallet`)**: Menghitung berapa penurunan jatah belanja harian untuk sisa hari bulan ini jika barang tersebut dibeli dari kas operasional. Memberikan vonis instan: `✅ Aman Dibeli`, `⚠️ Jatah Harian Menjadi Ketat`, atau `❌ Jangan Beli (Boncos)`.
+
+---
+
+### 3.5. Modul Integrasi Omnichannel Bot Telegram
+* **Kode Terkait**: `backend/app/services/telegram_bot.py`, `backend/app/api/v1/telegram.py`
+
+```mermaid
+sequenceDiagram
+    actor U as Pengguna
+    participant Web as Web Pengaturan
+    participant Redis as Redis (TTL 5 Menit)
+    participant Bot as Telegram Bot (@FinAi_track_bot)
+    participant DB as PostgreSQL
+
+    U->>Web: Klik "Hubungkan Telegram"
+    Web->>Redis: Generate Kode OTP 6 Digit (Key: telegram_otp:{code} -> user_id)
+    Redis-->>Web: Tampilkan Kode OTP (cth: 482910)
+    U->>Bot: Kirim "/start 482910" atau ketik "482910"
+    Bot->>Redis: Validasi Kode OTP
+    Bot->>DB: Simpan user.telegram_chat_id & Hapus OTP dari Redis
+    Bot-->>U: "✅ Akun berhasil terhubung! Kirim teks atau Voice Note kapan saja."
+```
+
+* **Kemampuan Bot Telegram**:
+  - Menerima chat natural (contoh: *"beli bensin 35rb pakai tunai"*) dan langsung mencatat ke database yang sama dengan Web.
+  - Menerima **Voice Note Telegram** (`.ogg`), mengunduh file dari server Telegram, mentranskripsikannya lewat Groq Whisper API, mengekstrak transaksi, dan membalas rincian pencatatan beserta sisa saldo dompet secara *real-time*.
+
+---
+
+## 4. Arsitektur Data (Entity-Relationship Diagram)
+
+Berikut adalah skema relasi tabel di database PostgreSQL yang menopang seluruh proses bisnis di atas:
 
 ```mermaid
 erDiagram
-    USERS ||--o{ WALLETS : "owns"
-    USERS ||--o{ CATEGORIES : "creates"
-    USERS ||--o{ TRANSACTIONS : "records"
-    USERS ||--o{ BUDGETS : "defines"
-    USERS ||--o{ AI_CHAT_LOGS : "interacts"
+    USERS ||--o{ WALLETS : owns
+    USERS ||--o{ CATEGORIES : owns
+    USERS ||--o{ TRANSACTIONS : records
+    USERS ||--o{ BUDGETS : sets
+    USERS ||--o{ FINANCIAL_PLANS : configures
+    USERS ||--o{ INCOME_STREAMS : receives
+    USERS ||--o{ FIXED_EXPENSES : pays
+    USERS ||--o{ WISHLISTS : plans
+    USERS ||--o{ AI_CHAT_LOGS : chats
 
-    WALLETS ||--o{ TRANSACTIONS : "source_of"
-    CATEGORIES ||--o{ TRANSACTIONS : "categorizes"
-    CATEGORIES ||--o{ BUDGETS : "targeted_by"
+    WALLETS ||--o{ TRANSACTIONS : funds
+    WALLETS ||--o{ FIXED_EXPENSES : assigned_to
+    CATEGORIES ||--o{ TRANSACTIONS : classifies
+    CATEGORIES ||--o{ BUDGETS : limits
+    CATEGORIES ||--o{ FIXED_EXPENSES : categorizes
+    TRANSACTIONS ||--o| FIXED_EXPENSES : settles
 
     USERS {
         uuid id PK
-        varchar name
-        varchar email UK
-        varchar password_hash
-        bigint telegram_chat_id UK "Nullable"
-        varchar default_currency
-        timestamp created_at
+        string name
+        string email UK
+        string password_hash
+        bigint telegram_chat_id UK
+        string default_currency
     }
 
     WALLETS {
         uuid id PK
         uuid user_id FK
-        varchar name
-        enum type "cash | bank | ewallet"
-        numeric balance "15, 2"
-        timestamp created_at
-    }
-
-    CATEGORIES {
-        uuid id PK
-        uuid user_id FK "Nullable (System Default)"
-        varchar name
-        enum type "income | expense"
-        varchar icon
-        varchar color
+        string name
+        enum type "CASH | BANK | EWALLET"
+        string purpose "operational | savings | subscription"
+        decimal balance
     }
 
     TRANSACTIONS {
@@ -178,244 +239,115 @@ erDiagram
         uuid user_id FK
         uuid wallet_id FK
         uuid category_id FK
-        numeric amount "15, 2"
-        enum type "income | expense | transfer"
-        text description
+        decimal amount
+        enum type "INCOME | EXPENSE | TRANSFER"
+        string description
         date transaction_date
-        enum source "manual_web | ai_chat | ai_voice | telegram_bot"
-        timestamp created_at
+        enum source "MANUAL_WEB | AI_CHAT | AI_VOICE | TELEGRAM_BOT"
     }
 
-    BUDGETS {
+    FINANCIAL_PLANS {
+        uuid id PK
+        uuid user_id FK
+        decimal monthly_income
+        decimal daily_living_budget
+        decimal monthly_savings_target
+        int cycle_start_day
+        boolean is_active
+    }
+
+    INCOME_STREAMS {
+        uuid id PK
+        uuid user_id FK
+        string name
+        decimal amount
+        string frequency "daily | weekly | biweekly | monthly"
+        int receive_day
+        boolean is_active
+    }
+
+    FIXED_EXPENSES {
         uuid id PK
         uuid user_id FK
         uuid category_id FK
-        numeric amount_limit "15, 2"
-        int month
-        int year
-        boolean is_ai_generated
-        timestamp created_at
+        uuid wallet_id FK
+        uuid paid_transaction_id FK
+        string name
+        decimal amount
+        int due_day_of_month
+        boolean is_paid_this_cycle
     }
 
-    AI_CHAT_LOGS {
+    WISHLISTS {
         uuid id PK
         uuid user_id FK
-        enum platform "web | telegram"
-        enum role "user | assistant"
-        text message
-        jsonb extracted_metadata "Nullable"
-        timestamp created_at
+        string item_name
+        decimal estimated_price
+        string priority
+        string target_source "savings_pool | operational_wallet"
+        boolean is_Completed
     }
 ```
 
-### 8.2. Detail Tabel & Spesifikasi Kolom
+---
 
-#### 1. `users`
-Menyimpan identitas akun pengguna dan konfigurasi global.
-- `id` (UUID, Primary Key)
-- `name` (VARCHAR, Not Null)
-- `email` (VARCHAR, Unique, Not Null)
-- `password_hash` (VARCHAR, Not Null)
-- `telegram_chat_id` (BIGINT, Unique, Nullable) — ID obrolan Telegram setelah proses *account linking*.
-- `default_currency` (VARCHAR, Default: `'IDR'`)
-- `created_at` (TIMESTAMP WITH TIME ZONE, Default: `NOW()`)
+## 5. Peta Navigasi UI & Fitur Frontend (Mobile-First 5 Menu Utama)
 
-#### 2. `wallets`
-Menyimpan rekening bank, dompet digital, atau uang tunai milik pengguna.
-- `id` (UUID, Primary Key)
-- `user_id` (UUID, Foreign Key $\rightarrow$ `users.id`, Index)
-- `name` (VARCHAR, Not Null — contoh: "BCA", "GoPay", "Uang Tunai")
-- `type` (ENUM: `'cash'`, `'bank'`, `'ewallet'`)
-- `balance` (NUMERIC(15, 2), Default: `0.00`)
-- `created_at` (TIMESTAMP WITH TIME ZONE, Default: `NOW()`)
+Aplikasi dirancang dengan kerangka simulator smartphone (`iPhone 15 Pro Max` frame pada layar desktop, dan *native full-screen* pada perangkat mobile) dengan 5 tab navigasi bawah (*Bottom Navigation Bar*):
 
-#### 3. `categories`
-Menyimpan kategori transaksi baik bawaan sistem (*global*) maupun buatan pengguna (*custom*).
-- `id` (UUID, Primary Key)
-- `user_id` (UUID, Foreign Key $\rightarrow$ `users.id`, Nullable — bernilai NULL jika kategori *default* bawaan sistem)
-- `name` (VARCHAR, Not Null — contoh: "Makanan & Minuman", "Gaji")
-- `type` (ENUM: `'income'`, `'expense'`)
-- `icon` (VARCHAR, Nullable — penanda ikon UI)
-- `color` (VARCHAR, Nullable — kode warna hex)
-
-#### 4. `transactions`
-Buku besar utama pencatatan mutasi keuangan.
-- `id` (UUID, Primary Key)
-- `user_id` (UUID, Foreign Key $\rightarrow$ `users.id`, Index)
-- `wallet_id` (UUID, Foreign Key $\rightarrow$ `wallets.id`, Index)
-- `category_id` (UUID, Foreign Key $\rightarrow$ `categories.id`, Index)
-- `amount` (NUMERIC(15, 2), Not Null)
-- `type` (ENUM: `'income'`, `'expense'`, `'transfer'`)
-- `description` (TEXT, Nullable)
-- `transaction_date` (DATE, Not Null)
-- `source` (ENUM: `'manual_web'`, `'ai_chat'`, `'ai_voice'`, `'telegram_bot'`) — Melacak asal input untuk analitik penggunaan fitur.
-- `created_at` (TIMESTAMP WITH TIME ZONE, Default: `NOW()`)
-
-#### 5. `budgets`
-Menyimpan alokasi target batas pengeluaran bulanan per kategori.
-- `id` (UUID, Primary Key)
-- `user_id` (UUID, Foreign Key $\rightarrow$ `users.id`, Index)
-- `category_id` (UUID, Foreign Key $\rightarrow$ `categories.id`, Index)
-- `amount_limit` (NUMERIC(15, 2), Not Null)
-- `month` (INT, Not Null, Range 1–12)
-- `year` (INT, Not Null)
-- `is_ai_generated` (BOOLEAN, Default: `FALSE`)
-- `created_at` (TIMESTAMP WITH TIME ZONE, Default: `NOW()`)
-
-#### 6. `ai_chat_logs`
-Menyimpan histori interaksi asisten AI untuk audit dan analisis konteks percakapan.
-- `id` (UUID, Primary Key)
-- `user_id` (UUID, Foreign Key $\rightarrow$ `users.id`, Index)
-- `platform` (ENUM: `'web'`, `'telegram'`)
-- `role` (ENUM: `'user'`, `'assistant'`)
-- `message` (TEXT, Not Null)
-- `extracted_metadata` (JSONB, Nullable — menyimpan payload JSON hasil ekstraksi parameter LLM)
-- `created_at` (TIMESTAMP WITH TIME ZONE, Default: `NOW()`)
+1. **🏠 Dashboard (`/dashboard`)**:
+   - *Quick AI Input Bar* (Teks & Rekam Suara langsung di atas halaman).
+   - *Hero Card* Total Saldo Gabungan dengan *Privacy Eye Toggle* (sensor nominal default).
+   - Ringkasan Pemasukan & Pengeluaran bulan berjalan + 3 tombol aksi cepat (`+ Masuk`, `- Keluar`, `⇄ Transfer`).
+   - Grid Dompet & Rekening beserta badge peruntukan (`Tabungan`, `Tagihan`).
+   - Visualisasi Grafik *Donut Category Breakdown* & *7-Days Cashflow Bar Chart* serta 5 transaksi terakhir.
+2. **🧭 Proyeksi (`/forecast`)**:
+   - *Hero Card* **Batas Belanja Hari Ini** (`/ hari Ideal`), bar progres pemakaian hari ini, *Saldo Operasional Bebas*, *Daya Tahan Uang (Runway)*, dan *Tabungan Tersimpan*.
+   - Strip rincian amplop (`Operasional`, `Tabungan`, `Tagihan`) + tombol **`⚙️ Atur Dompet`** untuk mengubah fungsi dompet secara instan.
+   - Tombol **`Blueprint`** untuk mengatur multi-sumber pendapatan (harian/mingguan/bulanan), target tabungan, dan tanggal gajian.
+   - **Tab 1 (📅 Harian)**: Buku besar realisasi pengeluaran harian vs plafon ideal harian + indikator jadwal pemasukan cair.
+   - **Tab 2 (📋 Tagihan Pasti)**: Checklist 1-Tap Lunas/Belum Lunas dengan pemilihan dompet pembayar otomatis.
+   - **Tab 3 (💡 Simulasi)**: Kalkulator *"Bisa Beli Nggak?"* dan daftar Wishlist barang impian.
+3. **✨ FinAI (`/ai`)**:
+   - Antarmuka *conversational assistant* dengan dukungan mikrofon suara dan teks.
+   - *Smart Budget Generator* untuk menyusun alokasi anggaran otomatis berbasis persentase kategori.
+4. **🧾 Transaksi (`/transactions`)**:
+   - Riwayat lengkap seluruh transaksi dengan pencarian kata kunci, filter tipe (`INCOME`, `EXPENSE`), dan penghapusan transaksi (otomatis mengembalikan saldo dompet).
+5. **⚙️ Pengaturan (`/settings`)**:
+   - Kartu penautan **Bot Telegram** via kode OTP 6 digit.
+   - Manajemen **Dompet & Rekening** (Tambah, Edit detail & peruntukan amplop, Dropdown cepat ganti fungsi dompet, Hapus).
+   - Manajemen **Kategori** kustom.
+   - *Danger Zone*: **Reset Seluruh Data Finansial** untuk mengembalikan akun bersih seperti baru.
 
 ---
 
-## 9. Skema Arsitektur Backend — FastAPI
+## 6. Spesifikasi Endpoint REST API (`/api/v1`)
 
-Arsitektur backend mengadopsi pola **Layered Modular Architecture** (4 Lapisan) agar logika inti dapat digunakan secara terpadu oleh Web API, AI Voice/Chatbot, dan Bot Telegram.
-
-### 9.1. Diagram Aliran Data & Pemrosesan
-
-```mermaid
-flowchart TD
-    subgraph Clients["Entrypoints / Clients"]
-        WebClient["Web Client (Next.js PWA)"]
-        TGUser["Telegram App (User)"]
-        TGServer["Telegram Server"]
-    end
-
-    subgraph Layer1["1. API & Webhook Router Layer"]
-        AuthRouter["Auth Router (/auth)"]
-        FinanceRouter["Core Finance Router (/finance)"]
-        AIRouter["AI Interaction Router (/ai)"]
-        TGWebhook["Telegram Webhook Receiver (/webhook/telegram)"]
-    end
-
-    subgraph Layer2["2. AI Orchestrator & Pipeline Layer"]
-        STTService["STT Service (Whisper API)"]
-        IntentRouter{"Intent Router & Classifier"}
-        ExtractPipeline["Structured Extraction Pipeline (LLM)"]
-        QAPipeline["Financial Q&A Engine (Function Calling)"]
-        BudgetEngine["Smart Budget Engine"]
-    end
-
-    subgraph Layer3["3. Business Logic / Service Layer"]
-        TxService["Transaction & Ledger Service (Atomic)"]
-        BudgetService["Budget Monitor & Alert Service"]
-    end
-
-    subgraph Layer4["4. Data Access Layer"]
-        Postgres[(PostgreSQL)]
-        RedisStore[(Redis Cache & Session)]
-    end
-
-    WebClient -->|HTTP / JSON| AuthRouter
-    WebClient -->|HTTP / REST| FinanceRouter
-    WebClient -->|Text / Audio Blob| AIRouter
-    TGUser --> TGServer -->|Webhook POST| TGWebhook
-
-    AIRouter --> STTService
-    AIRouter --> IntentRouter
-    TGWebhook --> STTService
-    TGWebhook --> IntentRouter
-
-    STTService --> IntentRouter
-    IntentRouter -->|Niat: Catat Transaksi| ExtractPipeline
-    IntentRouter -->|Niat: Tanya Saldo / Analitik| QAPipeline
-    IntentRouter -->|Niat: Rekomendasi Budget| BudgetEngine
-
-    ExtractPipeline --> TxService
-    TxService --> BudgetService
-    QAPipeline --> Postgres
-    BudgetEngine --> Postgres
-
-    TxService --> Postgres
-    BudgetService --> RedisStore
-    AuthRouter --> RedisStore
-    AuthRouter --> Postgres
-    FinanceRouter --> Postgres
-```
-
-### 9.2. Rincian Lapisan Arsitektur
-
-#### A. API & Webhook Router Layer (Pintu Masuk Request)
-- **Auth Module:** Menangani registrasi, login, verifikasi dan penerbitan token JWT, serta pembuatan kode *pairing* 6-digit untuk menautkan akun pengguna dengan Telegram.
-- **Core Finance Module:** Kumpulan *endpoint* CRUD standar untuk mengelola data Dompet, Kategori, Transaksi manual, dan ringkasan metrik Dashboard.
-- **AI Interaction Module:** Menerima pesan teks obrolan, *streaming* jawaban, unggahan *file blob audio* dari mikrofon web, serta generator anggaran otomatis.
-- **Telegram Webhook Receiver:** Satu *endpoint* terpusat yang menerima *payload event* dari server Telegram (pesan teks, *voice note* format `.ogg`, atau perintah khusus seperti `/start`).
-
-#### B. AI Orchestrator & Pipeline Layer (Otak Pemrosesan AI)
-- **Speech-to-Text Service:** Menerima *file audio* (`.webm` dari Web atau `.ogg` dari Telegram), melakukan validasi durasi (maksimal 30 detik), meneruskan ke Groq Whisper API, dan mengembalikan teks bersih.
-- **Intent Router & Classifier:** Menganalisis teks pengguna untuk menentukan niat utama:
-  1. *Intent Catat Transaksi:* Mengambil daftar dompet & kategori aktif milik pengguna dari database, menyuntikkannya ke dalam *system prompt*, lalu mengekstrak data terstruktur (*Nominal, Kategori, Dompet, Catatan*) melalui skema Pydantic.
-  2. *Intent Tanya Data (Q&A):* Memanggil *Query Tools* (fungsi Python berizin *read-only* yang mengeksekusi agregasi data berdasarkan filter tanggal/kategori), kemudian menyusun jawaban naratif yang informatif.
-  3. *Intent Buat Budget:* Mengambil histori rata-rata pengeluaran pengguna, memadukannya dengan batasan/keinginan pengguna, dan menghasilkan rekomendasi draf anggaran per kategori.
-
-#### C. Business Logic / Service Layer (Single Source of Truth)
-- **Transaction & Balance Service:** Setiap kali ada transaksi baru (baik dari form manual Web maupun hasil ekstraksi AI), layanan ini menyimpan baris data transaksi sekaligus memperbarui (*INCREMENT* / *DECREMENT*) saldo pada tabel `wallets` di dalam satu transaksi database tunggal (*Atomic Database Transaction*) untuk mencegah inkonsistensi saldo.
-- **Budget Monitor Service:** Memeriksa dan menghitung persentase pemakaian batas anggaran secara otomatis saat pengeluaran baru tercatat. Jika pemakaian telah mencapai ambang batas (misal: $\ge 80\%$ atau $\ge 100\%$), sistem menyisipkan pesan peringatan (*alert warning*) ke dalam respons obrolan Web atau bot Telegram.
-
-#### D. Data Access Layer (Repository)
-- Mengabstraksi seluruh kueri SQL ke PostgreSQL melalui SQLAlchemy / SQLModel.
-- Mengelola *session*, penyimpanan *chat memory* riwayat obrolan terkini, dan token OTP pairing di Redis.
-
----
-
-## 10. Skema Arsitektur Frontend — Next.js PWA
-
-Arsitektur antarmuka dirancang dengan pendekatan **Mobile-First Responsive Layout** (menggunakan *Sidebar* permanen pada layar *Desktop* dan *Bottom Navigation Bar* pada layar *Mobile / PWA*).
-
-### 10.1. Struktur Halaman & Navigasi (App Router)
-
-```
-app/
-├── (auth)/
-│   ├── login/page.tsx           # Form masuk dengan validasi client-side
-│   └── register/page.tsx        # Form pendaftaran akun baru
-├── (dashboard)/
-│   ├── dashboard/page.tsx       # Ringkasan saldo, Quick AI Bar, grafik, transaksi terkini
-│   ├── ai-assistant/page.tsx    # Tab Chat Assistant & Tab Smart Budgeting
-│   ├── transactions/page.tsx    # Riwayat buku besar, filter tanggal/kategori, edit/hapus
-│   └── settings/page.tsx        # Manajemen dompet, kategori, dan pairing Telegram Bot
-├── layout.tsx                   # Shell layout (Sidebar Desktop / Bottom Bar Mobile)
-├── manifest.json                # Metadata instalasi PWA
-└── sw.ts                        # Service worker caching & offline fallback
-```
-
-### 10.2. Rincian Antarmuka Halaman
-
-1. **Halaman Autentikasi (`/login`, `/register`)**
-   - Form otentikasi bersih dengan validasi *client-side* (Zod & React Hook Form).
-   - Penanganan sesi JWT dan *redirect* otomatis ke *dashboard*.
-
-2. **Halaman Utama / Dashboard (`/dashboard`)**
-   - **Header Card:** Menampilkan total akumulasi saldo seluruh dompet (dilengkapi tombol *Hide/Show Balance*) dan karusel kartu per dompet.
-   - **Quick AI Bar:** Komponen input cepat di bagian atas layar yang dilengkapi tombol Mikrofon untuk langsung mengetik atau berbicara mencatat pengeluaran tanpa perlu berpindah menu.
-   - **Visualisasi Arus Kas:**
-     - *Donut Chart:* Komposisi pengeluaran per kategori bulan berjalan.
-     - *Bar Chart:* Tren arus kas (*Income vs Expense*) 7 hari terakhir.
-   - **Recent Transactions:** Daftar 5 transaksi terakhir yang dilengkapi *badge* sumber input (misal: ikon bot Telegram, ikon AI Voice, atau ikon Web).
-
-3. **Halaman AI Assistant & Budgeting (`/ai-assistant`)**
-   - **Tab Chat:** Antarmuka obrolan penuh dengan dukungan *streaming text* dan *Transaction Preview Card* interaktif saat AI berhasil mengekstrak transaksi baru.
-   - **Tab Smart Budget:** Form input parameter anggaran bulanan disertai kartu draf alokasi hasil generator AI yang dapat disesuaikan menggunakan *slider* sebelum disimpan ke database.
-
-4. **Halaman Riwayat Transaksi (`/transactions`)**
-   - Tabel dan daftar transaksi komprehensif yang dilengkapi filter rentang tanggal, filter dompet, dan filter kategori.
-   - Fitur pencarian deskripsi transaksi serta aksi *Edit* dan *Delete*.
-
-5. **Halaman Pengaturan & Integrasi (`/settings`)**
-   - Manajemen penambahan, pengubahan nama, dan penyesuaian saldo awal Dompet serta Kategori.
-   - **Kartu Integrasi Telegram:** Tombol *"Hubungkan ke Telegram"* yang menampilkan kode token *pairing* 6 digit unik serta tautan langsung (*deep link*) menuju bot Telegram.
-
-### 10.3. Komponen Fungsional Khusus
-
-- **Audio Recorder Engine:**  
-  Menggunakan browser *MediaRecorder API* untuk menangkap suara langsung dari mikrofon perangkat pengguna, menampilkan visualisasi indikator gelombang suara (*recording state*), mengonversi audio ke format `.webm`, dan mengirimkan audio blob ke endpoint FastAPI.
-- **PWA Service Worker & Web Manifest:**  
-  Mengonfigurasi `manifest.json` agar aplikasi dapat dipasang (*Add to Home Screen*) pada perangkat Android & iOS, menyajikan *splash screen* bermerek, serta menerapkan strategi *caching* aset statis agar aplikasi dapat dibuka secara instan dan responsif.
-
+| Grup Modul | Method & Endpoint | Deskripsi Fungsi Bisnis |
+| :--- | :--- | :--- |
+| **Auth** | `POST /auth/register` | Registrasi user + auto-seed dompet Tunai & kategori dasar |
+| | `POST /auth/login` | Autentikasi email/password & penerbitan JWT Bearer Token |
+| | `GET /auth/me` | Profil pengguna yang sedang login |
+| | `POST /auth/reset-data` | Hapus seluruh data finansial user & reset ke 1 dompet Tunai Rp0 |
+| **Wallets** | `GET /wallets` | Daftar seluruh dompet milik user |
+| | `POST /wallets` | Buat dompet baru beserta tipe & `purpose` (`operational`/`savings`/`subscription`) |
+| | `PUT /wallets/{id}` | Ubah nama, tipe, saldo, atau peruntukan (`purpose`) dompet |
+| | `DELETE /wallets/{id}` | Hapus dompet |
+| **Transactions** | `GET /transactions` | Daftar transaksi dengan filter tanggal, tipe, dompet, kategori |
+| | `POST /transactions` | Catat pemasukan, pengeluaran, atau transfer antar-dompet |
+| | `DELETE /transactions/{id}` | Hapus transaksi & kembalikan (*rollback*) saldo dompet secara atomik |
+| **Dashboard** | `GET /dashboard/summary` | Agregasi saldo, arus kas bulanan, breakdown kategori, dan tren 7 hari |
+| **Forecast & Runway** | `GET /forecast/summary` | Mesin utama penghitung jatah ideal harian, runway, amplop saldo, & prediksi tabungan |
+| | `GET /forecast/daily-ledger` | Rekap perbandingan belanja aktual vs ideal per tanggal dalam 1 siklus |
+| | `GET, PUT /forecast/plan` | Ambil & simpan parameter Blueprint Keuangan |
+| | `GET, POST, DELETE /forecast/income-streams` | Kelola multi-sumber pendapatan (harian, mingguan, bulanan) |
+| | `GET, POST, DELETE /forecast/fixed-expenses` | Kelola daftar tagihan pasti & dompet pembayarnya |
+| | `POST /forecast/fixed-expenses/{id}/toggle-paid` | 1-Tap toggle lunas tagihan (auto-debit/refund dompet & catat transaksi) |
+| | `POST /forecast/simulate` | Kalkulator simulasi belanja *"Bisa Beli Nggak?"* |
+| | `GET, POST, DELETE /forecast/wishlists` | Kelola daftar barang impian (Wishlist) |
+| **AI Assistant** | `POST /ai/chat` | Pemrosesan perintah teks natural (catat transaksi, buat dompet, tanya keuangan) |
+| | `POST /ai/voice` | Upload rekaman suara $\rightarrow$ Transkripsi Groq Whisper $\rightarrow$ Eksekusi AI Chat |
+| | `POST /ai/budget-plan` | Rekomendasi pembagian anggaran otomatis berbasis AI |
+| **Telegram** | `POST /telegram/pairing-code` | Buat kode OTP 6 digit di Redis untuk penautan akun Telegram |
+| | `GET /telegram/status` | Cek status keterhubungan akun dengan Bot Telegram |
+| | `DELETE /telegram/unlink` | Putuskan tautan Bot Telegram dari akun |

@@ -50,7 +50,13 @@ class FixedExpense(SQLModel, table=True):
         sa_column=Column(Numeric(15, 2), nullable=False),
     )
     due_day_of_month: Optional[int] = Field(default=None, ge=1, le=31)
-    frequency: str = Field(default="monthly", max_length=20)
+    frequency: str = Field(default="monthly", max_length=20)  # monthly, biweekly, weekly, every_n_days
+    interval_value: Optional[int] = Field(default=None, description="Nilai interval: misal 4 jika tiap 4 hari, atau 0-6 (Senin-Minggu) jika mingguan")
+    anchor_date: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), nullable=True),
+        description="Tanggal patokan/terakhir pelaksanaan siklus untuk kalkulasi kelipatan hari"
+    )
     is_paid_this_cycle: bool = Field(default=False, nullable=False)
     last_paid_at: Optional[datetime] = Field(
         default=None,

@@ -13,6 +13,7 @@ class IncomeStreamBase(BaseModel):
     amount: Decimal = Field(..., gt=0, description="Nominal per siklus penerimaan")
     frequency: str = Field(default="monthly", description="daily, weekly, biweekly, monthly")
     receive_day: Optional[int] = Field(default=None, description="Tanggal (1-31) jika bulanan, atau hari (0=Senin, 6=Minggu) jika mingguan")
+    wallet_id: Optional[uuid.UUID] = Field(default=None, description="Dompet tujuan pencairan pemasukan")
     is_active: bool = Field(default=True)
 
 
@@ -25,12 +26,14 @@ class IncomeStreamUpdate(BaseModel):
     amount: Optional[Decimal] = None
     frequency: Optional[str] = None
     receive_day: Optional[int] = None
+    wallet_id: Optional[uuid.UUID] = None
     is_active: Optional[bool] = None
 
 
 class IncomeStreamResponse(IncomeStreamBase):
     id: uuid.UUID
     user_id: uuid.UUID
+    wallet_name: Optional[str] = None
     monthly_equivalent: Decimal = Field(default=Decimal("0.00"), description="Estimasi setara bulanan otomatis")
     created_at: datetime
     updated_at: datetime
@@ -79,7 +82,9 @@ class FixedExpenseBase(BaseModel):
     category_id: Optional[uuid.UUID] = None
     wallet_id: Optional[uuid.UUID] = Field(default=None, description="Dompet pembayar khusus (misal: Subscription / BCA)")
     due_day_of_month: Optional[int] = Field(default=None, ge=1, le=31)
-    frequency: str = Field(default="monthly")
+    frequency: str = Field(default="monthly", description="monthly, weekly, biweekly, every_n_days")
+    interval_value: Optional[int] = Field(default=None, ge=1, description="Interval hari jika frequency=every_n_days (cth: 4 hari)")
+    anchor_date: Optional[datetime] = Field(default=None, description="Tanggal patokan awal siklus berkala")
     is_paid_this_cycle: bool = Field(default=False)
 
 
@@ -94,6 +99,8 @@ class FixedExpenseUpdate(BaseModel):
     wallet_id: Optional[uuid.UUID] = None
     due_day_of_month: Optional[int] = Field(default=None, ge=1, le=31)
     frequency: Optional[str] = None
+    interval_value: Optional[int] = None
+    anchor_date: Optional[datetime] = None
     is_paid_this_cycle: Optional[bool] = None
 
 
@@ -138,6 +145,49 @@ class WishlistResponse(WishlistBase):
     user_id: uuid.UUID
     is_purchased: bool
     purchased_at: Optional[datetime] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ==============================================================================
+# Planned Transaction Schemas (Rencana Transaksi Masa Depan)
+# ==============================================================================
+class PlannedTransactionBase(BaseModel):
+    name: str = Field(..., max_length=150, description="Nama rencana transaksi (cth: Servis Motor, Beli Buku)")
+    amount: Decimal = Field(..., gt=0, description="Nominal rencana transaksi")
+    type: str = Field(default="EXPENSE", description="EXPENSE | INCOME | TRANSFER")
+    wallet_id: Optional[uuid.UUID] = Field(default=None, description="Dompet sumber pengeluaran / tujuan pemasukan")
+    to_wallet_id: Optional[uuid.UUID] = Field(default=None, description="Dompet tujuan jika type=TRANSFER")
+    category_id: Optional[uuid.UUID] = None
+    planned_date: date = Field(..., description="Tanggal rencana transaksi dilakukan")
+    is_completed: bool = Field(default=False)
+    notes: Optional[str] = None
+
+
+class PlannedTransactionCreate(PlannedTransactionBase):
+    pass
+
+
+class PlannedTransactionUpdate(BaseModel):
+    name: Optional[str] = None
+    amount: Optional[Decimal] = None
+    type: Optional[str] = None
+    wallet_id: Optional[uuid.UUID] = None
+    to_wallet_id: Optional[uuid.UUID] = None
+    category_id: Optional[uuid.UUID] = None
+    planned_date: Optional[date] = None
+    is_completed: Optional[bool] = None
+    notes: Optional[str] = None
+
+
+class PlannedTransactionResponse(PlannedTransactionBase):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    wallet_name: Optional[str] = None
+    to_wallet_name: Optional[str] = None
+    category_name: Optional[str] = None
     created_at: datetime
 
     class Config:
