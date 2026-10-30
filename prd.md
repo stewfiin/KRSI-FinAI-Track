@@ -1,7 +1,7 @@
 # Product Requirements Document (PRD) & Arsitektur Proses Bisnis: FinAI Track
 
 **Nama Produk**: FinAI Track — *Smart Personal Finance & AI Runway Assistant*  
-**Versi Dokumen**: 2.0 (Full-Stack MVP + Envelope Banking & Multi-Stream Runway Engine)  
+**Versi Dokumen**: 2.1 (Full-Stack MVP + Envelope Banking, Periodic Living Cycles & Time-Series Cashflow Engine)  
 **Target Platform**: Mobile-First Web Application (Next.js) & Omnichannel Bot (Telegram)  
 
 ---
@@ -11,7 +11,7 @@
 **FinAI Track** adalah aplikasi manajemen keuangan pribadi cerdas berbasis AI yang dirancang khusus untuk menjawab tiga masalah utama pengguna sehari-hari:
 1. **Friksi Pencatatan Transaksi**: Mencatat pengeluaran manual terasa merepotkan. FinAI Track menyelesaikannya dengan input bahasa alami (*Natural Language Processing*), pesan suara (*Voice Note* via Groq Whisper), dan integrasi **Bot Telegram**.
 2. **Ilusi Saldo Gabungan**: Banyak pengguna merasa uangnya masih banyak di rekening, padahal sebagian adalah uang tabungan atau uang tagihan rutin (seperti iCloud, listrik, kos). FinAI Track menerapkan **Pocket / Envelope Banking** yang memisahkan dompet `operational`, `savings`, dan `subscription`.
-3. **Ketidakpastian Bertahan Hidup Sampai Gajian (*Financial Runway*)**: Aplikasi keuangan biasa hanya mencatat masa lalu (*backward-looking*). FinAI Track memiliki **Dynamic Daily Runway Engine** (*forward-looking*) yang menghitung secara *real-time* berapa batas belanja ideal hari ini, berapa hari uang akan bertahan, dan simulasi *"Bisa Beli Nggak?"* sebelum pengguna berbelanja.
+3. **Ketidakpastian Bertahan Hidup Sampai Gajian & Simulasi Saldo Masa Depan (*Time-Series Ledger*)**: Aplikasi keuangan biasa hanya memotret masa lalu (*backward-looking*) atau rata-rata statis. FinAI Track memiliki **Time-Series & Cyclical Cashflow Engine** yang memisahkan jatah makan dasar dengan siklus biaya hidup berkala (bensin tiap $N$ hari, pulsa 2-mingguan, galon mingguan), memproyeksikan saldo berjalan (*running balance*) per dompet hingga $N$ hari ke depan, serta memungkinkan pengujian skenario transaksi masa depan (*Planned Transactions*).
 
 ---
 
@@ -43,11 +43,13 @@ flowchart TD
         TeleBot["🤖 Bot Telegram (@FinAi_track_bot via OTP Pairing)"]
     end
 
-    subgraph CoreEngine["4. Core Ledger & Forecast Engine"]
+    subgraph CoreEngine["4. Core Ledger & Time-Series Engine"]
         TxService["⚙️ Transaction Service (Atomic Balance Update)"]
-        FixedToggle["📋 1-Tap Checklist Tagihan Pasti (Auto-Debit & Refund)"]
-        MultiIncome["💵 Multi-Stream Income (Harian, Mingguan, 2-Mingguan, Bulanan)"]
-        RunwayCalc["🧭 Dynamic Daily Runway & Burn Rate Engine"]
+        FixedToggle["📋 Tagihan Bulanan & Siklus Berkala (Bensin, Pulsa, Galon)"]
+        MultiIncome["💵 Multi-Stream Income (Harian, Mingguan, Bulanan + Dompet Tujuan)"]
+        PlannedTx["📅 Rencana Transaksi Masa Depan (Plan -> Simulate -> Execute)"]
+        RunwayCalc["🧭 Dynamic Daily Runway & Cyclical Buffer Engine"]
+        TimeSeriesLedger["🔮 Forward Time-Series Ledger (Multi-Wallet Running Balance)"]
         Simulator["💡 Simulasi Belanja What-If (Bisa Beli Nggak?)"]
     end
 
@@ -57,10 +59,14 @@ flowchart TD
     InputChannels --> TxService
     TxService --> Envelope
     Envelope --> RunwayCalc
-    MultiIncome --> RunwayCalc
+    Envelope --> TimeSeriesLedger
+    MultiIncome --> TimeSeriesLedger
+    FixedToggle --> TimeSeriesLedger
+    PlannedTx --> TimeSeriesLedger
     FixedToggle --> TxService
     FixedToggle --> RunwayCalc
     RunwayCalc --> Simulator
+    TimeSeriesLedger --> PlannedTx
 ```
 
 ---
@@ -124,46 +130,72 @@ sequenceDiagram
 
 ---
 
-### 3.4. Modul Proyeksi, Multi-Sumber Pendapatan & Runway Finansial
+### 3.4. Modul Proyeksi, Siklus Biaya Hidup Berkala & Time-Series Cashflow Engine
 * **Kode Terkait**: `backend/app/services/forecast_service.py`, `backend/app/api/v1/forecast.py`, `frontend/app/forecast/page.tsx`
 
-Modul ini adalah inti kecerdasan finansial FinAI Track yang menggantikan pencatatan spreadsheet manual menjadi otomatis:
+Modul ini adalah inti kecerdasan finansial FinAI Track yang mengubah pencatatan keuangan konvensional menjadi simulasi buku besar masa depan (*forward-looking time-series ledger*) dengan akurasi tinggi:
 
-#### A. Multi-Stream Income (Aliran Pendapatan Multi-Siklus)
+#### A. Multi-Stream Income (Aliran Pendapatan Multi-Siklus + Dompet Tujuan)
 Pengguna yang memiliki lebih dari 1 sumber pemasukan dengan jadwal berbeda dapat mendaftarkan rincian aliran pendapatan (`IncomeStream`):
 - **Harian (`daily`)**: $\text{Ekuivalen Bulanan} = \text{Nominal} \times \text{Total Hari Siklus}$
-- **Mingguan (`weekly`)**: $\text{Ekuivalen Bulanan} = \text{Nominal} \times (\frac{\text{Total Hari Siklus}}{7})$ (dilengkapi penanda hari cair, misal setiap Senin).
-- **2-Mingguan (`biweekly`)**: $\text{Ekuivalen Bulanan} = \text{Nominal} \times (\frac{\text{Total Hari Siklus}}{14})$
+- **Mingguan (`weekly`)**: $\text{Ekuivalen Bulanan} = \text{Nominal} \times (\frac{\text{Total Hari Siklus}}{7})$ (dilengkapi penanda hari cair 1=Senin s/d 7=Minggu).
+- **2-Mingguan (`biweekly`)**: $\text{Ekuivalen Bulanan} = \text{Nominal} \times (\frac{\text{Total Hari Siklus}}{14})$ (dilengkapi tanggal acuan awal `anchor_date`).
 - **Bulanan (`monthly`)**: $\text{Ekuivalen Bulanan} = \text{Nominal}$ (dilengkapi tanggal gajian 1–31).
+- **Target Dompet Penerima (`wallet_id`)**: Setiap pendapatan dapat ditautkan ke dompet spesifik (misal Gaji Bulanan masuk ke `BCA`, Pendapatan Freelance masuk ke `GoPay`), sehingga saat disimulasikan pada rentang tanggal, dana otomatis menambah saldo dompet yang bersangkutan.
 
-Jadwal pencairan ini otomatis ditandai pada **Rekap Pengeluaran Harian** di tanggal uang tersebut dijadwalkan masuk.
+#### B. Tagihan Bulanan vs Siklus Biaya Hidup Berkala (*Periodic Living Cycles*)
+Sistem membedakan dua jenis pengeluaran rutin:
+1. **Tagihan Pasti Bulanan (`frequency_type="monthly"`)**:
+   - Tagihan yang jatuh tempo pada tanggal tertentu (1–31) setiap bulan (misal: *iCloud*, *Kost*, *Wi-Fi*).
+   - Memiliki fitur **1-Tap Checklist Lunas / Belum Lunas** dengan auto-debit dan instant refund pada dompet pembayar.
+2. **Siklus Biaya Hidup Berkala (`every_n_days`, `weekly`, `biweekly`)**:
+   - Pengeluaran variabel berulang jarak pendek/menengah yang tidak bisa disamaratakan ke uang makan harian:
+     - **Interval $N$ Hari (`every_n_days`)**: Misal *Bensin Rp35.000 setiap 4 hari* (menggunakan `anchor_date` untuk menghitung hari jatuh tempo: `(t - anchor_date).days % interval == 0`).
+     - **Mingguan (`weekly`)**: Misal *Belanja Pasar / Galon Rp60.000 setiap hari Sabtu*.
+     - **2-Mingguan (`biweekly`)**: Misal *Pulsa & Kuota Rp50.000 setiap 14 hari*.
+   - Setiap siklus ditautkan langsung ke dompet asal (`wallet_id`), sehingga beban lonjakan biaya hidup memotong dompet yang tepat.
 
-#### B. Tagihan Pasti (*Fixed Expenses*) dengan Auto-Debit Dompet
-1. Pengguna mendaftarkan tagihan rutin bulanan (misal: *iCloud Rp45.000*, *Token Listrik Rp100.000*) dan memilih **Dompet Pembayar** (misal: dompet `Subscription`).
-2. **Logika Pencadangan (*Buffer*)**:
-   - Selama tagihan berstatus **Belum Lunas**, nominalnya dicadangkan sebagai *Unpaid Buffer*.
-   - Jika tagihan ditautkan ke dompet `Subscription`, maka beban tagihan ditanggung oleh saldo dompet `Subscription` terlebih dahulu. Hanya jika saldo `Subscription` kurang, selisih kekurangannya baru memotong saldo `Operasional`.
-3. **1-Tap Toggle Lunas / Belum Lunas**:
-   - **Dicentang Lunas**: Sistem otomatis memotong saldo dompet pembayar (`wallet.balance -= expense.amount`), membuat riwayat transaksi pengeluaran (`Pembayaran tagihan: [Nama]`), dan menyimpan `paid_transaction_id`.
-   - **Centang Dibatalkan**: Sistem otomatis me-*refund* saldo kembali ke dompet pembayar (`wallet.balance += tx.amount`) dan menghapus transaksi terkait.
+#### C. Pemisahan "Uang Makan Dasar" & Dynamic Daily Runway
+Untuk mencegah uang bensin dan pulsa terbagi ke jatah makan harian, sistem memisahkan **Patokan Makan & Jajan Harian Dasar** (`daily_living_budget`) dari siklus berkala:
 
-#### C. Rumus Matematika *Dynamic Daily Runway*
-Sistem menghitung batas belanja ideal hari ini berdasarkan uang riil yang siap dipakai:
+$$\text{Cyclical Buffer} = \sum \text{Estimasi Biaya Siklus Berkala yang Jatuh Tempo pada Sisa Siklus}$$
 
-$$\text{Safe to Spend Operasional} = \max\left(0, \text{Saldo Dompet Operasional} - \text{Sisa Tagihan Beban Operasional}\right)$$
+$$\text{Safe to Spend Murni} = \max\left(0, \text{Saldo Operasional Bebas} - \text{Sisa Tagihan Bulanan} - \text{Cyclical Buffer}\right)$$
 
-$$\text{Daily Cash Runway} = \frac{\text{Safe to Spend Operasional}}{\text{Sisa Hari dalam Siklus}}$$
+$$\text{Daily Cash Runway} = \frac{\text{Safe to Spend Murni}}{\text{Sisa Hari dalam Siklus}}$$
 
-- Jika pengguna menetapkan patokan batas harian di Blueprint ($\text{Daily Living Budget} > 0$), maka:
-  $$\text{Batas Belanja Ideal Hari Ini} = \min\left(\text{Daily Living Budget}, \text{Daily Cash Runway}\right)$$
-- Jika patokan harian diatur `0`, maka sistem otomatis menggunakan **$\text{Daily Cash Runway}$** secara penuh.
-- **Daya Tahan Uang (*Runway Days*)**:
-  $$\text{Runway Days} = \frac{\text{Safe to Spend Operasional}}{\text{Rata-rata Laju Pengeluaran 7 Hari Terakhir (Burn Rate)}}$$
+$$\text{Batas Belanja Ideal Hari Ini} = \begin{cases} \min(\text{daily\_living\_budget}, \text{Daily Cash Runway}) & \text{jika } \text{daily\_living\_budget} > 0 \\ \text{Daily Cash Runway} & \text{jika } \text{daily\_living\_budget} = 0 \end{cases}$$
 
-#### D. Simulasi Belanja *"Bisa Beli Nggak?"* (*What-If Simulator*) & Wishlist
-Sebelum membeli barang (misal: *Sepatu Rp350.000*), pengguna dapat menguji dampaknya dari dua sumber dana:
-1. **Ambil dari Tabungan (`savings_pool`)**: Menguji apakah saldo dompet `Savings` mencukupi dan apakah sisa tabungan masih di atas ambang aman (minimal 50% tersisa untuk status `safe`). Tidak memotong jatah makan harian.
-2. **Ambil dari Uang Jajan Operasional (`operational_wallet`)**: Menghitung berapa penurunan jatah belanja harian untuk sisa hari bulan ini jika barang tersebut dibeli dari kas operasional. Memberikan vonis instan: `✅ Aman Dibeli`, `⚠️ Jatah Harian Menjadi Ketat`, atau `❌ Jangan Beli (Boncos)`.
+Dengan formula ini, dana bensin dan kuota sudah diamankan (*reserved*) terlebih dahulu, sehingga pengguna tidak mengalami ilusi bahwa mereka memiliki uang makan lebih besar dari kenyataannya.
+
+#### D. Forward-Looking Time-Series Engine (Simulasi Buku Besar Masa Depan)
+Fitur `POST /api/v1/forecast/range-projection` memungkinkan pengguna memprediksi saldo berjalan (*running balance*) hari-demi-hari untuk rentang waktu kustom ($t_0 \rightarrow t_n$):
+- **Cakupan Dompet Fleksibel**:
+  - `all_operational`: Menggabungkan seluruh dompet kas operasional.
+  - `all_savings`: Khusus memproyeksikan saldo tabungan.
+  - `all_wallets`: Menggabungkan seluruh aset.
+  - Dompet Spesifik (UUID): Memilih satu dompet tertentu (misal: hanya dompet `BCA` atau `Tunai`).
+  - `custom_balance`: Saldo simulasi bayangan (misal: menginput Rp1.500.000 tanpa mengubah data riil database).
+- **Rumus Saldo Berjalan Harian (*Rolling Balance Formula*)**:
+  $$\text{Saldo Akhir}_W(t) = \text{Saldo Akhir}_W(t-1) + \text{Inflow}_W(t) - \text{Outflow}_W(t)$$
+  Di mana untuk setiap tanggal $t$:
+  $$\text{Inflow}_W(t) = \text{IncomeStream}_W(t) + \text{Rencana Pemasukan/Transfer Masuk}_W(t)$$
+  $$\text{Outflow}_W(t) = \text{Jatah Makan Harian}_W + \text{Siklus Berkala}_W(t) + \text{Tagihan Bulanan}_W(t) + \text{Rencana Pengeluaran/Transfer Keluar}_W(t)$$
+- **Pencegahan Pengurangan Ganda (*Double-Deduction Prevention*)**:
+  Pada hari pertama ($t_0$), jika sistem mendeteksi sudah ada transaksi riil yang tercatat di database, komponen jatah makan dasar harian tidak dikurangkan lagi agar pengeluaran riil tidak terpotong dua kali.
+
+#### E. Siklus Hidup Rencana Transaksi Masa Depan (*Planned Transactions*)
+Pengguna dapat menguji dampak rencana transaksi dadakan (misal: *Servis Motor Rp150.000 di tanggal 12* atau *Transfer Rp300.000 ke Tabungan di tanggal 15*):
+1. **Plan & Simulate**: Disimpan ke tabel `PLANNED_TRANSACTIONS` dengan tanggal rencana (`planned_date`) dan dompet sumber/tujuan. Mesin Time-Series langsung memproyeksikan dampaknya ke saldo berjalan hari berikutnya dan menampilkan indikator status `SAFE` atau `DEFICIT` jika saldo anjlok ke bawah nol.
+2. **Execute (`POST /planned-transactions/{id}/execute`)**: Saat transaksi benar-benar terjadi di dunia nyata, pengguna cukup menekan tombol **⚡ Eksekusi**. Sistem secara atomik:
+   - Membuat baris riwayat di tabel `TRANSACTIONS`.
+   - Menyesuaikan saldo dompet terkait (`wallet.balance`).
+   - Menandai `is_executed = True` dan menautkan `executed_transaction_id`.
+
+#### F. Simulasi Belanja *"Bisa Beli Nggak?"* (*What-If Simulator*) & Wishlist
+Sebelum membeli barang sekunder/tersier (misal: *Sepatu Rp350.000*), pengguna dapat menguji kelayakannya:
+1. **Ambil dari Tabungan (`savings_pool`)**: Menguji apakah saldo tabungan mencukupi tanpa menurunkan rasio cadangan darurat di bawah 50%.
+2. **Ambil dari Operasional (`operational_wallet`)**: Menghitung dampak penurunan jatah makan harian untuk sisa bulan ini, dengan rekomendasi vonis: `✅ Aman Dibeli`, `⚠️ Jatah Harian Menjadi Ketat`, atau `❌ Jangan Beli (Boncos)`.
 
 ---
 
@@ -206,15 +238,19 @@ erDiagram
     USERS ||--o{ FINANCIAL_PLANS : configures
     USERS ||--o{ INCOME_STREAMS : receives
     USERS ||--o{ FIXED_EXPENSES : pays
-    USERS ||--o{ WISHLISTS : plans
+    USERS ||--o{ PLANNED_TRANSACTIONS : plans
+    USERS ||--o{ WISHLISTS : desires
     USERS ||--o{ AI_CHAT_LOGS : chats
 
     WALLETS ||--o{ TRANSACTIONS : funds
+    WALLETS ||--o{ INCOME_STREAMS : receives_to
     WALLETS ||--o{ FIXED_EXPENSES : assigned_to
+    WALLETS ||--o{ PLANNED_TRANSACTIONS : source_for
     CATEGORIES ||--o{ TRANSACTIONS : classifies
     CATEGORIES ||--o{ BUDGETS : limits
     CATEGORIES ||--o{ FIXED_EXPENSES : categorizes
     TRANSACTIONS ||--o| FIXED_EXPENSES : settles
+    TRANSACTIONS ||--o| PLANNED_TRANSACTIONS : executes
 
     USERS {
         uuid id PK
@@ -259,6 +295,7 @@ erDiagram
     INCOME_STREAMS {
         uuid id PK
         uuid user_id FK
+        uuid wallet_id FK
         string name
         decimal amount
         string frequency "daily | weekly | biweekly | monthly"
@@ -274,8 +311,24 @@ erDiagram
         uuid paid_transaction_id FK
         string name
         decimal amount
+        string frequency_type "monthly | every_n_days | weekly | biweekly"
+        int interval_value
+        date anchor_date
         int due_day_of_month
         boolean is_paid_this_cycle
+    }
+
+    PLANNED_TRANSACTIONS {
+        uuid id PK
+        uuid user_id FK
+        uuid wallet_id FK
+        uuid to_wallet_id FK
+        decimal amount
+        enum type "INCOME | EXPENSE | TRANSFER"
+        string description
+        date planned_date
+        boolean is_executed
+        uuid executed_transaction_id FK
     }
 
     WISHLISTS {
@@ -285,7 +338,7 @@ erDiagram
         decimal estimated_price
         string priority
         string target_source "savings_pool | operational_wallet"
-        boolean is_Completed
+        boolean is_completed
     }
 ```
 
@@ -304,10 +357,20 @@ Aplikasi dirancang dengan kerangka simulator smartphone (`iPhone 15 Pro Max` fra
 2. **🧭 Proyeksi (`/forecast`)**:
    - *Hero Card* **Batas Belanja Hari Ini** (`/ hari Ideal`), bar progres pemakaian hari ini, *Saldo Operasional Bebas*, *Daya Tahan Uang (Runway)*, dan *Tabungan Tersimpan*.
    - Strip rincian amplop (`Operasional`, `Tabungan`, `Tagihan`) + tombol **`⚙️ Atur Dompet`** untuk mengubah fungsi dompet secara instan.
-   - Tombol **`Blueprint`** untuk mengatur multi-sumber pendapatan (harian/mingguan/bulanan), target tabungan, dan tanggal gajian.
-   - **Tab 1 (📅 Harian)**: Buku besar realisasi pengeluaran harian vs plafon ideal harian + indikator jadwal pemasukan cair.
-   - **Tab 2 (📋 Tagihan Pasti)**: Checklist 1-Tap Lunas/Belum Lunas dengan pemilihan dompet pembayar otomatis.
-   - **Tab 3 (💡 Simulasi)**: Kalkulator *"Bisa Beli Nggak?"* dan daftar Wishlist barang impian.
+   - Tombol **`Blueprint`** untuk mengatur multi-sumber pendapatan (dengan pemilihan dompet tujuan), **Siklus Biaya Hidup Berkala** (Bensin, Pulsa, Galon), patokan makan harian dasar, target tabungan, dan tanggal gajian.
+   - **Tab 1: 📅 Proyeksi & Runway**:
+     - *Sub-View Switcher*: `🔮 Prediksi Saldo Masa Depan` vs `📜 Realisasi Siklus Berjalan`.
+     - *Filter Bar Proyeksi*: Pemilihan dompet (`Semua Operasional`, `Semua Tabungan`, `Semua Dompet`, dompet spesifik, atau `🧪 Saldo Kustom`), tombol preset rentang waktu (7 Hari, 14 Hari, Sisa Siklus, atau Tanggal Bebas), serta toggle hitung jatah makan harian.
+     - *Kartu Ringkasan Proyeksi*: Saldo Awal, Total Masuk, Total Keluar, Prediksi Saldo Akhir, dan status kelayakan (`✅ AMAN` / `⚠️ RISIKO DEFISIT`).
+     - *Timeline Buku Besar Berjalan (Forward Daily Ledger)*: Visualisasi hari-demi-hari mutasi masuk/keluar, badge event (`GAJI`, `MAKAN`, `BENSIN/SIKLUS`, `TAGIHAN`, `RENCANA`), dan saldo berjalan harian.
+     - *Manajemen Rencana Transaksi (Planned Transactions)*: Tombol `+ Rencana Transaksi` dan tombol aksi instan `⚡ Eksekusi` untuk merealisasikan rencana ke saldo dompet nyata.
+   - **Tab 2: 📋 Tagihan & Siklus**:
+     - Sub-filter tab (`Semua`, `Bulanan`, `Siklus`).
+     - Kartu item tagihan/siklus dengan badge frekuensi, dompet pembayar, dan tombol edit/hapus.
+     - 1-Tap Toggle Lunas/Belum Lunas khusus untuk tagihan bulanan.
+   - **Tab 3: 💡 Simulasi**:
+     - Kalkulator simulasi belanja *"Bisa Beli Nggak?"* (menguji pemotongan dari Tabungan vs Operasional).
+     - Daftar barang impian (*Wishlist*) terintegrasi.
 3. **✨ FinAI (`/ai`)**:
    - Antarmuka *conversational assistant* dengan dukungan mikrofon suara dan teks.
    - *Smart Budget Generator* untuk menyusun alokasi anggaran otomatis berbasis persentase kategori.
@@ -337,12 +400,16 @@ Aplikasi dirancang dengan kerangka simulator smartphone (`iPhone 15 Pro Max` fra
 | | `POST /transactions` | Catat pemasukan, pengeluaran, atau transfer antar-dompet |
 | | `DELETE /transactions/{id}` | Hapus transaksi & kembalikan (*rollback*) saldo dompet secara atomik |
 | **Dashboard** | `GET /dashboard/summary` | Agregasi saldo, arus kas bulanan, breakdown kategori, dan tren 7 hari |
-| **Forecast & Runway** | `GET /forecast/summary` | Mesin utama penghitung jatah ideal harian, runway, amplop saldo, & prediksi tabungan |
+| **Forecast & Time-Series** | `GET /forecast/summary` | Mesin penghitung jatah ideal harian (dengan cyclical buffer), runway, & amplop saldo |
+| | `POST /forecast/range-projection` | **Mesin Simulasi Time-Series**: Hitung saldo harian berjalan per dompet pada rentang waktu kustom |
 | | `GET /forecast/daily-ledger` | Rekap perbandingan belanja aktual vs ideal per tanggal dalam 1 siklus |
 | | `GET, PUT /forecast/plan` | Ambil & simpan parameter Blueprint Keuangan |
-| | `GET, POST, DELETE /forecast/income-streams` | Kelola multi-sumber pendapatan (harian, mingguan, bulanan) |
-| | `GET, POST, DELETE /forecast/fixed-expenses` | Kelola daftar tagihan pasti & dompet pembayarnya |
+| | `GET, POST, DELETE /forecast/income-streams` | Kelola multi-sumber pendapatan (harian, mingguan, bulanan) + dompet tujuan |
+| | `GET, POST, DELETE /forecast/fixed-expenses` | Kelola tagihan bulanan & siklus biaya hidup berkala (bensin, pulsa) |
+| | `PUT /forecast/fixed-expenses/{id}` | Update rincian tagihan bulanan atau parameter siklus berkala |
 | | `POST /forecast/fixed-expenses/{id}/toggle-paid` | 1-Tap toggle lunas tagihan (auto-debit/refund dompet & catat transaksi) |
+| | `GET, POST, PUT, DELETE /forecast/planned-transactions` | Kelola rencana transaksi masa depan untuk simulasi arus kas |
+| | `POST /forecast/planned-transactions/{id}/execute` | Eksekusi rencana transaksi menjadi mutasi riil di database & dompet |
 | | `POST /forecast/simulate` | Kalkulator simulasi belanja *"Bisa Beli Nggak?"* |
 | | `GET, POST, DELETE /forecast/wishlists` | Kelola daftar barang impian (Wishlist) |
 | **AI Assistant** | `POST /ai/chat` | Pemrosesan perintah teks natural (catat transaksi, buat dompet, tanya keuangan) |
