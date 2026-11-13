@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/store";
+import { isProtectedTunaiWallet } from "@/components/WalletConfigModal";
 import { useRouter } from "next/navigation";
 
 export default function SettingsPage() {
@@ -186,17 +187,26 @@ export default function SettingsPage() {
   };
 
   // Action: Delete Wallet
-  const handleDeleteWallet = async (walletId: string, walletName: string) => {
-    if (!confirm(`Hapus dompet "${walletName}"? Seluruh transaksi yang terikat dompet ini akan terhapus.`)) return;
+  const handleDeleteWallet = async (w: any) => {
+    if (isProtectedTunaiWallet(w, wallets)) {
+      alert("Dompet Tunai (Cash) utama tidak dapat dihapus.");
+      return;
+    }
+    const balanceNum = parseFloat(w.balance ?? "0") || 0;
+    const transferNote =
+      balanceNum !== 0
+        ? ` Sisa saldo sebesar Rp${balanceNum.toLocaleString("id-ID")} akan otomatis dipindahkan ke dompet Tunai (Cash).`
+        : "";
+    if (!confirm(`Hapus dompet "${w.name}"?${transferNote}`)) return;
     try {
-      await api.delete(`/api/v1/wallets/${walletId}`);
-      if (editingWallet?.id === walletId) setEditingWallet(null);
+      await api.delete(`/api/v1/wallets/${w.id}`);
+      if (editingWallet?.id === w.id) setEditingWallet(null);
       refetchWallets();
       queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
       queryClient.invalidateQueries({ queryKey: ["forecast-summary"] });
       queryClient.invalidateQueries({ queryKey: ["forecast-ledger"] });
     } catch (err: any) {
-      alert("Gagal menghapus dompet.");
+      alert(err?.response?.data?.detail || "Gagal menghapus dompet.");
     }
   };
 
@@ -360,14 +370,23 @@ export default function SettingsPage() {
                   >
                     <Pencil className="h-3.5 w-3.5" />
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteWallet(w.id, w.name)}
-                    className="rounded-xl p-1.5 text-espresso-muted hover:bg-expense/10 hover:text-expense transition"
-                    title="Hapus Dompet"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  {!isProtectedTunaiWallet(w, wallets) ? (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteWallet(w)}
+                      className="rounded-xl p-1.5 text-espresso-muted hover:bg-expense/10 hover:text-expense transition"
+                      title="Hapus Dompet (saldo dipindah ke Tunai)"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  ) : (
+                    <span
+                      className="rounded-xl p-1.5 text-espresso-muted/30 cursor-not-allowed"
+                      title="Dompet Tunai (Cash) tidak dapat dihapus"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </span>
+                  )}
                 </div>
               </div>
 

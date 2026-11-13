@@ -81,9 +81,6 @@ export default function ForecastPage() {
   const [cyclicalToWalletId, setCyclicalToWalletId] = useState("");
   const [isSavingCyclical, setIsSavingCyclical] = useState(false);
 
-  // Quick Wallet Purpose Config Modal State
-  const [isWalletConfigModalOpen, setIsWalletConfigModalOpen] = useState(false);
-
   // Add Wishlist Modal State
   const [isAddWishlistModalOpen, setIsAddWishlistModalOpen] = useState(false);
   const [wishlistName, setWishlistName] = useState("");
@@ -105,7 +102,7 @@ export default function ForecastPage() {
   // Forward Range Projection Filters
   const [projWalletFilter, setProjWalletFilter] = useState("all_operational");
   const [projCustomInitialBalance, setProjCustomInitialBalance] = useState("");
-  const [projRangePreset, setProjRangePreset] = useState<"14days" | "end_of_cycle" | "3months" | "1year" | "custom">("14days");
+  const [isCustomDateOpen, setIsCustomDateOpen] = useState(false);
   const [projStartDate, setProjStartDate] = useState(new Date().toISOString().split("T")[0]);
   const [projEndDate, setProjEndDate] = useState("");
   const [projIncludeMeal, setProjIncludeMeal] = useState(true);
@@ -186,33 +183,16 @@ export default function ForecastPage() {
     queryFn: async () => (await api.get("/api/v1/wallets")).data,
   });
 
-  // Hitung tanggal akhir efektif berdasarkan preset yang dipilih
+  // Hitung tanggal akhir efektif (default 14 hari ke depan jika belum diatur kustom)
   const maxAllowedDate = new Date();
   maxAllowedDate.setFullYear(maxAllowedDate.getFullYear() + 1);
   const maxAllowedDateStr = maxAllowedDate.toISOString().split("T")[0];
 
-  let effectiveEndDate = projEndDate;
-  if (projRangePreset === "14days") {
-    const d = new Date();
-    d.setDate(d.getDate() + 14);
-    effectiveEndDate = d.toISOString().split("T")[0];
-  } else if (projRangePreset === "end_of_cycle") {
-    if (summary?.cycle_info?.cycle_end_date) {
-      effectiveEndDate = summary.cycle_info.cycle_end_date;
-    } else {
-      const d = new Date();
-      d.setDate(d.getDate() + 30);
-      effectiveEndDate = d.toISOString().split("T")[0];
-    }
-  } else if (projRangePreset === "3months") {
-    const d = new Date();
-    d.setMonth(d.getMonth() + 3);
-    effectiveEndDate = d.toISOString().split("T")[0];
-  } else if (projRangePreset === "1year") {
-    const d = new Date();
-    d.setFullYear(d.getFullYear() + 1);
-    effectiveEndDate = d.toISOString().split("T")[0];
-  }
+  const defaultEndDateObj = new Date();
+  defaultEndDateObj.setDate(defaultEndDateObj.getDate() + 14);
+  const defaultEndDateStr = defaultEndDateObj.toISOString().split("T")[0];
+
+  const effectiveEndDate = projEndDate || defaultEndDateStr;
 
   const {
     data: rangeProjection,
@@ -549,19 +529,6 @@ export default function ForecastPage() {
 
   return (
     <div className="space-y-5 pb-16">
-      {/* Header */}
-      <div className="flex items-center justify-end">
-        <button
-          type="button"
-          onClick={() => setIsPlanModalOpen(true)}
-          className="flex items-center gap-1.5 rounded-2xl border border-surface-border bg-white px-3.5 py-2 text-xs font-extrabold text-espresso shadow-xs hover:border-[#0D0F17] hover:bg-surface-card transition active:scale-95"
-          title="Atur Blueprint Finansial"
-        >
-          <Sliders className="h-3.5 w-3.5 text-espresso" />
-          <span>Blueprint</span>
-        </button>
-      </div>
-
       {/* ===================================================================== */}
       {/* 1. HERO CARD: JATAH BELANJA IDEAL HARI INI (DYNAMIC DAILY RUNWAY)     */}
       {/* ===================================================================== */}
@@ -570,6 +537,12 @@ export default function ForecastPage() {
           {/* Ambient Glow */}
           <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-[#C8F526]/10 blur-3xl" />
           <div className="pointer-events-none absolute -left-16 -bottom-16 h-48 w-48 rounded-full bg-[#10B981]/10 blur-3xl" />
+
+          <div className="flex items-center">
+            <span className="inline-flex items-center rounded-full bg-[#C8F526] px-3 py-1 text-[10px] font-semibold text-black tracking-wider uppercase shadow-sm">
+              Batas Belanja Hari Ini
+            </span>
+          </div>
 
           <div>
             <h2 className="text-3xl sm:text-4xl font-semibold text-white tracking-tight">
@@ -600,12 +573,12 @@ export default function ForecastPage() {
           <div className="flex flex-col sm:flex-row sm:justify-end pt-1 text-[11px]">
             <button
               type="button"
-              onClick={() => setIsWalletConfigModalOpen(true)}
+              onClick={() => setIsPlanModalOpen(true)}
               className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-white/15 bg-white/10 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-white/20 transition active:scale-95"
-              title="Atur dompet mana yang jadi tabungan, operasional, atau tagihan"
+              title="Atur Blueprint Finansial"
             >
               <Sliders className="h-3 w-3 text-[#C8F526] shrink-0" />
-              <span>Atur Dompet</span>
+              <span>Blueprint</span>
             </button>
           </div>
         </div>
@@ -618,37 +591,34 @@ export default function ForecastPage() {
         <button
           type="button"
           onClick={() => setActiveTab("ledger")}
-          className={`rounded-xl py-2 px-1 inline-flex items-center justify-center gap-1.5 truncate transition whitespace-nowrap ${
+          className={`rounded-xl py-2 px-1 inline-flex items-center justify-center truncate transition whitespace-nowrap ${
             activeTab === "ledger"
               ? "bg-[#0D0F17] text-[#C8F526] shadow-sm"
               : "text-espresso-muted hover:text-espresso hover:bg-surface-card"
           }`}
         >
-          <TrendingUp className="h-3.5 w-3.5 shrink-0" />
           <span>Proyeksi</span>
         </button>
         <button
           type="button"
           onClick={() => setActiveTab("fixed")}
-          className={`rounded-xl py-2 px-1 inline-flex items-center justify-center gap-1.5 truncate transition whitespace-nowrap ${
+          className={`rounded-xl py-2 px-1 inline-flex items-center justify-center truncate transition whitespace-nowrap ${
             activeTab === "fixed"
               ? "bg-[#0D0F17] text-[#C8F526] shadow-sm"
               : "text-espresso-muted hover:text-espresso hover:bg-surface-card"
           }`}
         >
-          <Receipt className="h-3.5 w-3.5 shrink-0" />
           <span>Tagihan</span>
         </button>
         <button
           type="button"
           onClick={() => setActiveTab("simulator")}
-          className={`rounded-xl py-2 px-1 inline-flex items-center justify-center gap-1.5 truncate transition whitespace-nowrap ${
+          className={`rounded-xl py-2 px-1 inline-flex items-center justify-center truncate transition whitespace-nowrap ${
             activeTab === "simulator"
               ? "bg-[#0D0F17] text-[#C8F526] shadow-sm"
               : "text-espresso-muted hover:text-espresso hover:bg-surface-card"
           }`}
         >
-          <Lightbulb className="h-3.5 w-3.5 shrink-0" />
           <span>Simulasi</span>
         </button>
       </div>
@@ -663,25 +633,23 @@ export default function ForecastPage() {
             <button
               type="button"
               onClick={() => setTimelineView("forward")}
-              className={`flex-1 py-2 px-2 rounded-xl transition flex items-center justify-center gap-1.5 whitespace-nowrap truncate ${
+              className={`flex-1 py-2 px-2 rounded-xl transition flex items-center justify-center whitespace-nowrap truncate ${
                 timelineView === "forward"
                   ? "bg-[#0D0F17] text-[#C8F526] shadow-sm"
                   : "text-espresso-muted hover:text-espresso hover:bg-surface-card"
               }`}
             >
-              <Sparkles className="h-3.5 w-3.5 shrink-0" />
               <span className="truncate">Prediksi Saldo</span>
             </button>
             <button
               type="button"
               onClick={() => setTimelineView("history")}
-              className={`flex-1 py-2 px-2 rounded-xl transition flex items-center justify-center gap-1.5 whitespace-nowrap truncate ${
+              className={`flex-1 py-2 px-2 rounded-xl transition flex items-center justify-center whitespace-nowrap truncate ${
                 timelineView === "history"
                   ? "bg-[#0D0F17] text-[#C8F526] shadow-sm"
                   : "text-espresso-muted hover:text-espresso hover:bg-surface-card"
               }`}
             >
-              <Clock className="h-3.5 w-3.5 text-espresso-muted shrink-0" />
               <span className="truncate">Realisasi Harian</span>
             </button>
           </div>
@@ -728,33 +696,22 @@ export default function ForecastPage() {
                     </select>
                   </div>
 
-                  {/* Rentang Waktu Preset */}
+                  {/* Rentang Waktu Prediksi (Hanya Opsi Kustom) */}
                   <div>
                     <label className="block text-[11px] font-bold text-espresso mb-1">
                       Rentang Waktu Prediksi
                     </label>
-                    <div className="grid grid-cols-5 gap-1">
-                      {[
-                        { id: "14days", label: "14 Hari" },
-                        { id: "end_of_cycle", label: "Akhir Siklus" },
-                        { id: "3months", label: "3 Bulan" },
-                        { id: "1year", label: "1 Tahun" },
-                        { id: "custom", label: "Kustom" },
-                      ].map((item) => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => setProjRangePreset(item.id as any)}
-                          className={`rounded-xl py-1.5 text-[10px] font-extrabold border transition ${
-                            projRangePreset === item.id
-                              ? "bg-[#0D0F17] text-[#C8F526] border-[#0D0F17] shadow-xs"
-                              : "bg-surface-card text-espresso-muted border-surface-border hover:text-espresso"
-                          }`}
-                        >
-                          {item.label}
-                        </button>
-                      ))}
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsCustomDateOpen((prev) => !prev)}
+                      className={`w-full rounded-xl py-2 px-3 text-xs font-extrabold border transition ${
+                        isCustomDateOpen || projEndDate
+                          ? "bg-[#0D0F17] text-[#C8F526] border-[#0D0F17] shadow-xs"
+                          : "bg-surface-card text-espresso-muted border-surface-border hover:text-espresso"
+                      }`}
+                    >
+                      Atur waktu prediksi
+                    </button>
                   </div>
                 </div>
 
@@ -777,28 +734,28 @@ export default function ForecastPage() {
                   </div>
                 )}
 
-                {/* Input Tanggal Kustom jika memilih custom */}
-                {projRangePreset === "custom" && (
-                  <div className="grid grid-cols-2 gap-2 text-xs pt-1">
-                    <div>
-                      <label className="block text-[10px] font-semibold text-espresso mb-0.5">Mulai Tanggal</label>
+                {/* Input Tanggal Kustom */}
+                {isCustomDateOpen && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs pt-1">
+                    <div className="min-w-0">
+                      <label className="block text-[10px] font-semibold text-espresso mb-1">Mulai Tanggal</label>
                       <input
                         type="date"
                         value={projStartDate}
                         onChange={(e) => setProjStartDate(e.target.value)}
-                        className="w-full rounded-xl border border-surface-border bg-surface-card px-2.5 py-1.5 text-xs text-espresso focus:outline-none focus:border-[#0D0F17]"
+                        className="block w-full min-w-0 max-w-full appearance-none rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs text-espresso focus:outline-none focus:border-[#0D0F17]"
                       />
                     </div>
-                    <div>
-                      <label className="block text-[10px] font-semibold text-espresso mb-0.5">
+                    <div className="min-w-0">
+                      <label className="block text-[10px] font-semibold text-espresso mb-1">
                         Sampai Tanggal <span className="text-[9px] text-espresso-muted">(Maks. 1 Thn)</span>
                       </label>
                       <input
                         type="date"
-                        value={projEndDate}
+                        value={projEndDate || effectiveEndDate}
                         max={maxAllowedDateStr}
                         onChange={(e) => setProjEndDate(e.target.value)}
-                        className="w-full rounded-xl border border-surface-border bg-surface-card px-2.5 py-1.5 text-xs text-espresso focus:outline-none focus:border-[#0D0F17]"
+                        className="block w-full min-w-0 max-w-full appearance-none rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs text-espresso focus:outline-none focus:border-[#0D0F17]"
                       />
                     </div>
                   </div>
@@ -933,34 +890,6 @@ export default function ForecastPage() {
                     </div>
                   )}
 
-                  {/* Banner Status Aman / Defisit */}
-                  <div className={`rounded-2xl p-3.5 border text-xs font-semibold flex items-center gap-2.5 ${
-                    rangeProjection.is_safe
-                      ? "bg-income/10 border-income/30 text-income"
-                      : "bg-expense/15 border-expense/30 text-expense"
-                  }`}>
-                    {rangeProjection.is_safe ? (
-                      <>
-                        <CheckCircle2 className="h-4 w-4 shrink-0" />
-                        <div>
-                          <span className="font-bold">Arus kas aman terjaga! Saldo diproyeksikan bertahan di atas Rp0.</span>
-                          <span className="block text-[10px] text-espresso-muted mt-0.5">
-                            Saldo terendah: {formatIDR(rangeProjection.lowest_balance)} (pada tanggal {rangeProjection.lowest_balance_date})
-                          </span>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <AlertTriangle className="h-4 w-4 shrink-0" />
-                        <div>
-                          <span className="font-bold">Waspada Defisit! Saldo diprediksi minus mulai tanggal {rangeProjection.critical_deficit_date}.</span>
-                          <span className="block text-[10px] text-espresso-muted mt-0.5">
-                            Titik defisit terdalam mencapai {formatIDR(rangeProjection.lowest_balance)}. Siapkan dana darurat atau tunda pengeluaran rencana!
-                          </span>
-                        </div>
-                      </>
-                    )}
-                  </div>
                 </div>
               )}
 
@@ -2581,118 +2510,6 @@ export default function ForecastPage() {
           </div>
         </div>
       )}
-      {/* ===================================================================== */}
-      {/* MODAL 4: ATUR PERUNTUKAN DOMPET LANGSUNG                              */}
-      {/* ===================================================================== */}
-      {isWalletConfigModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="w-full max-w-sm rounded-3xl border border-surface-border bg-white p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-surface-border pb-3">
-              <div>
-                <h3 className="text-base font-semibold text-espresso">Atur Peruntukan Dompet</h3>
-                <p className="text-[11px] text-espresso-muted">Pilih alokasi operasional, tabungan, atau tagihan</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsWalletConfigModalOpen(false)}
-                className="rounded-full p-1 text-espresso-muted hover:bg-surface-card hover:text-espresso transition"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
-              {wallets?.map((w: any) => (
-                <div
-                  key={w.id}
-                  className="rounded-2xl border border-surface-border bg-surface-card p-3 space-y-2.5"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-xs font-bold text-espresso block">{w.name}</span>
-                      <span className="text-[10px] text-espresso-muted uppercase font-bold">{w.type}</span>
-                    </div>
-                    <span className="text-xs font-semibold text-espresso">
-                      {formatIDR(w.balance)}
-                    </span>
-                  </div>
-
-                  {/* 3 Option Pills */}
-                  <div className="grid grid-cols-3 gap-1.5 pt-0.5 text-[10px] font-bold">
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        await api.put(`/api/v1/wallets/${w.id}`, { purpose: "operational" });
-                        refetchSummary();
-                        refetchLedger();
-                        queryClient.invalidateQueries({ queryKey: ["wallets"] });
-                        queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
-                      }}
-                      className={`rounded-xl py-2 px-1 transition text-center border inline-flex items-center justify-center gap-1 ${
-                        (w.purpose || "operational") === "operational"
-                          ? "bg-[#0D0F17] text-[#C8F526] border-[#0D0F17] shadow-xs"
-                          : "bg-white text-espresso-muted border-surface-border hover:text-espresso"
-                      }`}
-                    >
-                      <Wallet className="h-3 w-3 shrink-0" />
-                      <span>Operasional</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        await api.put(`/api/v1/wallets/${w.id}`, { purpose: "savings" });
-                        refetchSummary();
-                        refetchLedger();
-                        queryClient.invalidateQueries({ queryKey: ["wallets"] });
-                        queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
-                      }}
-                      className={`rounded-xl py-2 px-1 transition text-center border inline-flex items-center justify-center gap-1 ${
-                        w.purpose === "savings"
-                          ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
-                          : "bg-white text-espresso-muted border-surface-border hover:text-income"
-                      }`}
-                    >
-                      <PiggyBank className="h-3 w-3 shrink-0" />
-                      <span>Tabungan</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        await api.put(`/api/v1/wallets/${w.id}`, { purpose: "subscription" });
-                        refetchSummary();
-                        refetchLedger();
-                        queryClient.invalidateQueries({ queryKey: ["wallets"] });
-                        queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
-                      }}
-                      className={`rounded-xl py-2 px-1 transition text-center border inline-flex items-center justify-center gap-1 ${
-                        w.purpose === "subscription"
-                          ? "bg-amber-400 text-black border-amber-400 shadow-xs"
-                          : "bg-white text-espresso-muted border-surface-border hover:text-espresso"
-                      }`}
-                    >
-                      <Receipt className="h-3 w-3 shrink-0" />
-                      <span>Tagihan</span>
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="pt-2 border-t border-surface-border">
-              <button
-                type="button"
-                onClick={() => setIsWalletConfigModalOpen(false)}
-                className="w-full rounded-2xl bg-[#0D0F17] py-2.5 text-xs font-semibold text-[#C8F526] hover:bg-[#161A26] transition shadow-xs active:scale-98"
-              >
-                Selesai
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ===================================================================== */}
       {/* MODAL 5: TAMBAH RENCANA TRANSAKSI MASA DEPAN                           */}
       {/* ===================================================================== */}

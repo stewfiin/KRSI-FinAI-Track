@@ -19,6 +19,7 @@ import {
   X,
   Loader2,
   Tag,
+  Sliders,
 } from "lucide-react";
 import {
   PieChart,
@@ -35,6 +36,7 @@ import {
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/store";
 import { QuickAIBar } from "@/components/QuickAIBar";
+import { WalletConfigModal } from "@/components/WalletConfigModal";
 import Link from "next/link";
 
 export default function DashboardPage() {
@@ -54,6 +56,7 @@ export default function DashboardPage() {
   const [destWalletId, setDestWalletId] = useState("");
   const [description, setDescription] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isWalletConfigModalOpen, setIsWalletConfigModalOpen] = useState(false);
 
   // Fetch data ringkasan dashboard terpadu
   const { data: summary, isLoading, refetch } = useQuery({
@@ -277,13 +280,14 @@ export default function DashboardPage() {
       <div>
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-sm font-bold tracking-tight text-espresso">Dompet & Rekening</h3>
-          <Link
-            href="/settings"
-            className="flex items-center gap-1 text-xs font-semibold text-terracotta hover:text-terracotta-hover"
+          <button
+            type="button"
+            onClick={() => setIsWalletConfigModalOpen(true)}
+            className="flex items-center gap-1.5 rounded-xl border border-surface-border bg-white px-2.5 py-1 text-xs font-semibold text-espresso hover:border-[#0D0F17] hover:bg-surface-card transition active:scale-95"
           >
-            <Plus className="h-3.5 w-3.5" />
-            Tambah Dompet
-          </Link>
+            <Sliders className="h-3.5 w-3.5" />
+            <span>Atur Dompet</span>
+          </button>
         </div>
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
@@ -292,26 +296,8 @@ export default function DashboardPage() {
               key={wallet.id}
               className="rounded-2xl border border-surface-border bg-surface p-4 shadow-xs transition-all hover:border-black/20 hover:shadow-md group"
             >
-              <div className="flex items-center justify-between">
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-black/5 text-black group-hover:scale-105 transition-transform">
-                  <WalletIcon className="h-4 w-4" />
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="rounded-md bg-surface-card px-2 py-0.5 text-[10px] font-bold text-espresso-muted border border-surface-border uppercase">
-                    {wallet.type}
-                  </span>
-                  {wallet.purpose && wallet.purpose !== "operational" && (
-                    <span
-                      className={`rounded-md px-1.5 py-0.5 text-[9px] font-bold border ${
-                        wallet.purpose === "savings"
-                          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                          : "bg-blue-50 text-blue-700 border-blue-200"
-                      }`}
-                    >
-                      {wallet.purpose === "savings" ? "Tabungan" : "Tagihan"}
-                    </span>
-                  )}
-                </div>
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-black/5 text-black group-hover:scale-105 transition-transform">
+                <WalletIcon className="h-4 w-4" />
               </div>
               <span className="mt-3 block text-xs font-semibold text-espresso-muted truncate">
                 {wallet.name}
@@ -761,6 +747,13 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      <WalletConfigModal
+        isOpen={isWalletConfigModalOpen}
+        onClose={() => setIsWalletConfigModalOpen(false)}
+        wallets={wallets}
+        formatIDR={formatIDR}
+      />
     </div>
   );
 }

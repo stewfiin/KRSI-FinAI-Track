@@ -1,4 +1,5 @@
 import uuid
+from decimal import Decimal
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import select, desc
@@ -6,6 +7,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.deps import get_current_user
 from app.core.database import get_session
+from app.models.enums import WalletType
 from app.models.user import User
 from app.models.wallet import Wallet
 from app.schemas.wallet import WalletCreate, WalletResponse, WalletUpdate
@@ -98,6 +100,51 @@ async def delete_wallet(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Dompet tidak ditemukan atau bukan milik akun Anda.",
         )
+
+    user_wallets_res = await session.exec(
+        select(Wallet).where(Wallet.user_id == current_user.id).order_by(Wallet.created_at)
+    )
+    user_wallets = user_wallets_res.all()
+    cash_wallets = [w for w in user_wallets if w.type == WalletType.CASH]
+
+    is_primary_tunai = (
+        wallet.type == WalletType.CASH
+        and (wallet.name or "").strip().lower() == "tunai"
+    )
+    is_only_cash = wallet.type == WalletType.CASH and len(cash_wallets) <= 1
+
+    if is_primary_tunai or is_only_cash:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Dompet Tunai (Cash) utama tidak dapat dihapus.",
+        )
+
+    # Pindahkan sisa saldo dompet yang dihapus ke dompet Tunai (Cash)
+    target_cash_wallet = next(
+        (
+            w
+            for w in cash_wallets
+            if w.id != wallet.id and (w.name or "").strip().lower() == "tunai"
+        ),
+        None,
+    )
+    if not target_cash_wallet:
+        target_cash_wallet = next((w for w in cash_wallets if w.id != wallet.id), None)
+
+    if not target_cash_wallet:
+        target_cash_wallet = Wallet(
+            user_id=current_user.id,
+            name="Tunai",
+            type=WalletType.CASH,
+            purpose="operational",
+            balance=Decimal("0.00"),
+        )
+        session.add(target_cash_wallet)
+        await session.flush()
+
+    if wallet.balance and wallet.balance != Decimal("0.00"):
+        target_cash_wallet.balance = (target_cash_wallet.balance or Decimal("0.00")) + wallet.balance
+        session.add(target_cash_wallet)
 
     await session.delete(wallet)
     await session.commit()
