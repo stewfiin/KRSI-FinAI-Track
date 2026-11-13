@@ -238,20 +238,26 @@ export default function AIAssistantPage() {
       {/* Header & Tabs Navigation */}
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-espresso flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-terracotta" />
-            AI Finance Assistant
-          </h1>
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-[#C8F526] animate-pulse" />
+            <h1 className="text-xl font-black tracking-tight text-espresso flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-espresso" />
+              AI Finance Assistant
+            </h1>
+          </div>
+          <p className="text-xs text-espresso-muted font-medium mt-0.5">
+            Pencatatan cepat via suara/teks & rekomendasi anggaran pintar
+          </p>
         </div>
 
         {/* Tab Toggle */}
-        <div className="flex rounded-xl bg-surface-card p-1 border border-surface-border">
+        <div className="flex rounded-2xl bg-white p-1 border border-surface-border shadow-xs text-xs font-bold">
           <button
             type="button"
             onClick={() => setActiveTab("chat")}
-            className={`rounded-lg px-4 py-1.5 text-xs font-bold transition ${
+            className={`rounded-xl px-4 py-2 transition ${
               activeTab === "chat"
-                ? "bg-terracotta text-white shadow-md shadow-terracotta/20"
+                ? "bg-[#0D0F17] text-[#C8F526] shadow-sm font-black"
                 : "text-espresso-muted hover:text-espresso"
             }`}
           >
@@ -260,9 +266,9 @@ export default function AIAssistantPage() {
           <button
             type="button"
             onClick={() => setActiveTab("budget")}
-            className={`rounded-lg px-4 py-1.5 text-xs font-bold transition ${
+            className={`rounded-xl px-4 py-2 transition ${
               activeTab === "budget"
-                ? "bg-terracotta text-white shadow-md shadow-terracotta/20"
+                ? "bg-[#0D0F17] text-[#C8F526] shadow-sm font-black"
                 : "text-espresso-muted hover:text-espresso"
             }`}
           >
@@ -275,7 +281,7 @@ export default function AIAssistantPage() {
       {/* TAB 1: AI CHAT ASSISTANT */}
       {/* ===================================================================== */}
       {activeTab === "chat" && (
-        <div className="flex h-[75vh] flex-col rounded-3xl border border-surface-border bg-surface shadow-md">
+        <div className="flex h-[75vh] flex-col rounded-3xl border border-surface-border bg-white shadow-xs overflow-hidden">
           {/* Chat Messages Scrollable Box */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {messages.map((msg) => (
@@ -284,17 +290,17 @@ export default function AIAssistantPage() {
                 className={`flex gap-3 ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
               >
                 {msg.sender === "assistant" && (
-                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl bg-terracotta text-white shadow-sm">
+                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-2xl bg-[#0D0F17] text-[#C8F526] shadow-xs">
                     <Bot className="h-4 w-4" />
                   </div>
                 )}
 
                 <div className={`max-w-[85%] sm:max-w-md space-y-2`}>
                   <div
-                    className={`rounded-2xl px-4 py-2.5 text-xs leading-relaxed ${
+                    className={`rounded-2xl px-4 py-3 text-xs leading-relaxed ${
                       msg.sender === "user"
-                        ? "bg-terracotta text-white shadow-md shadow-terracotta/20 rounded-tr-none font-medium"
-                        : "border border-surface-border bg-surface-card text-espresso rounded-tl-none font-medium"
+                        ? "bg-[#0D0F17] text-white shadow-md rounded-tr-none font-medium"
+                        : "border border-surface-border bg-surface-card text-espresso rounded-tl-none font-medium shadow-2xs"
                     }`}
                   >
                     <p className="whitespace-pre-line">{msg.text}</p>
@@ -305,8 +311,8 @@ export default function AIAssistantPage() {
 
                   {/* Transaction Preview Card (Jika ada transaksi tercatat) */}
                   {msg.transaction && (
-                    <div className="rounded-2xl border border-income/30 bg-income/10 p-3 text-xs shadow-sm">
-                      <div className="flex items-center gap-1.5 text-income font-bold mb-1.5">
+                    <div className="rounded-2xl border border-income/30 bg-income/10 p-3.5 text-xs shadow-xs space-y-2">
+                      <div className="flex items-center gap-1.5 text-income font-bold">
                         <CheckCircle2 className="h-4 w-4" />
                         <span>Transaksi Berhasil Disimpan</span>
                       </div>
@@ -333,15 +339,15 @@ export default function AIAssistantPage() {
 
                   {/* Budget Alert Card */}
                   {msg.budgetAlert && (
-                    <div className="flex items-center gap-2 rounded-xl border border-amber/40 bg-amber/15 p-2.5 text-xs text-espresso">
-                      <AlertTriangle className="h-4 w-4 flex-shrink-0 text-terracotta" />
+                    <div className="flex items-center gap-2 rounded-2xl border border-amber-400/40 bg-amber-400/10 p-3 text-xs text-espresso">
+                      <AlertTriangle className="h-4 w-4 flex-shrink-0 text-amber-600" />
                       <span>{msg.budgetAlert.message}</span>
                     </div>
                   )}
                 </div>
 
                 {msg.sender === "user" && (
-                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl bg-amber/20 text-terracotta">
+                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-2xl bg-[#0D0F17] text-white shadow-xs">
                     <UserIcon className="h-4 w-4" />
                   </div>
                 )}
@@ -349,8 +355,8 @@ export default function AIAssistantPage() {
             ))}
             {isChatLoading && (
               <div className="flex items-center gap-2 text-xs text-espresso-muted">
-                <Loader2 className="h-4 w-4 animate-spin text-terracotta" />
-                <span>FinAI sedang berpikir...</span>
+                <Loader2 className="h-4 w-4 animate-spin text-[#0D0F17]" />
+                <span>FinAI sedang menganalisis pesan Anda...</span>
               </div>
             )}
             <div ref={chatEndRef} />
@@ -359,17 +365,18 @@ export default function AIAssistantPage() {
           {/* Chat Input Bar */}
           <div className="border-t border-surface-border bg-surface-card p-3">
             {isRecording ? (
-              <div className="flex items-center justify-between rounded-2xl bg-terracotta/10 border border-terracotta/30 px-4 py-2.5">
-                <div className="flex items-center gap-2 text-xs font-semibold text-terracotta">
+              <div className="flex items-center justify-between rounded-2xl bg-rose-500/10 border border-rose-500/30 px-4 py-2.5">
+                <div className="flex items-center gap-2 text-xs font-bold text-rose-600">
                   <span className="relative flex h-2.5 w-2.5">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-terracotta opacity-75"></span>
-                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-terracotta"></span>
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-500 opacity-75"></span>
+                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-rose-500"></span>
                   </span>
                   <span>Merekam pesan suara... {recordSeconds} detik</span>
                 </div>
                 <button
+                  type="button"
                   onClick={stopVoiceRecording}
-                  className="flex items-center gap-1.5 rounded-xl bg-terracotta px-3 py-1.5 text-xs font-semibold text-white hover:bg-terracotta-hover"
+                  className="flex items-center gap-1.5 rounded-xl bg-rose-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-rose-700 transition active:scale-95"
                 >
                   <Square className="h-3.5 w-3.5 fill-current" />
                   Kirim Suara
@@ -381,7 +388,7 @@ export default function AIAssistantPage() {
                   type="button"
                   onClick={startVoiceRecording}
                   disabled={isChatLoading}
-                  className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl border border-surface-border bg-surface text-espresso-muted hover:text-terracotta transition hover:bg-surface-card"
+                  className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl border border-surface-border bg-white text-espresso hover:bg-surface-card transition active:scale-95 shadow-xs"
                   title="Rekam Voice Note"
                 >
                   <Mic className="h-4 w-4" />
@@ -392,16 +399,16 @@ export default function AIAssistantPage() {
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-                  placeholder="Ketik pengeluaran / pertanyaan keuangan..."
+                  placeholder="Ketik transaksi (mis: Beli kopi 25rb) atau tanya kondisi kas..."
                   disabled={isChatLoading}
-                  className="flex-1 rounded-2xl border border-surface-border bg-surface px-4 py-2.5 text-xs text-espresso placeholder:text-espresso-muted/40 focus:border-terracotta focus:outline-none"
+                  className="flex-1 rounded-2xl border border-surface-border bg-white px-4 py-3 text-xs text-espresso placeholder:text-espresso-muted/40 focus:border-[#0D0F17] focus:outline-none"
                 />
 
                 <button
                   type="button"
                   onClick={handleSendMessage}
                   disabled={!inputText.trim() || isChatLoading}
-                  className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-terracotta text-white hover:bg-terracotta-hover disabled:opacity-40 transition shadow-sm"
+                  className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-[#0D0F17] text-[#C8F526] hover:bg-[#161A26] disabled:opacity-40 transition shadow-xs active:scale-95"
                 >
                   <Send className="h-4 w-4" />
                 </button>
@@ -416,13 +423,13 @@ export default function AIAssistantPage() {
       {/* ===================================================================== */}
       {activeTab === "budget" && (
         <div className="space-y-6">
-          <div className="rounded-3xl border border-surface-border bg-surface p-6 shadow-sm space-y-4">
+          <div className="rounded-3xl border border-surface-border bg-white p-6 shadow-xs space-y-4">
             <div>
-              <h3 className="text-sm font-bold text-espresso flex items-center gap-2">
-                <Sliders className="h-4 w-4 text-terracotta" />
+              <h3 className="text-sm font-black text-espresso flex items-center gap-2">
+                <Sliders className="h-4 w-4 text-espresso" />
                 Parameter Keinginan & Batasan Finansial Anda
               </h3>
-              <p className="text-xs text-espresso-muted mt-1">
+              <p className="text-xs text-espresso-muted mt-1 leading-relaxed">
                 Tuliskan kondisi pemasukan dan target tabungan Anda dalam bahasa santai. AI akan membaca
                 histori rata-rata pengeluaran Anda dan menghitung rekomendasi plafon per kategori.
               </p>
@@ -433,14 +440,14 @@ export default function AIAssistantPage() {
               value={budgetPrompt}
               onChange={(e) => setBudgetPrompt(e.target.value)}
               placeholder="Contoh: Pemasukan 5 juta, ingin menabung 1 juta untuk dana darurat, kurangi pos belanja dan hiburan."
-              className="w-full rounded-2xl border border-surface-border bg-surface-card p-3 text-xs text-espresso placeholder:text-espresso-muted/40 focus:border-terracotta focus:outline-none"
+              className="w-full rounded-2xl border border-surface-border bg-surface-card p-3 text-xs text-espresso placeholder:text-espresso-muted/40 focus:border-[#0D0F17] focus:outline-none"
             />
 
             <button
               type="button"
               onClick={handleGenerateBudget}
               disabled={isBudgetLoading || !budgetPrompt.trim()}
-              className="flex items-center gap-2 rounded-xl bg-terracotta px-5 py-2.5 text-xs font-semibold text-white shadow-md shadow-terracotta/20 transition hover:bg-terracotta-hover disabled:opacity-50"
+              className="flex items-center gap-2 rounded-2xl bg-[#0D0F17] px-5 py-3 text-xs font-black text-[#C8F526] shadow-md transition hover:bg-[#161A26] disabled:opacity-50 active:scale-98"
             >
               {isBudgetLoading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -453,19 +460,19 @@ export default function AIAssistantPage() {
 
           {/* Hasil Draf Anggaran */}
           {budgetPlan && (
-            <div className="rounded-3xl border border-surface-border bg-surface p-6 shadow-sm space-y-6">
+            <div className="rounded-3xl border border-surface-border bg-white p-6 shadow-xs space-y-6">
               <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center border-b border-surface-border pb-4">
                 <div>
-                  <h3 className="text-base font-bold text-espresso">Rekomendasi Anggaran Bulanan</h3>
+                  <h3 className="text-base font-black text-espresso">Rekomendasi Anggaran Bulanan</h3>
                   <p className="text-xs text-espresso-muted mt-0.5">
                     Strategi: <span className="text-espresso font-semibold">{budgetPlan.strategy_summary}</span>
                   </p>
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <div className="rounded-xl border border-amber/30 bg-amber/15 px-3 py-1.5 text-right">
-                    <span className="block text-[10px] text-terracotta font-bold uppercase">Total Plafon</span>
-                    <span className="text-sm font-bold text-espresso">
+                  <div className="rounded-2xl border border-surface-border bg-surface-card px-3.5 py-2 text-right">
+                    <span className="block text-[10px] text-espresso-muted font-bold uppercase">Total Plafon</span>
+                    <span className="text-sm font-black text-espresso">
                       Rp{parseFloat(budgetPlan.total_budget).toLocaleString("id-ID")}
                     </span>
                   </div>
@@ -474,7 +481,7 @@ export default function AIAssistantPage() {
                     type="button"
                     onClick={handleSaveBudgetToDb}
                     disabled={isBudgetLoading}
-                    className="flex items-center gap-1.5 rounded-xl bg-income px-4 py-2 text-xs font-semibold text-white hover:bg-income-hover transition shadow-sm disabled:opacity-50"
+                    className="flex items-center gap-1.5 rounded-2xl bg-[#C8F526] px-4 py-2.5 text-xs font-black text-black hover:bg-[#b8e51b] transition shadow-md disabled:opacity-50 active:scale-95"
                   >
                     <Save className="h-3.5 w-3.5" />
                     Terapkan ke Database
@@ -483,7 +490,7 @@ export default function AIAssistantPage() {
               </div>
 
               {saveSuccessMsg && (
-                <div className="rounded-xl border border-income/30 bg-income/10 p-3 text-xs text-income font-medium">
+                <div className="rounded-2xl border border-income/30 bg-income/10 p-3 text-xs text-income font-medium">
                   {saveSuccessMsg}
                 </div>
               )}
@@ -497,7 +504,7 @@ export default function AIAssistantPage() {
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-bold text-espresso">{item.category_name}</span>
-                      <span className="rounded-md bg-amber/20 px-2 py-0.5 text-xs font-bold text-terracotta">
+                      <span className="rounded-full bg-[#0D0F17] px-2.5 py-0.5 text-xs font-black text-[#C8F526]">
                         Rp{parseFloat(item.suggested_limit).toLocaleString("id-ID")}
                       </span>
                     </div>

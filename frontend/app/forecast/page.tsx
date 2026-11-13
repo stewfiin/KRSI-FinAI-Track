@@ -540,11 +540,10 @@ export default function ForecastPage() {
   return (
     <div className="space-y-5 pb-16">
       {/* Header */}
-      {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-extrabold tracking-tight text-espresso flex items-center gap-2">
-            <Compass className="h-5 w-5 text-terracotta" />
+        <div className="flex items-center gap-2">
+          <span className="h-2.5 w-2.5 rounded-full bg-[#C8F526] animate-pulse" />
+          <h1 className="text-xl font-black tracking-tight text-espresso flex items-center gap-2">
             Proyeksi & Runway
           </h1>
         </div>
@@ -552,10 +551,10 @@ export default function ForecastPage() {
         <button
           type="button"
           onClick={() => setIsPlanModalOpen(true)}
-          className="flex items-center gap-1.5 rounded-xl border border-surface-border bg-surface px-3 py-1.5 text-xs font-bold text-espresso shadow-sm hover:border-terracotta transition"
+          className="flex items-center gap-1.5 rounded-2xl border border-surface-border bg-white px-3.5 py-2 text-xs font-extrabold text-espresso shadow-xs hover:border-[#0D0F17] hover:bg-surface-card transition active:scale-95"
           title="Atur Blueprint Finansial"
         >
-          <Sliders className="h-3.5 w-3.5 text-terracotta" />
+          <Sliders className="h-3.5 w-3.5 text-espresso" />
           <span>Blueprint</span>
         </button>
       </div>
@@ -564,33 +563,38 @@ export default function ForecastPage() {
       {/* 1. HERO CARD: JATAH BELANJA IDEAL HARI INI (DYNAMIC DAILY RUNWAY)     */}
       {/* ===================================================================== */}
       {summary && (
-        <div className="relative overflow-hidden rounded-3xl border border-surface-border bg-gradient-to-br from-surface to-surface-card p-5 shadow-md space-y-4">
+        <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-[#0F1117] via-[#161A26] to-[#0A0C12] p-5 sm:p-6 text-white shadow-xl space-y-4">
+          {/* Ambient Glow */}
+          <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-[#C8F526]/10 blur-3xl" />
+          <div className="pointer-events-none absolute -left-16 -bottom-16 h-48 w-48 rounded-full bg-[#10B981]/10 blur-3xl" />
+
           <div className="flex items-center justify-between">
-            <span className="rounded-lg bg-amber/20 px-2 py-0.5 text-[10px] font-bold text-terracotta uppercase tracking-wider">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#C8F526] px-3 py-1 text-[10px] font-black text-black tracking-wider uppercase shadow-sm">
+              <span className="h-1.5 w-1.5 rounded-full bg-black animate-ping" />
               Batas Belanja Hari Ini
             </span>
-            <span className="text-xs text-espresso-muted font-medium">
-              Sisa {summary.cycle_info.days_remaining} hari dalam siklus
+            <span className="text-xs text-white/60 font-semibold">
+              Sisa {summary.cycle_info.days_remaining} hari siklus
             </span>
           </div>
 
           <div>
             <div className="flex items-baseline gap-2">
-              <h2 className="text-3xl font-black text-espresso tracking-tight">
+              <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
                 {formatIDR(summary.today_metrics.ideal_spending_today)}
               </h2>
-              <span className="text-xs text-espresso-muted font-semibold">/ hari (Ideal)</span>
+              <span className="text-xs text-white/50 font-semibold">/ hari (Ideal)</span>
             </div>
 
-            <div className="mt-2 flex items-center justify-between text-xs">
-              <span className="text-espresso-muted">
-                Terpakai: <strong className="text-espresso">{formatIDR(summary.today_metrics.actual_spent_today)}</strong>
+            <div className="mt-2.5 flex items-center justify-between text-xs">
+              <span className="text-white/70">
+                Terpakai: <strong className="text-white font-bold">{formatIDR(summary.today_metrics.actual_spent_today)}</strong>
               </span>
               <span
-                className={`font-bold rounded-md px-1.5 py-0.5 text-[11px] ${
+                className={`font-black rounded-lg px-2 py-0.5 text-[11px] ${
                   summary.today_metrics.daily_variance >= 0
-                    ? "bg-income/15 text-income"
-                    : "bg-expense/15 text-expense"
+                    ? "bg-[#C8F526]/20 text-[#C8F526] border border-[#C8F526]/30"
+                    : "bg-[#F43F5E]/20 text-[#F43F5E] border border-[#F43F5E]/30"
                 }`}
               >
                 {summary.today_metrics.daily_variance >= 0
@@ -600,14 +604,14 @@ export default function ForecastPage() {
             </div>
 
             {/* Gauge Progress Bar */}
-            <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-cream-dark/60">
+            <div className="mt-2.5 h-2 w-full overflow-hidden rounded-full bg-white/10">
               <div
                 className={`h-full rounded-full transition-all duration-500 ${
                   summary.today_metrics.percentage_used > 100
-                    ? "bg-expense"
+                    ? "bg-[#F43F5E]"
                     : summary.today_metrics.percentage_used >= 80
-                    ? "bg-amber"
-                    : "bg-income"
+                    ? "bg-amber-400"
+                    : "bg-[#C8F526]"
                 }`}
                 style={{ width: `${Math.min(summary.today_metrics.percentage_used, 100)}%` }}
               />
@@ -615,63 +619,63 @@ export default function ForecastPage() {
           </div>
 
           {/* Quick Metrics Grid */}
-          <div className="grid grid-cols-2 gap-2 pt-2 border-t border-surface-border text-xs">
-            <div className="rounded-2xl border border-surface-border bg-surface p-2.5 flex flex-col justify-between min-h-[76px]">
-              <div className="flex items-center gap-1.5 text-espresso-muted text-[11px] h-4">
-                <Clock className="h-3.5 w-3.5 text-terracotta shrink-0" />
+          <div className="grid grid-cols-2 gap-2.5 pt-3 border-t border-white/10 text-xs">
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-3 flex flex-col justify-between min-h-[82px] backdrop-blur-sm">
+              <div className="flex items-center gap-1.5 text-white/60 text-[11px] h-4">
+                <Clock className="h-3.5 w-3.5 text-[#C8F526] shrink-0" />
                 <span className="truncate font-medium">Kas Bebas</span>
               </div>
-              <span className="text-sm sm:text-base font-extrabold text-espresso truncate">
+              <span className="text-base sm:text-lg font-black text-white truncate">
                 {formatIDR(summary.safe_to_spend_total)}
               </span>
-              <div className="text-[10px] text-espresso-muted truncate h-4 flex items-center gap-1">
-                <span>Daya tahan: <strong>{summary.runway_prediction.predicted_runway_days} Hari</strong></span>
+              <div className="text-[10px] text-white/60 truncate h-4 flex items-center gap-1">
+                <span>Daya tahan: <strong className="text-white">{summary.runway_prediction.predicted_runway_days} Hari</strong></span>
                 {summary.runway_prediction.is_runway_safe ? (
-                  <CheckCircle2 className="h-3 w-3 text-income shrink-0" />
+                  <CheckCircle2 className="h-3 w-3 text-[#10B981] shrink-0" />
                 ) : (
-                  <AlertTriangle className="h-3 w-3 text-amber shrink-0" />
+                  <AlertTriangle className="h-3 w-3 text-amber-400 shrink-0" />
                 )}
               </div>
             </div>
 
-            <div className="rounded-2xl border border-surface-border bg-surface p-2.5 flex flex-col justify-between min-h-[76px]">
-              <div className="flex items-center gap-1.5 text-espresso-muted text-[11px] h-4">
-                <Sparkles className="h-3.5 w-3.5 text-income shrink-0" />
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-3 flex flex-col justify-between min-h-[82px] backdrop-blur-sm">
+              <div className="flex items-center gap-1.5 text-white/60 text-[11px] h-4">
+                <Sparkles className="h-3.5 w-3.5 text-[#10B981] shrink-0" />
                 <span className="truncate font-medium">Tabungan</span>
               </div>
-              <span className="text-sm sm:text-base font-extrabold text-income truncate">
+              <span className="text-base sm:text-lg font-black text-[#10B981] truncate">
                 {formatIDR(summary.current_savings_balance ?? summary.savings_pool_balance)}
               </span>
-              <div className="text-[10px] text-espresso-muted truncate h-4 flex items-center">
+              <div className="text-[10px] text-white/60 truncate h-4 flex items-center">
                 <span>Target: {formatIDR(summary.end_of_month_forecast.target_savings)}</span>
               </div>
             </div>
           </div>
 
           {/* Envelope / Pocket Banking Breakdown Strip */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 text-[11px]">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1 text-[11px]">
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="inline-flex items-center gap-1.5 rounded-xl bg-surface px-2.5 py-1 text-espresso border border-surface-border">
-                <span className="h-2 w-2 rounded-full bg-terracotta" />
-                <span>Operasional: <strong>{formatIDR(summary.safe_to_spend_total)}</strong></span>
+              <span className="inline-flex items-center gap-1.5 rounded-xl bg-white/5 px-2.5 py-1 text-white/80 border border-white/10">
+                <span className="h-2 w-2 rounded-full bg-[#C8F526]" />
+                <span>Operasional: <strong className="text-white">{formatIDR(summary.safe_to_spend_total)}</strong></span>
               </span>
-              <span className="inline-flex items-center gap-1.5 rounded-xl bg-surface px-2.5 py-1 text-espresso border border-surface-border">
-                <span className="h-2 w-2 rounded-full bg-income" />
-                <span>Tabungan: <strong>{formatIDR(summary.current_savings_balance ?? summary.savings_pool_balance)}</strong></span>
+              <span className="inline-flex items-center gap-1.5 rounded-xl bg-white/5 px-2.5 py-1 text-white/80 border border-white/10">
+                <span className="h-2 w-2 rounded-full bg-[#10B981]" />
+                <span>Tabungan: <strong className="text-white">{formatIDR(summary.current_savings_balance ?? summary.savings_pool_balance)}</strong></span>
               </span>
-              <span className="inline-flex items-center gap-1.5 rounded-xl bg-surface px-2.5 py-1 text-espresso border border-surface-border">
-                <span className="h-2 w-2 rounded-full bg-amber" />
-                <span>Tagihan: <strong>{formatIDR(summary.subscription_pool_balance)}</strong></span>
+              <span className="inline-flex items-center gap-1.5 rounded-xl bg-white/5 px-2.5 py-1 text-white/80 border border-white/10">
+                <span className="h-2 w-2 rounded-full bg-amber-400" />
+                <span>Tagihan: <strong className="text-white">{formatIDR(summary.subscription_pool_balance)}</strong></span>
               </span>
             </div>
 
             <button
               type="button"
               onClick={() => setIsWalletConfigModalOpen(true)}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-surface-border bg-surface px-2.5 py-1 text-[11px] font-bold text-terracotta hover:border-terracotta transition shadow-xs"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-white/15 bg-white/10 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-white/20 transition active:scale-95"
               title="Atur dompet mana yang jadi tabungan, operasional, atau tagihan"
             >
-              <Sliders className="h-3 w-3 shrink-0" />
+              <Sliders className="h-3 w-3 text-[#C8F526] shrink-0" />
               <span>Atur Dompet</span>
             </button>
           </div>
@@ -681,14 +685,14 @@ export default function ForecastPage() {
       {/* ===================================================================== */}
       {/* 2. SEGMENTED TABS (MOBILE-FIRST)                                     */}
       {/* ===================================================================== */}
-      <div className="grid grid-cols-3 gap-1 rounded-2xl bg-surface-card p-1 border border-surface-border text-xs font-bold">
+      <div className="grid grid-cols-3 gap-1 rounded-2xl bg-white p-1.5 border border-surface-border text-xs font-bold shadow-xs">
         <button
           type="button"
           onClick={() => setActiveTab("ledger")}
           className={`rounded-xl py-2 px-1 inline-flex items-center justify-center gap-1.5 truncate transition whitespace-nowrap ${
             activeTab === "ledger"
-              ? "bg-terracotta text-white shadow-sm"
-              : "text-espresso-muted hover:text-espresso"
+              ? "bg-[#0D0F17] text-[#C8F526] shadow-sm"
+              : "text-espresso-muted hover:text-espresso hover:bg-surface-card"
           }`}
         >
           <TrendingUp className="h-3.5 w-3.5 shrink-0" />
@@ -699,8 +703,8 @@ export default function ForecastPage() {
           onClick={() => setActiveTab("fixed")}
           className={`rounded-xl py-2 px-1 inline-flex items-center justify-center gap-1.5 truncate transition whitespace-nowrap ${
             activeTab === "fixed"
-              ? "bg-terracotta text-white shadow-sm"
-              : "text-espresso-muted hover:text-espresso"
+              ? "bg-[#0D0F17] text-[#C8F526] shadow-sm"
+              : "text-espresso-muted hover:text-espresso hover:bg-surface-card"
           }`}
         >
           <Receipt className="h-3.5 w-3.5 shrink-0" />
@@ -711,8 +715,8 @@ export default function ForecastPage() {
           onClick={() => setActiveTab("simulator")}
           className={`rounded-xl py-2 px-1 inline-flex items-center justify-center gap-1.5 truncate transition whitespace-nowrap ${
             activeTab === "simulator"
-              ? "bg-terracotta text-white shadow-sm"
-              : "text-espresso-muted hover:text-espresso"
+              ? "bg-[#0D0F17] text-[#C8F526] shadow-sm"
+              : "text-espresso-muted hover:text-espresso hover:bg-surface-card"
           }`}
         >
           <Lightbulb className="h-3.5 w-3.5 shrink-0" />
@@ -726,17 +730,17 @@ export default function ForecastPage() {
       {activeTab === "ledger" && (
         <div className="space-y-4">
           {/* Sub-View Switcher: Forward Time-Series Projection vs Realisasi Harian */}
-          <div className="flex gap-1.5 p-1 rounded-2xl bg-surface-card border border-surface-border text-xs font-bold shadow-2xs">
+          <div className="flex gap-1.5 p-1 rounded-2xl bg-white border border-surface-border text-xs font-bold shadow-xs">
             <button
               type="button"
               onClick={() => setTimelineView("forward")}
               className={`flex-1 py-2 px-2 rounded-xl transition flex items-center justify-center gap-1.5 whitespace-nowrap truncate ${
                 timelineView === "forward"
-                  ? "bg-surface text-terracotta shadow-xs border border-surface-border"
-                  : "text-espresso-muted hover:text-espresso"
+                  ? "bg-[#0D0F17] text-[#C8F526] shadow-sm"
+                  : "text-espresso-muted hover:text-espresso hover:bg-surface-card"
               }`}
             >
-              <Sparkles className="h-3.5 w-3.5 text-terracotta shrink-0" />
+              <Sparkles className="h-3.5 w-3.5 shrink-0" />
               <span className="truncate">Prediksi Saldo</span>
             </button>
             <button
@@ -744,8 +748,8 @@ export default function ForecastPage() {
               onClick={() => setTimelineView("history")}
               className={`flex-1 py-2 px-2 rounded-xl transition flex items-center justify-center gap-1.5 whitespace-nowrap truncate ${
                 timelineView === "history"
-                  ? "bg-surface text-terracotta shadow-xs border border-surface-border"
-                  : "text-espresso-muted hover:text-espresso"
+                  ? "bg-[#0D0F17] text-[#C8F526] shadow-sm"
+                  : "text-espresso-muted hover:text-espresso hover:bg-surface-card"
               }`}
             >
               <Clock className="h-3.5 w-3.5 text-espresso-muted shrink-0" />
@@ -759,31 +763,29 @@ export default function ForecastPage() {
           {timelineView === "forward" && (
             <div className="space-y-4">
               {/* 1. KONTROL FILTER PROYEKSI & RENCANA */}
-              <div className="rounded-3xl border border-surface-border bg-surface p-4 shadow-sm space-y-3">
-                <div className="flex items-center justify-between pb-2 border-b border-surface-border">
-                  <div>
-                    <h3 className="text-sm font-bold text-espresso">Filter Proyeksi Arus Kas</h3>
-                  </div>
+              <div className="rounded-3xl border border-surface-border bg-white p-5 shadow-xs space-y-3.5">
+                <div className="flex items-center justify-between pb-2.5 border-b border-surface-border">
+                  <h3 className="text-sm font-black text-espresso">Filter Proyeksi Arus Kas</h3>
                   <button
                     type="button"
                     onClick={() => setIsAddPlannedModalOpen(true)}
-                    className="flex items-center gap-1 rounded-xl bg-terracotta px-2.5 py-1 text-xs font-bold text-white hover:bg-terracotta-hover transition shadow-xs"
+                    className="flex items-center gap-1.5 rounded-xl bg-[#0D0F17] px-3 py-1.5 text-xs font-black text-[#C8F526] hover:bg-[#161A26] transition shadow-xs active:scale-95"
                   >
                     <Plus className="h-3.5 w-3.5" />
-                    <span>+ Rencana</span>
+                    <span>Rencana</span>
                   </button>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                   {/* Dompet Filter */}
                   <div>
-                    <label className="block text-[11px] font-semibold text-espresso mb-1">
+                    <label className="block text-[11px] font-bold text-espresso mb-1">
                       Pilih Dompet / Basis Saldo
                     </label>
                     <select
                       value={projWalletFilter}
                       onChange={(e) => setProjWalletFilter(e.target.value)}
-                      className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs font-semibold text-espresso focus:outline-none focus:border-terracotta"
+                      className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs font-semibold text-espresso focus:outline-none focus:border-[#0D0F17]"
                     >
                       <option value="all_operational">Semua Dompet Operasional</option>
                       <option value="all_savings">Semua Tabungan (Savings)</option>
@@ -799,7 +801,7 @@ export default function ForecastPage() {
 
                   {/* Rentang Waktu Preset */}
                   <div>
-                    <label className="block text-[11px] font-semibold text-espresso mb-1">
+                    <label className="block text-[11px] font-bold text-espresso mb-1">
                       Rentang Waktu Prediksi
                     </label>
                     <div className="grid grid-cols-5 gap-1">
@@ -814,9 +816,9 @@ export default function ForecastPage() {
                           key={item.id}
                           type="button"
                           onClick={() => setProjRangePreset(item.id as any)}
-                          className={`rounded-lg py-1.5 text-[10px] font-bold border transition ${
+                          className={`rounded-xl py-1.5 text-[10px] font-extrabold border transition ${
                             projRangePreset === item.id
-                              ? "bg-terracotta text-white border-terracotta shadow-xs"
+                              ? "bg-[#0D0F17] text-[#C8F526] border-[#0D0F17] shadow-xs"
                               : "bg-surface-card text-espresso-muted border-surface-border hover:text-espresso"
                           }`}
                         >
@@ -829,8 +831,8 @@ export default function ForecastPage() {
 
                 {/* Input Saldo Kustom jika memilih custom_balance */}
                 {projWalletFilter === "custom_balance" && (
-                  <div className="rounded-xl border border-amber/30 bg-amber/10 p-2.5 space-y-1">
-                    <label className="block text-[11px] font-semibold text-terracotta">
+                  <div className="rounded-2xl border border-amber-400/40 bg-amber-400/10 p-3 space-y-1">
+                    <label className="block text-[11px] font-bold text-amber-900">
                       Saldo Awal Bayangan untuk Uji Coba (Rp)
                     </label>
                     <input
@@ -838,7 +840,7 @@ export default function ForecastPage() {
                       value={projCustomInitialBalance}
                       onChange={(e) => setProjCustomInitialBalance(e.target.value)}
                       placeholder="Contoh: 1500000"
-                      className="w-full rounded-lg border border-surface-border bg-surface px-3 py-1.5 text-xs font-bold text-espresso focus:outline-none focus:border-terracotta"
+                      className="w-full rounded-xl border border-surface-border bg-white px-3 py-1.5 text-xs font-bold text-espresso focus:outline-none focus:border-[#0D0F17]"
                     />
                     <span className="text-[10px] text-espresso-muted block">
                       Saldo riil di database tidak akan berubah sama sekali saat melakukan simulasi ini.
@@ -855,7 +857,7 @@ export default function ForecastPage() {
                         type="date"
                         value={projStartDate}
                         onChange={(e) => setProjStartDate(e.target.value)}
-                        className="w-full rounded-lg border border-surface-border bg-surface-card px-2.5 py-1 text-xs text-espresso focus:outline-none focus:border-terracotta"
+                        className="w-full rounded-xl border border-surface-border bg-surface-card px-2.5 py-1.5 text-xs text-espresso focus:outline-none focus:border-[#0D0F17]"
                       />
                     </div>
                     <div>
@@ -867,7 +869,7 @@ export default function ForecastPage() {
                         value={projEndDate}
                         max={maxAllowedDateStr}
                         onChange={(e) => setProjEndDate(e.target.value)}
-                        className="w-full rounded-lg border border-surface-border bg-surface-card px-2.5 py-1 text-xs text-espresso focus:outline-none focus:border-terracotta"
+                        className="w-full rounded-xl border border-surface-border bg-surface-card px-2.5 py-1.5 text-xs text-espresso focus:outline-none focus:border-[#0D0F17]"
                       />
                     </div>
                   </div>
@@ -882,7 +884,7 @@ export default function ForecastPage() {
                           type="checkbox"
                           checked={projIncludeMeal}
                           onChange={(e) => setProjIncludeMeal(e.target.checked)}
-                          className="rounded border-surface-border text-terracotta focus:ring-terracotta"
+                          className="rounded border-surface-border text-[#0D0F17] focus:ring-[#0D0F17]"
                         />
                         <span className="text-espresso font-medium text-[11px]">
                           Hitung Patokan Makan Harian ({formatIDR(plan?.daily_living_budget || 0)}/hari)
@@ -890,7 +892,7 @@ export default function ForecastPage() {
                       </label>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/25">
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input
                           type="checkbox"
@@ -918,7 +920,7 @@ export default function ForecastPage() {
                             placeholder={String(plan?.monthly_savings_target ? Math.round(plan.monthly_savings_target / 30) : 25000)}
                             value={projCustomDailySavings}
                             onChange={(e) => setProjCustomDailySavings(e.target.value)}
-                            className="w-28 rounded-lg border border-emerald-400 bg-surface px-2 py-1 text-xs font-bold text-emerald-900 text-right focus:outline-none focus:border-emerald-600"
+                            className="w-28 rounded-xl border border-emerald-400 bg-white px-2.5 py-1 text-xs font-bold text-emerald-900 text-right focus:outline-none focus:border-emerald-600"
                           />
                         </div>
                       )}
@@ -929,54 +931,54 @@ export default function ForecastPage() {
 
               {/* 2. KARTU RINGKASAN HASIL PROYEKSI RENTANG WAKTU */}
               {isProjectionLoading ? (
-                <div className="rounded-3xl border border-surface-border bg-surface p-8 flex items-center justify-center">
-                  <Loader2 className="h-6 w-6 animate-spin text-terracotta" />
+                <div className="rounded-3xl border border-surface-border bg-white p-8 flex items-center justify-center">
+                  <Loader2 className="h-6 w-6 animate-spin text-[#0D0F17]" />
                 </div>
               ) : rangeProjection && (
-                <div className="rounded-3xl border border-surface-border bg-gradient-to-br from-surface to-surface-card p-4 shadow-sm space-y-3">
+                <div className="rounded-3xl border border-surface-border bg-white p-5 shadow-xs space-y-3.5">
                   <div className="flex items-center justify-between text-xs pb-2 border-b border-surface-border">
-                    <span className="font-bold text-espresso">
+                    <span className="font-extrabold text-espresso">
                       Proyeksi {rangeProjection.total_days} Hari ({rangeProjection.start_date} s/d {rangeProjection.end_date})
                     </span>
                   </div>
 
                   {/* 5 Metrik Utama Grid */}
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 text-xs">
-                    <div className="rounded-2xl bg-surface p-2.5 border border-surface-border flex flex-col justify-between min-h-[72px]">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5 text-xs">
+                    <div className="rounded-2xl bg-surface-card p-3 border border-surface-border flex flex-col justify-between min-h-[76px]">
                       <span className="text-[10px] text-espresso-muted uppercase font-bold block truncate">Saldo Kas Awal</span>
-                      <span className="text-sm font-extrabold text-espresso block truncate">
+                      <span className="text-sm font-black text-espresso block truncate">
                         {formatIDR(rangeProjection.initial_balance)}
                       </span>
                     </div>
 
-                    <div className="rounded-2xl bg-income/10 p-2.5 border border-income/20 flex flex-col justify-between min-h-[72px]">
+                    <div className="rounded-2xl bg-income/10 p-3 border border-income/20 flex flex-col justify-between min-h-[76px]">
                       <span className="text-[10px] text-income uppercase font-bold block truncate">Estimasi Masuk</span>
-                      <span className="text-sm font-extrabold text-income block truncate">
+                      <span className="text-sm font-black text-income block truncate">
                         +{formatIDR(rangeProjection.total_inflow)}
                       </span>
                     </div>
 
-                    <div className="rounded-2xl bg-expense/10 p-2.5 border border-expense/20 flex flex-col justify-between min-h-[72px]">
+                    <div className="rounded-2xl bg-expense/10 p-3 border border-expense/20 flex flex-col justify-between min-h-[76px]">
                       <span className="text-[10px] text-expense uppercase font-bold block truncate">Estimasi Keluar</span>
-                      <span className="text-sm font-extrabold text-expense block truncate">
+                      <span className="text-sm font-black text-expense block truncate">
                         -{formatIDR(rangeProjection.total_outflow)}
                       </span>
                     </div>
 
-                    <div className={`rounded-2xl p-2.5 border flex flex-col justify-between min-h-[72px] ${
+                    <div className={`rounded-2xl p-3 border flex flex-col justify-between min-h-[76px] ${
                       rangeProjection.final_balance >= 0
-                        ? "bg-surface border-surface-border"
+                        ? "bg-surface-card border-surface-border"
                         : "bg-expense/15 border-expense/30"
                     }`}>
                       <span className="text-[10px] text-espresso-muted uppercase font-bold block truncate">Sisa Kas Operasional</span>
-                      <span className={`text-sm font-extrabold block truncate ${
-                        rangeProjection.final_balance >= 0 ? "text-terracotta" : "text-expense"
+                      <span className={`text-sm font-black block truncate ${
+                        rangeProjection.final_balance >= 0 ? "text-espresso" : "text-expense"
                       }`}>
                         {formatIDR(rangeProjection.final_balance)}
                       </span>
                     </div>
 
-                    <div className="rounded-2xl bg-emerald-500/10 p-2.5 border border-emerald-500/25 col-span-2 md:col-span-1 flex flex-col justify-between min-h-[72px]">
+                    <div className="rounded-2xl bg-emerald-500/10 p-3 border border-emerald-500/25 col-span-2 md:col-span-1 flex flex-col justify-between min-h-[76px]">
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] text-emerald-800 uppercase font-bold block truncate">Prediksi Tabungan</span>
                         {rangeProjection.target_savings > 0 && (
@@ -985,7 +987,7 @@ export default function ForecastPage() {
                           </span>
                         )}
                       </div>
-                      <span className="text-sm font-extrabold text-emerald-900 block truncate">
+                      <span className="text-sm font-black text-emerald-900 block truncate">
                         {formatIDR(rangeProjection.final_savings_balance ?? rangeProjection.initial_savings_balance ?? 0)}
                       </span>
                     </div>
@@ -993,7 +995,7 @@ export default function ForecastPage() {
 
                   {/* Banner Informasi Jika Rentang Dibatasi Sistem */}
                   {rangeProjection.is_clamped && (
-                    <div className="rounded-2xl p-2.5 bg-amber/10 border border-amber/30 text-amber-900 text-xs flex items-center gap-2">
+                    <div className="rounded-2xl p-3 bg-amber/10 border border-amber/30 text-amber-900 text-xs flex items-center gap-2">
                       <Info className="h-4 w-4 shrink-0 text-amber-700" />
                       <div>
                         <span className="font-bold">Rentang Dibatasi Maksimal 1 Tahun:</span>{" "}
@@ -1003,7 +1005,7 @@ export default function ForecastPage() {
                   )}
 
                   {/* Banner Status Aman / Defisit */}
-                  <div className={`rounded-2xl p-3 border text-xs font-semibold flex items-center gap-2 ${
+                  <div className={`rounded-2xl p-3.5 border text-xs font-semibold flex items-center gap-2.5 ${
                     rangeProjection.is_safe
                       ? "bg-income/10 border-income/30 text-income"
                       : "bg-expense/15 border-expense/30 text-expense"
@@ -1012,7 +1014,7 @@ export default function ForecastPage() {
                       <>
                         <CheckCircle2 className="h-4 w-4 shrink-0" />
                         <div>
-                          <span>Arus kas aman terjaga! Saldo diproyeksikan bertahan di atas Rp0.</span>
+                          <span className="font-bold">Arus kas aman terjaga! Saldo diproyeksikan bertahan di atas Rp0.</span>
                           <span className="block text-[10px] text-espresso-muted mt-0.5">
                             Saldo terendah: {formatIDR(rangeProjection.lowest_balance)} (pada tanggal {rangeProjection.lowest_balance_date})
                           </span>
@@ -1022,7 +1024,7 @@ export default function ForecastPage() {
                       <>
                         <AlertTriangle className="h-4 w-4 shrink-0" />
                         <div>
-                          <span>Waspada Defisit! Saldo diprediksi minus mulai tanggal {rangeProjection.critical_deficit_date}.</span>
+                          <span className="font-bold">Waspada Defisit! Saldo diprediksi minus mulai tanggal {rangeProjection.critical_deficit_date}.</span>
                           <span className="block text-[10px] text-espresso-muted mt-0.5">
                             Titik defisit terdalam mencapai {formatIDR(rangeProjection.lowest_balance)}. Siapkan dana darurat atau tunda pengeluaran rencana!
                           </span>
@@ -1034,16 +1036,16 @@ export default function ForecastPage() {
               )}
 
               {/* 3. TIMELINE HARIAN MASA DEPAN (FORWARD LEDGER) */}
-              <div className="rounded-3xl border border-surface-border bg-surface p-4 shadow-sm space-y-3">
+              <div className="rounded-3xl border border-surface-border bg-white p-5 shadow-xs space-y-3.5">
                 <div className="flex items-center justify-between pb-2 border-b border-surface-border">
                   <div>
-                    <h4 className="text-sm font-bold text-espresso">Buku Kas Masa Depan</h4>
+                    <h4 className="text-sm font-black text-espresso">Buku Kas Masa Depan</h4>
                   </div>
                 </div>
 
                 {isProjectionLoading ? (
                   <div className="py-8 flex items-center justify-center">
-                    <Loader2 className="h-5 w-5 animate-spin text-terracotta" />
+                    <Loader2 className="h-5 w-5 animate-spin text-[#0D0F17]" />
                   </div>
                 ) : rangeProjection && rangeProjection.timeline.length > 0 ? (
                   <div className="divide-y divide-surface-border">
@@ -1055,14 +1057,14 @@ export default function ForecastPage() {
                         <div
                           key={idx}
                           onClick={() => setSelectedDayDetail(day)}
-                          className="py-2.5 px-2 -mx-2 rounded-2xl hover:bg-surface-card transition-all flex items-center justify-between group cursor-pointer text-xs"
+                          className="py-3 px-2 -mx-2 rounded-2xl hover:bg-surface-card transition-all flex items-center justify-between group cursor-pointer text-xs"
                         >
                           {/* Sisi Kiri: Tanggal & Indikator Pemasukan/Pengeluaran */}
                           <div className="space-y-0.5">
                             <div className="flex items-center gap-1.5 font-bold text-espresso">
                               <span>{day.date}</span>
                               {day.is_today && (
-                                <span className="rounded-md bg-terracotta text-white px-1.5 py-0.2 text-[9px] font-bold">
+                                <span className="rounded-full bg-[#0D0F17] text-[#C8F526] px-2 py-0.5 text-[9px] font-black tracking-wider uppercase">
                                   Hari Ini
                                 </span>
                               )}
@@ -1105,17 +1107,17 @@ export default function ForecastPage() {
 
               {/* 4. DAFTAR RENCANA TRANSAKSI MASA DEPAN (PLANNED TRANSACTIONS) */}
               <div className="rounded-3xl border border-surface-border bg-surface p-4 shadow-sm space-y-3">
-                <div className="flex items-center justify-between pb-2 border-b border-surface-border">
+                <div className="flex items-center justify-between pb-2.5 border-b border-surface-border">
                   <div>
-                    <h4 className="text-sm font-bold text-espresso">Rencana Transaksi Terdaftar</h4>
+                    <h4 className="text-sm font-black text-espresso">Rencana Transaksi Terdaftar</h4>
                   </div>
                   <button
                     type="button"
                     onClick={() => setIsAddPlannedModalOpen(true)}
-                    className="flex items-center gap-1 rounded-xl bg-terracotta/10 px-2.5 py-1 text-xs font-bold text-terracotta hover:bg-terracotta/20"
+                    className="flex items-center gap-1.5 rounded-xl bg-[#0D0F17] px-3 py-1.5 text-xs font-black text-[#C8F526] hover:bg-[#161A26] transition shadow-xs active:scale-95"
                   >
                     <Plus className="h-3.5 w-3.5" />
-                    Tambah
+                    <span>Tambah</span>
                   </button>
                 </div>
 
@@ -1174,7 +1176,7 @@ export default function ForecastPage() {
                               type="button"
                               onClick={() => handleExecutePlanned(pt.id, pt.name)}
                               disabled={isExecutingPlanned === pt.id}
-                              className="rounded-xl bg-terracotta/15 px-2.5 py-1 text-[11px] font-bold text-terracotta hover:bg-terracotta/25 transition disabled:opacity-50 flex items-center gap-1"
+                              className="rounded-xl bg-[#C8F526] px-3 py-1.5 text-[11px] font-black text-black hover:bg-[#b8e51b] transition disabled:opacity-50 flex items-center gap-1 shadow-xs active:scale-95"
                               title="Eksekusi menjadi transaksi riil & debit dompet"
                             >
                               <Zap className="h-3 w-3" />
@@ -1184,7 +1186,7 @@ export default function ForecastPage() {
                           <button
                             type="button"
                             onClick={() => handleDeletePlanned(pt.id)}
-                            className="rounded-lg p-1.5 text-espresso-muted hover:bg-expense/10 hover:text-expense transition"
+                            className="rounded-xl p-1.5 text-espresso-muted hover:bg-expense/10 hover:text-expense transition"
                             title="Hapus rencana ini"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
@@ -1206,13 +1208,13 @@ export default function ForecastPage() {
           {/* B. HISTORICAL LEDGER VIEW (REKAP REALISASI HARIAN SIKLUS INI)     */}
           {/* ================================================================= */}
           {timelineView === "history" && (
-            <div className="rounded-3xl border border-surface-border bg-surface p-4 shadow-sm space-y-3">
-              <div className="flex items-center justify-between pb-2 border-b border-surface-border">
+            <div className="rounded-3xl border border-surface-border bg-white p-5 shadow-xs space-y-3.5">
+              <div className="flex items-center justify-between pb-2.5 border-b border-surface-border">
                 <div>
-                  <h3 className="text-sm font-bold text-espresso">Rekap Realisasi Harian</h3>
+                  <h3 className="text-sm font-black text-espresso">Rekap Realisasi Harian</h3>
                 </div>
                 {ledger && (
-                  <span className="rounded-lg bg-surface-card px-2 py-1 text-[11px] font-bold text-espresso border border-surface-border">
+                  <span className="rounded-xl bg-surface-card px-2.5 py-1 text-[11px] font-black text-espresso border border-surface-border">
                     Net: {ledger.net_variance >= 0 ? "+" : ""}{formatIDR(ledger.net_variance)}
                   </span>
                 )}
@@ -1220,7 +1222,7 @@ export default function ForecastPage() {
 
               {isLedgerLoading ? (
                 <div className="py-12 flex items-center justify-center">
-                  <Loader2 className="h-6 w-6 animate-spin text-terracotta" />
+                  <Loader2 className="h-6 w-6 animate-spin text-[#0D0F17]" />
                 </div>
               ) : ledger && ledger.items.length > 0 ? (
                 <div className="divide-y divide-surface-border">
@@ -1271,10 +1273,10 @@ export default function ForecastPage() {
       {/* TAB 2: TAGIHAN PASTI & SIKLUS BERKALA (FIXED & CYCLICAL EXPENSES)     */}
       {/* ===================================================================== */}
       {activeTab === "fixed" && (
-        <div className="rounded-3xl border border-surface-border bg-surface p-4 shadow-sm space-y-4">
-          <div className="flex items-center justify-between pb-2 border-b border-surface-border">
+        <div className="rounded-3xl border border-surface-border bg-white p-5 shadow-xs space-y-4">
+          <div className="flex items-center justify-between pb-2.5 border-b border-surface-border">
             <div>
-              <h3 className="text-sm font-bold text-espresso">Tagihan & Siklus Hidup Berkala</h3>
+              <h3 className="text-sm font-black text-espresso">Tagihan & Siklus Hidup Berkala</h3>
               <p className="text-[11px] text-espresso-muted">
                 Otomatis dicadangkan dari saldo agar jatah makan harian tidak terganggu
               </p>
@@ -1282,24 +1284,24 @@ export default function ForecastPage() {
             <button
               type="button"
               onClick={() => setIsAddFixedModalOpen(true)}
-              className="flex items-center gap-1 rounded-xl bg-terracotta/10 px-2.5 py-1 text-xs font-bold text-terracotta hover:bg-terracotta/20"
+              className="flex items-center gap-1.5 rounded-xl bg-[#0D0F17] px-3 py-1.5 text-xs font-black text-[#C8F526] hover:bg-[#161A26] transition shadow-xs active:scale-95"
             >
               <Plus className="h-3.5 w-3.5" />
-              Tambah
+              <span>Tambah</span>
             </button>
           </div>
 
           {summary && (
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="rounded-2xl bg-surface-card p-3 border border-surface-border">
+            <div className="grid grid-cols-2 gap-2.5 text-xs">
+              <div className="rounded-2xl bg-surface-card p-3.5 border border-surface-border">
                 <span className="text-[10px] text-espresso-muted uppercase font-bold">Total Bulanan</span>
-                <span className="mt-0.5 block text-sm font-extrabold text-espresso">
+                <span className="mt-0.5 block text-sm font-black text-espresso">
                   {formatIDR(summary.fixed_obligations.total_monthly_fixed)}
                 </span>
               </div>
-              <div className="rounded-2xl bg-amber/15 p-3 border border-amber/30">
-                <span className="text-[10px] text-terracotta uppercase font-bold">Belum Terbayar (Buffer)</span>
-                <span className="mt-0.5 block text-sm font-extrabold text-terracotta">
+              <div className="rounded-2xl bg-[#0D0F17]/5 p-3.5 border border-surface-border">
+                <span className="text-[10px] text-espresso-muted uppercase font-bold">Belum Terbayar (Buffer)</span>
+                <span className="mt-0.5 block text-sm font-black text-espresso">
                   {formatIDR(summary.fixed_obligations.unpaid_fixed_buffer)}
                 </span>
               </div>
@@ -1307,12 +1309,12 @@ export default function ForecastPage() {
           )}
 
           {/* Sub-Filter: Semua / Tagihan Bulanan / Siklus Biaya Hidup */}
-          <div className="flex gap-1.5 p-1 rounded-xl bg-surface-card border border-surface-border text-[11px] font-bold">
+          <div className="flex gap-1.5 p-1 rounded-2xl bg-surface-card border border-surface-border text-[11px] font-bold">
             <button
               type="button"
               onClick={() => setFixedFilter("all")}
-              className={`flex-1 py-1 rounded-lg transition ${
-                fixedFilter === "all" ? "bg-surface text-terracotta shadow-xs" : "text-espresso-muted hover:text-espresso"
+              className={`flex-1 py-1.5 rounded-xl transition ${
+                fixedFilter === "all" ? "bg-[#0D0F17] text-[#C8F526] shadow-xs" : "text-espresso-muted hover:text-espresso"
               }`}
             >
               Semua ({summary?.fixed_obligations?.items?.length || 0})
@@ -1320,8 +1322,8 @@ export default function ForecastPage() {
             <button
               type="button"
               onClick={() => setFixedFilter("monthly")}
-              className={`flex-1 py-1 rounded-lg transition inline-flex items-center justify-center gap-1 ${
-                fixedFilter === "monthly" ? "bg-surface text-terracotta shadow-xs" : "text-espresso-muted hover:text-espresso"
+              className={`flex-1 py-1.5 rounded-xl transition inline-flex items-center justify-center gap-1 ${
+                fixedFilter === "monthly" ? "bg-[#0D0F17] text-[#C8F526] shadow-xs" : "text-espresso-muted hover:text-espresso"
               }`}
             >
               <Calendar className="h-3 w-3 shrink-0" />
@@ -1330,8 +1332,8 @@ export default function ForecastPage() {
             <button
               type="button"
               onClick={() => setFixedFilter("cyclical")}
-              className={`flex-1 py-1 rounded-lg transition inline-flex items-center justify-center gap-1 ${
-                fixedFilter === "cyclical" ? "bg-surface text-terracotta shadow-xs" : "text-espresso-muted hover:text-espresso"
+              className={`flex-1 py-1.5 rounded-xl transition inline-flex items-center justify-center gap-1 ${
+                fixedFilter === "cyclical" ? "bg-[#0D0F17] text-[#C8F526] shadow-xs" : "text-espresso-muted hover:text-espresso"
               }`}
             >
               <ArrowRightLeft className="h-3 w-3 shrink-0" />
@@ -1365,33 +1367,33 @@ export default function ForecastPage() {
                 return (
                   <div
                     key={item.id}
-                    className="flex items-center justify-between rounded-2xl border border-surface-border bg-surface-card p-3 transition hover:border-terracotta/40"
+                    className="flex items-center justify-between rounded-2xl border border-surface-border bg-surface-card p-3 transition hover:border-[#0D0F17]/30"
                   >
                     <div className="flex items-center gap-3">
                       {isSavings ? (
-                        <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
-                          <PiggyBank className="h-3.5 w-3.5" />
+                        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+                          <PiggyBank className="h-4 w-4" />
                         </div>
                       ) : isPosTransfer ? (
-                        <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-blue-100 text-blue-700">
-                          <ArrowRightLeft className="h-3.5 w-3.5" />
+                        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-100 text-blue-700">
+                          <ArrowRightLeft className="h-4 w-4" />
                         </div>
                       ) : !isCyclical ? (
                         <button
                           type="button"
                           onClick={() => handleToggleFixed(item.id)}
-                          className={`flex h-6 w-6 items-center justify-center rounded-lg border transition ${
+                          className={`flex h-8 w-8 items-center justify-center rounded-xl border transition ${
                             item.is_paid_this_cycle
                               ? "border-income bg-income text-white shadow-sm"
-                              : "border-espresso-muted/40 bg-surface text-transparent"
+                              : "border-espresso-muted/40 bg-white text-transparent"
                           }`}
                           title={item.is_paid_this_cycle ? "Tandai Belum Lunas" : "Tandai Sudah Lunas"}
                         >
                           <Check className="h-4 w-4" />
                         </button>
                       ) : (
-                        <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-amber/20 text-terracotta">
-                          <Zap className="h-3.5 w-3.5" />
+                        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#0D0F17] text-[#C8F526]">
+                          <Zap className="h-4 w-4" />
                         </div>
                       )}
                       <div>
@@ -1414,12 +1416,12 @@ export default function ForecastPage() {
                               <span>Setor Tagihan</span>
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 rounded-md border border-terracotta/30 bg-terracotta/10 px-1.5 py-0.2 text-[9px] font-bold text-terracotta">
+                            <span className="inline-flex items-center gap-1 rounded-md border border-surface-border bg-white px-1.5 py-0.2 text-[9px] font-bold text-expense">
                               <ArrowUpRight className="h-3 w-3 shrink-0" />
                               <span>Pengeluaran</span>
                             </span>
                           )}
-                          <span className="rounded-md border border-surface-border bg-surface px-1.5 py-0.2 text-[9px] font-semibold text-espresso-muted">
+                          <span className="rounded-md border border-surface-border bg-white px-1.5 py-0.2 text-[9px] font-semibold text-espresso-muted">
                             {freqBadge}
                           </span>
                           {item.to_wallet_name ? (
@@ -1449,7 +1451,7 @@ export default function ForecastPage() {
                     </div>
 
                     <div className="flex items-center gap-3">
-                      <span className="text-xs font-bold text-espresso">
+                      <span className="text-xs font-black text-espresso">
                         {formatIDR(item.amount)}
                       </span>
                       <button
@@ -1474,29 +1476,30 @@ export default function ForecastPage() {
       {activeTab === "simulator" && (
         <div className="space-y-4">
           {/* Simulator Box */}
-          <div className="rounded-3xl border border-surface-border bg-surface p-5 shadow-sm space-y-4">
+          <div className="rounded-3xl border border-surface-border bg-white p-5 sm:p-6 shadow-xs space-y-4">
             <div>
-              <h3 className="text-sm font-bold text-espresso flex items-center gap-2">
-                <Zap className="h-4 w-4 text-amber" />
+              <h3 className="text-sm font-black text-espresso flex items-center gap-2">
+                <Zap className="h-4 w-4 text-[#0D0F17]" />
                 Simulasi Belanja ("Bisa Beli Nggak?")
               </h3>
+              <p className="text-[11px] text-espresso-muted">Uji dampak pembelian terhadap plafon harian dan tabungan</p>
             </div>
 
-            <form onSubmit={handleRunSimulation} className="space-y-3">
+            <form onSubmit={handleRunSimulation} className="space-y-3.5">
               <div>
-                <label className="block text-xs font-semibold text-espresso mb-1">Nama Barang / Pengeluaran</label>
+                <label className="block text-xs font-bold text-espresso mb-1">Nama Barang / Pengeluaran</label>
                 <input
                   type="text"
                   required
                   value={simName}
                   onChange={(e) => setSimName(e.target.value)}
                   placeholder="Misal: Keyboard Mechanical, Soundcard, IEM..."
-                  className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs font-medium text-espresso placeholder:text-espresso-muted/40 focus:border-terracotta focus:outline-none"
+                  className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs font-medium text-espresso placeholder:text-espresso-muted/40 focus:border-[#0D0F17] focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-espresso mb-1">Estimasi Harga (Rp)</label>
+                <label className="block text-xs font-bold text-espresso mb-1">Estimasi Harga (Rp)</label>
                 <input
                   type="number"
                   required
@@ -1504,27 +1507,27 @@ export default function ForecastPage() {
                   value={simAmount}
                   onChange={(e) => setSimAmount(e.target.value)}
                   placeholder="500000"
-                  className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-sm font-bold text-espresso placeholder:text-espresso-muted/40 focus:border-terracotta focus:outline-none"
+                  className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-sm font-bold text-espresso placeholder:text-espresso-muted/40 focus:border-[#0D0F17] focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-espresso mb-1">Sumber Pembiayaan</label>
+                <label className="block text-xs font-bold text-espresso mb-1">Sumber Pembiayaan</label>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <button
                     type="button"
                     onClick={() => setSimSource("savings_pool")}
-                    className={`rounded-xl py-2 px-3 font-bold border transition text-left ${
+                    className={`rounded-2xl p-3 font-bold border transition text-left ${
                       simSource === "savings_pool"
-                        ? "border-terracotta bg-terracotta/10 text-terracotta"
+                        ? "border-[#0D0F17] bg-[#0D0F17] text-white shadow-xs"
                         : "border-surface-border bg-surface-card text-espresso-muted"
                     }`}
                   >
                     <div className="flex items-center gap-1.5 font-bold">
-                      <PiggyBank className="h-3.5 w-3.5 text-emerald-700 shrink-0" />
+                      <PiggyBank className={`h-3.5 w-3.5 shrink-0 ${simSource === "savings_pool" ? "text-[#C8F526]" : "text-emerald-700"}`} />
                       <span>Dari Tabungan</span>
                     </div>
-                    <span className="block text-[10px] font-normal text-espresso-muted">
+                    <span className={`block text-[10px] font-normal mt-0.5 ${simSource === "savings_pool" ? "text-white/70" : "text-espresso-muted"}`}>
                       Saldo: {formatIDR(summary?.savings_pool_balance)}
                     </span>
                   </button>
@@ -1532,17 +1535,17 @@ export default function ForecastPage() {
                   <button
                     type="button"
                     onClick={() => setSimSource("operational_wallet")}
-                    className={`rounded-xl py-2 px-3 font-bold border transition text-left ${
+                    className={`rounded-2xl p-3 font-bold border transition text-left ${
                       simSource === "operational_wallet"
-                        ? "border-terracotta bg-terracotta/10 text-terracotta"
+                        ? "border-[#0D0F17] bg-[#0D0F17] text-white shadow-xs"
                         : "border-surface-border bg-surface-card text-espresso-muted"
                     }`}
                   >
                     <div className="flex items-center gap-1.5 font-bold">
-                      <Wallet className="h-3.5 w-3.5 text-terracotta shrink-0" />
+                      <Wallet className={`h-3.5 w-3.5 shrink-0 ${simSource === "operational_wallet" ? "text-[#C8F526]" : "text-espresso"}`} />
                       <span>Dari Kas Harian</span>
                     </div>
-                    <span className="block text-[10px] font-normal text-espresso-muted">
+                    <span className={`block text-[10px] font-normal mt-0.5 ${simSource === "operational_wallet" ? "text-white/70" : "text-espresso-muted"}`}>
                       Plafon: {formatIDR(summary?.today_metrics.ideal_spending_today)}/hr
                     </span>
                   </button>
@@ -1552,7 +1555,7 @@ export default function ForecastPage() {
               <button
                 type="submit"
                 disabled={isSimulating}
-                className="w-full rounded-xl bg-terracotta py-2.5 text-xs font-bold text-white shadow-md shadow-terracotta/20 hover:bg-terracotta-hover transition disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
+                className="w-full rounded-2xl bg-[#C8F526] py-3 text-xs font-black text-black shadow-md hover:bg-[#b8e51b] transition disabled:opacity-50 inline-flex items-center justify-center gap-1.5 active:scale-98"
               >
                 {isSimulating ? (
                   <span className="flex items-center justify-center gap-1.5">
@@ -1608,15 +1611,15 @@ export default function ForecastPage() {
           </div>
 
           {/* Wishlist List Sesuai Spreadsheet 3 */}
-          <div className="rounded-3xl border border-surface-border bg-surface p-4 shadow-sm space-y-3">
+          <div className="rounded-3xl border border-surface-border bg-white p-5 shadow-xs space-y-3.5">
             <div className="flex items-center justify-between pb-2 border-b border-surface-border">
               <div>
-                <h3 className="text-sm font-bold text-espresso">Daftar Impian Belanja (Wishlist)</h3>
+                <h3 className="text-sm font-black text-espresso">Daftar Impian Belanja (Wishlist)</h3>
               </div>
               <button
                 type="button"
                 onClick={() => setIsAddWishlistModalOpen(true)}
-                className="flex items-center gap-1 rounded-xl bg-terracotta/10 px-2.5 py-1 text-xs font-bold text-terracotta hover:bg-terracotta/20"
+                className="flex items-center gap-1.5 rounded-xl bg-[#0D0F17] px-3 py-1.5 text-xs font-black text-[#C8F526] hover:bg-[#161A26] transition shadow-xs active:scale-95"
               >
                 <Plus className="h-3.5 w-3.5" />
                 Tambah
@@ -1640,7 +1643,7 @@ export default function ForecastPage() {
                     <button
                       type="button"
                       onClick={() => quickSimulate(item.item_name, item.estimated_price)}
-                      className="rounded-lg bg-amber/20 px-2.5 py-1 text-[11px] font-bold text-terracotta hover:bg-amber/30 transition"
+                      className="rounded-xl bg-[#0D0F17] px-3 py-1 text-[11px] font-black text-[#C8F526] hover:bg-[#161A26] transition active:scale-95"
                     >
                       Uji Dampak
                     </button>
@@ -2298,18 +2301,18 @@ export default function ForecastPage() {
                   </span>
                 </div>
 
-                <div className="flex gap-2 pt-2">
+                <div className="flex gap-2.5 pt-3">
                   <button
                     type="button"
                     onClick={() => setIsPlanModalOpen(false)}
-                    className="flex-1 rounded-xl bg-surface-card py-2 text-xs font-semibold text-espresso-muted hover:text-espresso"
+                    className="flex-1 rounded-2xl bg-surface-card py-2.5 text-xs font-bold text-espresso-muted hover:text-espresso transition"
                   >
                     Batal
                   </button>
                   <button
                     type="submit"
                     disabled={isSavingPlan}
-                    className="flex-1 rounded-xl bg-terracotta py-2 text-xs font-bold text-white hover:bg-terracotta-hover transition disabled:opacity-50"
+                    className="flex-1 rounded-2xl bg-[#C8F526] py-2.5 text-xs font-black text-black hover:bg-[#b8e51b] transition disabled:opacity-50 shadow-md active:scale-98"
                   >
                     {isSavingPlan ? "Menyimpan..." : "Simpan Blueprint"}
                   </button>
@@ -2325,20 +2328,21 @@ export default function ForecastPage() {
       {/* ===================================================================== */}
       {isAddFixedModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="w-full max-w-sm rounded-3xl border border-surface-border bg-surface p-6 shadow-2xl space-y-4">
+          <div className="w-full max-w-sm rounded-3xl border border-surface-border bg-white p-6 shadow-2xl space-y-4">
             <div>
-              <h3 className="text-base font-bold text-espresso">Tambah Tagihan / Siklus Biaya</h3>
+              <h3 className="text-base font-black text-espresso">Tambah Tagihan / Siklus Biaya</h3>
+              <p className="text-[11px] text-espresso-muted">Dicadangkan otomatis agar tidak memotong jatah harian</p>
             </div>
             <form onSubmit={handleCreateFixed} className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-espresso mb-1">Tipe</label>
+                <label className="block text-xs font-bold text-espresso mb-1">Tipe</label>
                 <div className="grid grid-cols-2 gap-1.5">
                   <button
                     type="button"
                     onClick={() => setFixedExpenseType("EXPENSE")}
-                    className={`rounded-lg py-1.5 inline-flex items-center justify-center gap-1.5 text-[11px] font-bold border transition ${
+                    className={`rounded-xl py-2 inline-flex items-center justify-center gap-1.5 text-[11px] font-bold border transition ${
                       fixedExpenseType === "EXPENSE"
-                        ? "bg-terracotta text-white border-terracotta shadow-xs"
+                        ? "bg-[#0D0F17] text-[#C8F526] border-[#0D0F17] shadow-xs"
                         : "bg-surface-card text-espresso-muted border-surface-border hover:text-espresso"
                     }`}
                   >
@@ -2352,7 +2356,7 @@ export default function ForecastPage() {
                       const savingsWallet = wallets?.find((w: any) => w.purpose === "savings");
                       if (savingsWallet) setFixedToWalletId(savingsWallet.id);
                     }}
-                    className={`rounded-lg py-1.5 inline-flex items-center justify-center gap-1.5 text-[11px] font-bold border transition ${
+                    className={`rounded-xl py-2 inline-flex items-center justify-center gap-1.5 text-[11px] font-bold border transition ${
                       fixedExpenseType === "SAVINGS_TRANSFER"
                         ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
                         : "bg-surface-card text-espresso-muted border-surface-border hover:text-espresso"
@@ -2365,7 +2369,7 @@ export default function ForecastPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-espresso mb-1">
+                <label className="block text-xs font-bold text-espresso mb-1">
                   {fixedExpenseType === "SAVINGS_TRANSFER" ? "Nama Rencana Tabungan" : "Nama Tagihan / Pengeluaran"}
                 </label>
                 <input
@@ -2378,12 +2382,12 @@ export default function ForecastPage() {
                       ? "Misal: Tabungan Harian, Investasi Rutin"
                       : "Misal: Bensin, iCloud, Wifi, Pulsa, Galon..."
                   }
-                  className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs font-medium text-espresso focus:outline-none focus:border-terracotta"
+                  className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs font-medium text-espresso focus:outline-none focus:border-[#0D0F17]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-espresso mb-1">Nominal per Siklus (Rp)</label>
+                <label className="block text-xs font-bold text-espresso mb-1">Nominal per Siklus (Rp)</label>
                 <input
                   type="number"
                   required
@@ -2391,12 +2395,12 @@ export default function ForecastPage() {
                   value={fixedAmount}
                   onChange={(e) => setFixedAmount(e.target.value)}
                   placeholder="Contoh: 35000"
-                  className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-sm font-bold text-espresso focus:outline-none focus:border-terracotta"
+                  className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-sm font-bold text-espresso focus:outline-none focus:border-[#0D0F17]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-espresso mb-1">Pola Siklus</label>
+                <label className="block text-xs font-bold text-espresso mb-1">Pola Siklus</label>
                 <div className="grid grid-cols-5 gap-1">
                   {[
                     { id: "monthly", label: "Bulanan" },
@@ -2409,11 +2413,11 @@ export default function ForecastPage() {
                       key={item.id}
                       type="button"
                       onClick={() => setFixedFrequency(item.id as any)}
-                      className={`rounded-lg py-1.5 text-[10px] font-bold border transition ${
+                      className={`rounded-xl py-1.5 text-[10px] font-bold border transition ${
                         fixedFrequency === item.id
                           ? fixedExpenseType === "SAVINGS_TRANSFER"
                             ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
-                            : "bg-terracotta text-white border-terracotta shadow-xs"
+                            : "bg-[#0D0F17] text-[#C8F526] border-[#0D0F17] shadow-xs"
                           : "bg-surface-card text-espresso-muted border-surface-border hover:text-espresso"
                       }`}
                     >
@@ -2517,18 +2521,18 @@ export default function ForecastPage() {
                 </div>
               )}
 
-              <div className="flex gap-2 pt-2">
+              <div className="flex gap-2.5 pt-2">
                 <button
                   type="button"
                   onClick={() => setIsAddFixedModalOpen(false)}
-                  className="flex-1 rounded-xl bg-surface-card py-2 text-xs font-semibold text-espresso-muted hover:text-espresso"
+                  className="flex-1 rounded-2xl bg-surface-card py-2.5 text-xs font-bold text-espresso-muted hover:text-espresso transition"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={isSavingFixed}
-                  className="flex-1 rounded-xl bg-terracotta py-2 text-xs font-bold text-white hover:bg-terracotta-hover transition disabled:opacity-50"
+                  className="flex-1 rounded-2xl bg-[#C8F526] py-2.5 text-xs font-black text-black hover:bg-[#b8e51b] transition disabled:opacity-50 shadow-md active:scale-98"
                 >
                   {isSavingFixed ? "Menyimpan..." : "Simpan"}
                 </button>
@@ -2543,23 +2547,26 @@ export default function ForecastPage() {
       {/* ===================================================================== */}
       {isAddWishlistModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="w-full max-w-sm rounded-3xl border border-surface-border bg-surface p-6 shadow-2xl space-y-4">
-            <h3 className="text-base font-bold text-espresso">Tambah Barang Wishlist</h3>
+          <div className="w-full max-w-sm rounded-3xl border border-surface-border bg-white p-6 shadow-2xl space-y-4">
+            <div>
+              <h3 className="text-base font-black text-espresso">Tambah Barang Wishlist</h3>
+              <p className="text-[11px] text-espresso-muted">Simpan barang impian untuk uji dampak anggaran</p>
+            </div>
             <form onSubmit={handleCreateWishlist} className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-espresso mb-1">Nama Barang</label>
+                <label className="block text-xs font-bold text-espresso mb-1">Nama Barang</label>
                 <input
                   type="text"
                   required
                   value={wishlistName}
                   onChange={(e) => setWishlistName(e.target.value)}
                   placeholder="Misal: Keyboard Mechanical, Soundcard..."
-                  className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs font-medium text-espresso focus:outline-none focus:border-terracotta"
+                  className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-xs font-medium text-espresso focus:outline-none focus:border-[#0D0F17]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-espresso mb-1">Estimasi Harga (Rp)</label>
+                <label className="block text-xs font-bold text-espresso mb-1">Estimasi Harga (Rp)</label>
                 <input
                   type="number"
                   required
@@ -2567,22 +2574,22 @@ export default function ForecastPage() {
                   value={wishlistPrice}
                   onChange={(e) => setWishlistPrice(e.target.value)}
                   placeholder="500000"
-                  className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-sm font-bold text-espresso focus:outline-none focus:border-terracotta"
+                  className="w-full rounded-xl border border-surface-border bg-surface-card px-3 py-2 text-sm font-bold text-espresso focus:outline-none focus:border-[#0D0F17]"
                 />
               </div>
 
-              <div className="flex gap-2 pt-2">
+              <div className="flex gap-2.5 pt-2">
                 <button
                   type="button"
                   onClick={() => setIsAddWishlistModalOpen(false)}
-                  className="flex-1 rounded-xl bg-surface-card py-2 text-xs font-semibold text-espresso-muted hover:text-espresso"
+                  className="flex-1 rounded-2xl bg-surface-card py-2.5 text-xs font-bold text-espresso-muted hover:text-espresso transition"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={isSavingWishlist}
-                  className="flex-1 rounded-xl bg-terracotta py-2 text-xs font-bold text-white hover:bg-terracotta-hover transition disabled:opacity-50"
+                  className="flex-1 rounded-2xl bg-[#C8F526] py-2.5 text-xs font-black text-black hover:bg-[#b8e51b] transition disabled:opacity-50 shadow-md active:scale-98"
                 >
                   {isSavingWishlist ? "Menyimpan..." : "Simpan ke Wishlist"}
                 </button>
@@ -2596,15 +2603,16 @@ export default function ForecastPage() {
       {/* ===================================================================== */}
       {isWalletConfigModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="w-full max-w-sm rounded-3xl border border-surface-border bg-surface p-6 shadow-2xl space-y-4">
+          <div className="w-full max-w-sm rounded-3xl border border-surface-border bg-white p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-surface-border pb-3">
               <div>
-                <h3 className="text-base font-bold text-espresso">Atur Peruntukan Dompet</h3>
+                <h3 className="text-base font-black text-espresso">Atur Peruntukan Dompet</h3>
+                <p className="text-[11px] text-espresso-muted">Pilih alokasi operasional, tabungan, atau tagihan</p>
               </div>
               <button
                 type="button"
                 onClick={() => setIsWalletConfigModalOpen(false)}
-                className="rounded-lg p-1 text-espresso-muted hover:bg-surface-card hover:text-espresso"
+                className="rounded-full p-1 text-espresso-muted hover:bg-surface-card hover:text-espresso transition"
               >
                 ✕
               </button>
@@ -2619,15 +2627,15 @@ export default function ForecastPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <span className="text-xs font-bold text-espresso block">{w.name}</span>
-                      <span className="text-[10px] text-espresso-muted uppercase">{w.type}</span>
+                      <span className="text-[10px] text-espresso-muted uppercase font-bold">{w.type}</span>
                     </div>
-                    <span className="text-xs font-extrabold text-espresso">
+                    <span className="text-xs font-black text-espresso">
                       {formatIDR(w.balance)}
                     </span>
                   </div>
 
                   {/* 3 Option Pills */}
-                  <div className="grid grid-cols-3 gap-1 pt-0.5 text-[10px] font-bold">
+                  <div className="grid grid-cols-3 gap-1.5 pt-0.5 text-[10px] font-bold">
                     <button
                       type="button"
                       onClick={async () => {
@@ -2637,10 +2645,10 @@ export default function ForecastPage() {
                         queryClient.invalidateQueries({ queryKey: ["wallets"] });
                         queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
                       }}
-                      className={`rounded-xl py-1.5 px-1.5 transition text-center border inline-flex items-center justify-center gap-1 ${
+                      className={`rounded-xl py-2 px-1 transition text-center border inline-flex items-center justify-center gap-1 ${
                         (w.purpose || "operational") === "operational"
-                          ? "bg-terracotta text-white border-terracotta shadow-xs"
-                          : "bg-surface text-espresso-muted border-surface-border hover:text-espresso"
+                          ? "bg-[#0D0F17] text-[#C8F526] border-[#0D0F17] shadow-xs"
+                          : "bg-white text-espresso-muted border-surface-border hover:text-espresso"
                       }`}
                     >
                       <Wallet className="h-3 w-3 shrink-0" />
@@ -2656,10 +2664,10 @@ export default function ForecastPage() {
                         queryClient.invalidateQueries({ queryKey: ["wallets"] });
                         queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
                       }}
-                      className={`rounded-xl py-1.5 px-1.5 transition text-center border inline-flex items-center justify-center gap-1 ${
+                      className={`rounded-xl py-2 px-1 transition text-center border inline-flex items-center justify-center gap-1 ${
                         w.purpose === "savings"
-                          ? "bg-income text-white border-income shadow-xs"
-                          : "bg-surface text-espresso-muted border-surface-border hover:text-income"
+                          ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
+                          : "bg-white text-espresso-muted border-surface-border hover:text-income"
                       }`}
                     >
                       <PiggyBank className="h-3 w-3 shrink-0" />
@@ -2675,10 +2683,10 @@ export default function ForecastPage() {
                         queryClient.invalidateQueries({ queryKey: ["wallets"] });
                         queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
                       }}
-                      className={`rounded-xl py-1.5 px-1.5 transition text-center border inline-flex items-center justify-center gap-1 ${
+                      className={`rounded-xl py-2 px-1 transition text-center border inline-flex items-center justify-center gap-1 ${
                         w.purpose === "subscription"
-                          ? "bg-amber text-espresso border-amber shadow-xs"
-                          : "bg-surface text-espresso-muted border-surface-border hover:text-terracotta"
+                          ? "bg-amber-400 text-black border-amber-400 shadow-xs"
+                          : "bg-white text-espresso-muted border-surface-border hover:text-espresso"
                       }`}
                     >
                       <Receipt className="h-3 w-3 shrink-0" />
@@ -2693,7 +2701,7 @@ export default function ForecastPage() {
               <button
                 type="button"
                 onClick={() => setIsWalletConfigModalOpen(false)}
-                className="w-full rounded-xl bg-terracotta py-2 text-xs font-bold text-white hover:bg-terracotta-hover transition"
+                className="w-full rounded-2xl bg-[#0D0F17] py-2.5 text-xs font-black text-[#C8F526] hover:bg-[#161A26] transition shadow-xs active:scale-98"
               >
                 Selesai
               </button>
@@ -2843,18 +2851,18 @@ export default function ForecastPage() {
                 />
               </div>
 
-              <div className="flex gap-2 pt-2">
+              <div className="flex gap-2.5 pt-2">
                 <button
                   type="button"
                   onClick={() => setIsAddPlannedModalOpen(false)}
-                  className="flex-1 rounded-xl bg-surface-card py-2 text-xs font-semibold text-espresso-muted hover:text-espresso"
+                  className="flex-1 rounded-2xl bg-surface-card py-2.5 text-xs font-bold text-espresso-muted hover:text-espresso transition"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={isSavingPlanned}
-                  className="flex-1 rounded-xl bg-terracotta py-2 text-xs font-bold text-white hover:bg-terracotta-hover transition disabled:opacity-50"
+                  className="flex-1 rounded-2xl bg-[#C8F526] py-2.5 text-xs font-black text-black hover:bg-[#b8e51b] transition disabled:opacity-50 shadow-md active:scale-98"
                 >
                   {isSavingPlanned ? "Menyimpan..." : "Simpan Rencana"}
                 </button>
@@ -2869,15 +2877,15 @@ export default function ForecastPage() {
       {/* ===================================================================== */}
       {selectedDayDetail && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="w-full max-w-sm sm:max-w-md rounded-3xl border border-surface-border bg-surface p-5 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
+          <div className="w-full max-w-sm sm:max-w-md rounded-3xl border border-surface-border bg-white p-5 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
             {/* Header Modal */}
             <div className="flex items-center justify-between border-b border-surface-border pb-3 shrink-0">
               <div className="flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-terracotta shrink-0" />
-                <h3 className="text-base font-bold text-espresso flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-espresso shrink-0" />
+                <h3 className="text-base font-black text-espresso flex items-center gap-2">
                   <span>{selectedDayDetail.date}</span>
                   {selectedDayDetail.is_today && (
-                    <span className="rounded-md bg-terracotta text-white px-1.5 py-0.2 text-[9px] font-bold">
+                    <span className="rounded-full bg-[#0D0F17] text-[#C8F526] px-2 py-0.5 text-[9px] font-black tracking-wider uppercase">
                       Hari Ini
                     </span>
                   )}
@@ -2898,7 +2906,7 @@ export default function ForecastPage() {
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="rounded-2xl border border-surface-border bg-surface-card p-2.5 flex flex-col justify-between">
                   <span className="text-[10px] text-espresso-muted uppercase font-bold">Kas Ops Awal</span>
-                  <span className="text-sm font-extrabold text-espresso">
+                  <span className="text-sm font-black text-espresso">
                     {formatIDR(selectedDayDetail.initial_balance)}
                   </span>
                 </div>
@@ -2909,8 +2917,8 @@ export default function ForecastPage() {
                     : "border-expense/30 bg-expense/10"
                 }`}>
                   <span className="text-[10px] text-espresso-muted uppercase font-bold">Kas Ops Akhir</span>
-                  <span className={`text-sm font-extrabold ${
-                    selectedDayDetail.closing_balance >= 0 ? "text-terracotta" : "text-expense"
+                  <span className={`text-sm font-black ${
+                    selectedDayDetail.closing_balance >= 0 ? "text-espresso" : "text-expense"
                   }`}>
                     {formatIDR(selectedDayDetail.closing_balance)}
                   </span>
@@ -2918,40 +2926,40 @@ export default function ForecastPage() {
 
                 <div className="rounded-2xl border border-income/20 bg-income/10 p-2.5 flex flex-col justify-between">
                   <span className="text-[10px] text-income uppercase font-bold">Pemasukan</span>
-                  <span className="text-sm font-extrabold text-income">
+                  <span className="text-sm font-black text-income">
                     +{formatIDR(selectedDayDetail.total_inflow)}
                   </span>
                 </div>
 
                 <div className="rounded-2xl border border-expense/20 bg-expense/10 p-2.5 flex flex-col justify-between">
                   <span className="text-[10px] text-expense uppercase font-bold">Pengeluaran</span>
-                  <span className="text-sm font-extrabold text-expense">
+                  <span className="text-sm font-black text-expense">
                     -{formatIDR(selectedDayDetail.total_outflow)}
                   </span>
                 </div>
               </div>
 
               {/* Posisi Tabungan */}
-              <div className="rounded-2xl border border-emerald-300 bg-emerald-50/50 p-3 text-xs space-y-1">
+              <div className="rounded-2xl border border-emerald-300 bg-emerald-50/50 p-3.5 text-xs space-y-1">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5 text-emerald-800 font-bold">
                     <PiggyBank className="h-4 w-4 text-emerald-700 shrink-0" />
                     <span>Tabungan Tersimpan</span>
                   </div>
                   {Number(selectedDayDetail.day_saved) > 0 && (
-                    <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded-md border border-emerald-300">
+                    <span className="text-[9px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300">
                       +{formatIDR(selectedDayDetail.day_saved)} disisihkan
                     </span>
                   )}
                 </div>
-                <div className="text-base font-extrabold text-emerald-900">
+                <div className="text-base font-black text-emerald-900">
                   {formatIDR(selectedDayDetail.running_savings_balance ?? 0)}
                 </div>
               </div>
 
               {/* Rincian Transaksi & Mutasi Hari Ini */}
               <div className="space-y-2">
-                <div className="text-xs font-bold text-espresso">
+                <div className="text-xs font-black text-espresso">
                   Rincian Transaksi Terjadwal
                 </div>
 
@@ -2960,7 +2968,7 @@ export default function ForecastPage() {
                     {selectedDayDetail.events.map((ev: any, evIdx: number) => {
                       const badgeStyleMap: Record<string, string> = {
                         INCOME: "bg-income/10 text-income border-income/30",
-                        MEAL: "bg-amber/15 text-terracotta border-amber/30",
+                        MEAL: "bg-[#0D0F17]/5 text-espresso border-surface-border",
                         CYCLICAL: "bg-purple-100 text-purple-800 border-purple-200",
                         FIXED_BILL: "bg-espresso/10 text-espresso border-espresso/20",
                         PLANNED: "bg-blue-100 text-blue-800 border-blue-200",
@@ -2978,7 +2986,7 @@ export default function ForecastPage() {
                       return (
                         <div
                           key={evIdx}
-                          className="flex items-center justify-between p-2.5 rounded-xl border border-surface-border bg-surface-card text-xs"
+                          className="flex items-center justify-between p-2.5 rounded-2xl border border-surface-border bg-surface-card text-xs"
                         >
                           <div className="space-y-0.5">
                             <div className="flex items-center gap-1.5 font-bold text-espresso">
@@ -2986,7 +2994,7 @@ export default function ForecastPage() {
                               <span>{displayName}</span>
                             </div>
                             <div className="flex items-center gap-1.5 text-[10px] text-espresso-muted">
-                              <span className={`rounded px-1.5 py-0.2 border text-[9px] font-semibold ${badgeStyle}`}>
+                              <span className={`rounded-md px-1.5 py-0.2 border text-[9px] font-semibold ${badgeStyle}`}>
                                 {ev.type === "SAVINGS"
                                   ? "Setor Tabungan"
                                   : ev.type === "INCOME"
@@ -3006,7 +3014,7 @@ export default function ForecastPage() {
                               )}
                             </div>
                           </div>
-                          <span className={`font-extrabold ${
+                          <span className={`font-black ${
                             ev.direction === "INFLOW" ? "text-income" : "text-expense"
                           }`}>
                             {ev.direction === "INFLOW" ? "+" : "-"}{formatIDR(ev.amount)}
@@ -3016,7 +3024,7 @@ export default function ForecastPage() {
                     })}
                   </div>
                 ) : (
-                  <div className="py-6 text-center text-xs text-espresso-muted italic rounded-xl border border-dashed border-surface-border">
+                  <div className="py-6 text-center text-xs text-espresso-muted italic rounded-2xl border border-dashed border-surface-border">
                     Tidak ada transaksi terjadwal pada tanggal ini.
                   </div>
                 )}
@@ -3028,7 +3036,7 @@ export default function ForecastPage() {
               <button
                 type="button"
                 onClick={() => setSelectedDayDetail(null)}
-                className="w-full rounded-xl bg-surface-card py-2.5 text-xs font-semibold text-espresso hover:bg-surface-border/50 transition"
+                className="w-full rounded-2xl bg-[#0D0F17] py-2.5 text-xs font-black text-[#C8F526] hover:bg-[#161A26] transition shadow-xs active:scale-98"
               >
                 Tutup
               </button>

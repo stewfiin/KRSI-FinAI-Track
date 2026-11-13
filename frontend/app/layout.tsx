@@ -1,10 +1,7 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
 import { Navbar } from "@/components/Navbar";
-
-const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "FinAI Track — Smart Personal Finance & AI Assistant",
@@ -19,7 +16,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#FEF3E2",
+  themeColor: "#F8F9FD",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -33,10 +30,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="id">
-      <body className={`${inter.className} min-h-screen bg-background text-espresso antialiased selection:bg-amber-200 selection:text-espresso`}>
+      <body className="font-sans min-h-screen bg-background text-espresso antialiased selection:bg-[#C8F526] selection:text-black">
         <Providers>
           <Navbar />
-          <main className="mx-auto max-w-5xl px-4 pt-4 pb-24 md:pl-56 md:pb-12">
+          <main className="mx-auto max-w-5xl px-4 pt-4 pb-28 md:pl-56 md:pb-12">
             {children}
           </main>
         </Providers>

@@ -379,3 +379,96 @@ class RangeProjectionResponse(BaseModel):
     savings_achievement_rate: Decimal = Decimal("0.00")
     timeline: List[ProjectedDayItem]
 
+
+# ==============================================================================
+# Installment Simulation Schemas (Simulasi Cicilan & Uji Kelayakan)
+# ==============================================================================
+class InstallmentSimulationRequest(BaseModel):
+    item_name: str = Field(..., min_length=1, max_length=150, description="Nama barang atau kebutuhan cicilan")
+    item_price: Decimal = Field(..., gt=0, description="Harga barang atau total kebutuhan dana")
+    down_payment: Decimal = Field(default=Decimal("0.00"), ge=0, description="Nominal uang muka (DP)")
+    dp_source: str = Field(default="savings_pool", description="Sumber dana DP: savings_pool | operational_wallet")
+    tenor_months: int = Field(default=12, ge=1, le=240, description="Tenor cicilan dalam bulan")
+    interest_type: str = Field(default="flat", description="Skema bunga: zero | flat | effective")
+    interest_rate: Decimal = Field(default=Decimal("0.00"), ge=0, le=100, description="Suku bunga dalam persen")
+    interest_rate_period: str = Field(default="annual", description="Periode suku bunga: monthly | annual")
+    admin_fee: Decimal = Field(default=Decimal("0.00"), ge=0, description="Biaya admin/provisi awal")
+    monthly_fee: Decimal = Field(default=Decimal("0.00"), ge=0, description="Biaya layanan rutin per bulan")
+    start_date: Optional[date] = Field(default=None, description="Tanggal mulai cicilan/DP (default: hari ini)")
+    due_day_of_month: Optional[int] = Field(default=None, ge=1, le=31, description="Tanggal jatuh tempo tiap bulan")
+
+
+class InstallmentAmortizationItem(BaseModel):
+    month_index: int
+    due_date: date
+    principal_amount: Decimal
+    interest_amount: Decimal
+    fee_amount: Decimal
+    total_payment: Decimal
+    remaining_principal: Decimal
+
+
+class InstallmentTenorComparison(BaseModel):
+    tenor_months: int
+    monthly_installment: Decimal
+    total_interest_and_fees: Decimal
+    total_payment: Decimal
+    income_ratio_percent: float
+    projected_daily_ideal_after: Decimal
+    verdict: str  # "safe" | "warning" | "danger"
+
+
+class InstallmentSimulationResponse(BaseModel):
+    item_name: str
+    item_price: Decimal
+    down_payment: Decimal
+    dp_source: str
+    tenor_months: int
+    interest_type: str
+    interest_rate: Decimal
+    interest_rate_period: str
+    admin_fee: Decimal
+    monthly_fee: Decimal
+    principal_amount: Decimal
+    upfront_cash_needed: Decimal
+    monthly_installment: Decimal
+    first_month_installment: Decimal
+    last_month_installment: Decimal
+    total_interest: Decimal
+    total_fees: Decimal
+    total_installment_payments: Decimal
+    total_cost: Decimal
+    effective_markup_percent: float
+    is_dp_affordable: bool
+    is_monthly_affordable: bool
+    verdict: str  # "safe" | "warning" | "danger"
+    headline: str
+    explanation: str
+    recommendations: List[str] = []
+    current_savings: Decimal
+    projected_savings_after_dp: Decimal
+    current_safe_to_spend: Decimal
+    projected_safe_to_spend_after_dp: Decimal
+    current_monthly_income: Decimal
+    current_monthly_fixed: Decimal
+    current_monthly_free_cashflow: Decimal
+    projected_monthly_free_cashflow: Decimal
+    installment_to_income_ratio: float
+    current_daily_ideal: Decimal
+    projected_daily_ideal_after: Decimal
+    amortization_schedule: List[InstallmentAmortizationItem]
+    tenor_comparisons: List[InstallmentTenorComparison]
+
+
+class InstallmentApplyRequest(InstallmentSimulationRequest):
+    wallet_id: Optional[uuid.UUID] = Field(default=None, description="Dompet pembayar cicilan & DP (opsional)")
+    include_down_payment: bool = Field(default=True, description="Catat juga DP/biaya awal sebagai rencana transaksi")
+
+
+class InstallmentApplyResponse(BaseModel):
+    created_count: int
+    item_name: str
+    planned_ids: List[uuid.UUID]
+    message: str
+
+

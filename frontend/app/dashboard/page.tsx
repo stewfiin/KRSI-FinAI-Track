@@ -185,90 +185,91 @@ export default function DashboardPage() {
         <QuickAIBar onSuccess={() => refetch()} />
       </div>
 
-      {/* 2. Total Saldo & Financial Overview Card */}
-      <div className="relative overflow-hidden rounded-3xl border border-surface-border bg-gradient-to-br from-surface to-surface-card p-5 sm:p-6 shadow-sm">
+      {/* 2. Total Saldo & Financial Overview Hero Card (Neo-Obsidian High-Contrast) */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0F1117] via-[#161A26] to-[#0A0C12] p-5 sm:p-6 text-white shadow-xl shadow-black/10 border border-white/10">
         <div className="relative z-10 flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold tracking-wider text-espresso-muted uppercase">
+              <span className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">
                 Total Saldo Gabungan
               </span>
               <button
                 type="button"
                 onClick={toggleBalanceHidden}
-                className="flex items-center justify-center h-6 w-6 rounded-md text-espresso-muted hover:text-espresso hover:bg-espresso/5 transition"
+                className="flex items-center justify-center h-6 w-6 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition"
                 title={isBalanceHidden ? "Tampilkan nominal (Sensor aktif)" : "Sembunyikan nominal (Sensor nonaktif)"}
                 aria-label={isBalanceHidden ? "Tampilkan Saldo" : "Sembunyikan Saldo"}
               >
                 {isBalanceHidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
-            <h2 className="mt-1.5 text-3xl font-extrabold tracking-tight text-espresso sm:text-4xl">
+            <h2 className="mt-2 text-3xl font-black tracking-tight text-white sm:text-4xl">
               {formatIDR(summary?.total_balance)}
             </h2>
           </div>
 
-          {/* Mini Cashflow Metrics - Status Ringkasan Arus Kas Bulan Ini (Indikator informatif, bukan tombol duplikat) */}
+          {/* Mini Cashflow Metrics in Dark Glass */}
           <div className="grid grid-cols-2 gap-2.5 sm:flex sm:items-center sm:gap-3">
-            <div className="rounded-2xl border border-income/25 bg-income-bg/70 px-3.5 py-2.5 sm:px-4 sm:py-2.5">
-              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-income">
+            <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md px-3.5 py-2.5 sm:px-4 sm:py-2.5">
+              <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-400">
                 <TrendingUp className="h-3.5 w-3.5" />
                 <span>Pemasukan Bln Ini</span>
               </div>
-              <span className="mt-1 block text-sm font-bold text-espresso">
+              <span className="mt-1 block text-sm font-black text-white">
                 {formatIDR(summary?.monthly_income)}
               </span>
             </div>
 
-            <div className="rounded-2xl border border-expense/25 bg-expense-bg/70 px-3.5 py-2.5 sm:px-4 sm:py-2.5">
-              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-expense">
+            <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md px-3.5 py-2.5 sm:px-4 sm:py-2.5">
+              <div className="flex items-center gap-1.5 text-[11px] font-bold text-rose-400">
                 <TrendingDown className="h-3.5 w-3.5" />
                 <span>Pengeluaran Bln Ini</span>
               </div>
-              <span className="mt-1 block text-sm font-bold text-espresso">
+              <span className="mt-1 block text-sm font-black text-white">
                 {formatIDR(summary?.monthly_expense)}
               </span>
             </div>
           </div>
         </div>
 
-        {/* Background glow decoration */}
-        <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-amber/15 blur-3xl pointer-events-none" />
+        {/* Ambient background glow decoration */}
+        <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-[#C8F526]/10 blur-3xl pointer-events-none" />
+        <div className="absolute -left-16 -bottom-16 h-48 w-48 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
       </div>
 
-      {/* 3. Tombol Aksi Cepat Terpadu (Modern, Clean & High-Affordance Input Buttons) */}
+      {/* 3. Tombol Aksi Cepat Terpadu (Neo-Fintech High-Contrast Dual Action Pills) */}
       <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
         <button
           type="button"
           onClick={() => openTransactionModal("income")}
-          className="group flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2.5 rounded-2xl border border-income/30 bg-surface px-3 py-3 shadow-xs hover:border-income hover:bg-income/5 hover:shadow-sm active:scale-95 transition-all"
+          className="group flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2.5 rounded-2xl bg-[#C8F526] hover:bg-[#B6DF1E] px-3 py-3.5 shadow-lg shadow-[#C8F526]/20 active:scale-95 transition-all text-black border border-[#C8F526]"
         >
-          <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-income/15 text-income group-hover:scale-105 transition-transform">
-            <Plus className="h-4 w-4 stroke-[2.5]" />
+          <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-black text-[#C8F526] group-hover:scale-110 transition-transform">
+            <Plus className="h-4 w-4 stroke-[3]" />
           </div>
-          <span className="text-xs sm:text-sm font-bold text-espresso">Masuk</span>
+          <span className="text-xs sm:text-sm font-black">Masuk</span>
         </button>
 
         <button
           type="button"
           onClick={() => openTransactionModal("expense")}
-          className="group flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2.5 rounded-2xl border border-expense/30 bg-surface px-3 py-3 shadow-xs hover:border-expense hover:bg-expense/5 hover:shadow-sm active:scale-95 transition-all"
+          className="group flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2.5 rounded-2xl bg-[#0D0F17] hover:bg-slate-900 px-3 py-3.5 shadow-md shadow-black/15 active:scale-95 transition-all text-white border border-black"
         >
-          <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-expense/15 text-expense group-hover:scale-105 transition-transform">
-            <Minus className="h-4 w-4 stroke-[2.5]" />
+          <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-white/15 text-rose-400 group-hover:scale-110 transition-transform">
+            <Minus className="h-4 w-4 stroke-[3]" />
           </div>
-          <span className="text-xs sm:text-sm font-bold text-espresso">Keluar</span>
+          <span className="text-xs sm:text-sm font-bold">Keluar</span>
         </button>
 
         <button
           type="button"
           onClick={() => openTransactionModal("transfer")}
-          className="group flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2.5 rounded-2xl border border-amber/40 bg-surface px-3 py-3 shadow-xs hover:border-amber hover:bg-amber/10 hover:shadow-sm active:scale-95 transition-all"
+          className="group flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2.5 rounded-2xl bg-surface hover:bg-surface-card px-3 py-3.5 shadow-xs border border-surface-border active:scale-95 transition-all text-espresso"
         >
-          <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-amber/20 text-terracotta group-hover:scale-105 transition-transform">
+          <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-blue-50 text-blue-600 group-hover:scale-110 transition-transform">
             <ArrowRightLeft className="h-4 w-4 stroke-[2.5]" />
           </div>
-          <span className="text-xs sm:text-sm font-bold text-espresso">Transfer</span>
+          <span className="text-xs sm:text-sm font-bold">Transfer</span>
         </button>
       </div>
 
@@ -289,22 +290,22 @@ export default function DashboardPage() {
           {summary?.wallets?.map((wallet: any) => (
             <div
               key={wallet.id}
-              className="rounded-2xl border border-surface-border bg-surface p-4 shadow-sm transition hover:border-terracotta/40 hover:shadow-md"
+              className="rounded-2xl border border-surface-border bg-surface p-4 shadow-xs transition-all hover:border-black/20 hover:shadow-md group"
             >
               <div className="flex items-center justify-between">
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-terracotta/10 text-terracotta">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-black/5 text-black group-hover:scale-105 transition-transform">
                   <WalletIcon className="h-4 w-4" />
                 </div>
                 <div className="flex items-center gap-1">
-                  <span className="rounded-md bg-surface-card px-2 py-0.5 text-[10px] font-semibold text-espresso-muted border border-surface-border uppercase">
+                  <span className="rounded-md bg-surface-card px-2 py-0.5 text-[10px] font-bold text-espresso-muted border border-surface-border uppercase">
                     {wallet.type}
                   </span>
                   {wallet.purpose && wallet.purpose !== "operational" && (
                     <span
                       className={`rounded-md px-1.5 py-0.5 text-[9px] font-bold border ${
                         wallet.purpose === "savings"
-                          ? "bg-income/15 text-income border-income/30"
-                          : "bg-amber/20 text-terracotta border-amber/40"
+                          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                          : "bg-blue-50 text-blue-700 border-blue-200"
                       }`}
                     >
                       {wallet.purpose === "savings" ? "Tabungan" : "Tagihan"}
@@ -312,10 +313,10 @@ export default function DashboardPage() {
                   )}
                 </div>
               </div>
-              <span className="mt-3 block text-xs font-medium text-espresso-muted truncate">
+              <span className="mt-3 block text-xs font-semibold text-espresso-muted truncate">
                 {wallet.name}
               </span>
-              <span className="mt-0.5 block text-sm font-bold text-espresso">
+              <span className="mt-0.5 block text-sm font-black text-espresso">
                 {formatIDR(wallet.balance)}
               </span>
             </div>
@@ -532,14 +533,16 @@ export default function DashboardPage() {
         {summary?.recent_transactions && summary.recent_transactions.length > 0 ? (
           <div className="divide-y divide-surface-border">
             {summary.recent_transactions.map((tx: any) => (
-              <div key={tx.id} className="flex items-center justify-between py-3">
+              <div key={tx.id} className="flex items-center justify-between py-3 group">
                 <div className="flex items-center gap-3">
                   <div
-                    className="flex h-9 w-9 items-center justify-center rounded-xl font-bold text-xs"
-                    style={{
-                      backgroundColor: tx.type === "transfer" ? "#F4AE5225" : `${tx.category_color || "#D4621A"}20`,
-                      color: tx.type === "transfer" ? "#D4621A" : (tx.category_color || "#D4621A"),
-                    }}
+                    className={`flex h-10 w-10 items-center justify-center rounded-2xl font-black text-xs border ${
+                      tx.type === "income"
+                        ? "bg-emerald-50 text-emerald-600 border-emerald-200/60"
+                        : tx.type === "expense"
+                        ? "bg-rose-50 text-rose-600 border-rose-200/60"
+                        : "bg-blue-50 text-blue-600 border-blue-200/60"
+                    }`}
                   >
                     {tx.type === "transfer" ? (
                       <ArrowRightLeft className="h-4 w-4" />
@@ -549,7 +552,7 @@ export default function DashboardPage() {
                   </div>
                   <div>
                     <div className="flex items-center gap-1.5">
-                      <span className="text-sm font-semibold text-espresso">
+                      <span className="text-sm font-bold text-espresso group-hover:text-black transition-colors">
                         {tx.description || tx.category_name}
                       </span>
                       {getSourceIcon(tx.source)}
@@ -561,12 +564,12 @@ export default function DashboardPage() {
                 </div>
 
                 <span
-                  className={`text-sm font-bold ${
+                  className={`text-sm font-black ${
                     tx.type === "income"
                       ? "text-income"
                       : tx.type === "expense"
                       ? "text-expense"
-                      : "text-terracotta"
+                      : "text-espresso"
                   }`}
                 >
                   {tx.type === "income" ? "+" : tx.type === "expense" ? "-" : "↔ "}

@@ -3,16 +3,16 @@
 @tailwind utilities;
 
 :root {
-  --background: #FEF3E2;
-  --foreground: #2A1A0E;
+  --background: #F8F9FD;
+  --foreground: #0F1117;
   --surface: #FFFFFF;
-  --surface-card: #FDF9F2;
-  --surface-border: #EBD8C1;
-  --primary: #D4621A;
-  --accent: #F4AE52;
-  --espresso: #2A1A0E;
-  --income: #588157;
-  --expense: #D4621A;
+  --surface-card: #F1F4FA;
+  --surface-border: #E5E8F0;
+  --primary: #0D0F17;
+  --accent: #C8F526;
+  --espresso: #0F1117;
+  --income: #10B981;
+  --expense: #F43F5E;
 }
 
 body {
@@ -29,23 +29,23 @@ body {
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #FEF3E2;
+  background: #F8F9FD;
 }
 ::-webkit-scrollbar-thumb {
-  background: #E0CDB4;
+  background: #CBD5E1;
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #C4AE93;
+  background: #94A3B8;
 }
 
 /* Pulse Glow Animation */
 @keyframes pulseGlow {
   0%, 100% {
-    box-shadow: 0 0 15px rgba(212, 98, 26, 0.3);
+    box-shadow: 0 0 15px rgba(200, 245, 38, 0.4);
   }
   50% {
-    box-shadow: 0 0 25px rgba(212, 98, 26, 0.6);
+    box-shadow: 0 0 25px rgba(200, 245, 38, 0.8);
   }
 }
 
