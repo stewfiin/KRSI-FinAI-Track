@@ -249,17 +249,12 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <div className="flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full bg-[#C8F526] animate-pulse" />
-          <h1 className="text-xl font-black tracking-tight text-espresso flex items-center gap-2">
-            <SettingsIcon className="h-5 w-5 text-espresso" />
-            Pengaturan & Integrasi
-          </h1>
-        </div>
-        <p className="text-xs text-espresso-muted font-medium mt-0.5">
-          Kelola akun, integrasi bot Telegram, dompet & kategori transaksi
-        </p>
+      <div className="flex items-center gap-2">
+        <span className="h-2 w-2 rounded-full bg-[#C8F526] animate-pulse" />
+        <h1 className="text-xl font-black tracking-tight text-espresso flex items-center gap-2">
+          <SettingsIcon className="h-5 w-5 text-espresso" />
+          Pengaturan & Integrasi
+        </h1>
       </div>
 
       {/* ===================================================================== */}
@@ -554,10 +549,7 @@ export default function SettingsPage() {
       {isWalletModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="w-full max-w-sm rounded-3xl border border-surface-border bg-white p-6 shadow-2xl space-y-4">
-            <div>
-              <h3 className="text-base font-black text-espresso">Tambah Dompet / Rekening</h3>
-              <p className="text-[11px] text-espresso-muted">Pilih jenis akun & peruntukan pengelolaan uang</p>
-            </div>
+            <h3 className="text-base font-black text-espresso">Tambah Dompet / Rekening</h3>
             <form onSubmit={handleCreateWallet} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-espresso mb-1">Nama Dompet</label>
@@ -641,10 +633,7 @@ export default function SettingsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-md p-4">
           <div className="w-full max-w-sm rounded-[28px] border border-black/5 bg-white p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-              <div>
-                <h3 className="text-base font-black text-black">Atur Dompet</h3>
-                <p className="text-xs text-gray-400 font-medium">Tentukan fungsi dompet untuk sistem proyeksi</p>
-              </div>
+              <h3 className="text-base font-black text-black">Atur Dompet</h3>
               <button
                 type="button"
                 onClick={() => setEditingWallet(null)}

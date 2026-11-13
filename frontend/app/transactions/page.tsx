@@ -135,14 +135,9 @@ export default function TransactionsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-[#C8F526] animate-pulse" />
-            <h1 className="text-xl font-black tracking-tight text-espresso">Buku Besar Transaksi</h1>
-          </div>
-          <p className="text-xs text-espresso-muted font-medium mt-0.5">
-            Riwayat seluruh mutasi pemasukan, pengeluaran, dan transfer saldo
-          </p>
+        <div className="flex items-center gap-2">
+          <span className="h-2 w-2 rounded-full bg-[#C8F526] animate-pulse" />
+          <h1 className="text-xl font-black tracking-tight text-espresso">Buku Besar Transaksi</h1>
         </div>
 
         <button
@@ -303,10 +298,7 @@ export default function TransactionsPage() {
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="w-full max-w-md rounded-3xl border border-surface-border bg-white p-6 shadow-2xl space-y-4">
-            <div>
-              <h3 className="text-base font-black text-espresso">Catat Transaksi Manual</h3>
-              <p className="text-[11px] text-espresso-muted">Tambahkan mutasi pemasukan atau pengeluaran baru</p>
-            </div>
+            <h3 className="text-base font-black text-espresso">Catat Transaksi Manual</h3>
 
             <form onSubmit={handleCreateTransaction} className="space-y-4">
               <div>

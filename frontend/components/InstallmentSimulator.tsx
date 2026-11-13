@@ -263,15 +263,10 @@ export function InstallmentSimulator({
       {/* Form Simulasi Cicilan */}
       <div className="rounded-3xl border border-surface-border bg-white p-5 sm:p-6 shadow-xs space-y-4">
         <div className="flex items-start justify-between gap-2">
-          <div>
-            <h3 className="text-sm font-black text-espresso flex items-center gap-2">
-              <CreditCard className="h-4 w-4 text-[#0D0F17]" />
-              Simulasi Cicilan & Uji Kelayakan
-            </h3>
-            <p className="text-[11px] text-espresso-muted">
-              Hitung cicilan 0%, Flat, atau Efektif serta dampaknya terhadap cashflow & jatah harian Anda
-            </p>
-          </div>
+          <h3 className="text-sm font-black text-espresso flex items-center gap-2">
+            <CreditCard className="h-4 w-4 text-[#0D0F17]" />
+            Simulasi Cicilan & Uji Kelayakan
+          </h3>
           <span className="rounded-full bg-[#C8F526]/40 border border-[#C8F526] px-2.5 py-0.5 text-[10px] font-black text-black shrink-0">
             Smart DSR
           </span>
@@ -803,12 +798,7 @@ export function InstallmentSimulator({
 
           {/* 4. Perbandingan Multi-Tenor */}
           <div className="rounded-3xl border border-surface-border bg-white p-5 shadow-xs space-y-3">
-            <div>
-              <h4 className="text-xs font-black text-espresso">Bandingkan Opsi Tenor</h4>
-              <p className="text-[11px] text-espresso-muted">
-                Klik salah satu tenor di bawah untuk langsung mengganti simulasi
-              </p>
-            </div>
+            <h4 className="text-xs font-black text-espresso">Bandingkan Opsi Tenor</h4>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {result.tenor_comparisons.map((item) => {
@@ -921,12 +911,7 @@ export function InstallmentSimulator({
 
           {/* 6. Terapkan ke Proyeksi Cashflow / Simpan ke Wishlist */}
           <div className="rounded-3xl border border-surface-border bg-white p-5 shadow-xs space-y-3">
-            <div>
-              <h4 className="text-xs font-black text-espresso">Langkah Selanjutnya</h4>
-              <p className="text-[11px] text-espresso-muted">
-                Jadwalkan angsuran ini ke Prediksi Saldo Masa Depan untuk melihat dampaknya pada buku kas harian
-              </p>
-            </div>
+            <h4 className="text-xs font-black text-espresso">Langkah Selanjutnya</h4>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <div>

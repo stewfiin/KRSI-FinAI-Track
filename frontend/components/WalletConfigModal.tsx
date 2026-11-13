@@ -199,13 +199,6 @@ export function WalletConfigModal({
                   ? "Edit Dompet"
                   : "Atur Dompet"}
               </h3>
-              <p className="text-[11px] text-espresso-muted truncate">
-                {mode === "create"
-                  ? "Buat akun baru dan tentukan peruntukannya"
-                  : mode === "edit"
-                  ? "Ubah nama, tipe, saldo, atau peruntukan"
-                  : "Atur peruntukan, edit, hapus, atau tambah dompet"}
-              </p>
             </div>
           </div>
 

@@ -50,7 +50,38 @@ class FixedExpense(SQLModel, table=True):
     expense_type: str = Field(
         default="EXPENSE",
         max_length=20,
-        description="EXPENSE (biaya rutin keluar) atau SAVINGS_TRANSFER (transfer ke tabungan)"
+        description="EXPENSE (biaya rutin keluar), SAVINGS_TRANSFER (transfer ke tabungan), atau INSTALLMENT (cicilan berbunga)"
+    )
+    principal_amount: Optional[Decimal] = Field(
+        default=None,
+        sa_column=Column(Numeric(15, 2), nullable=True),
+        description="Pokok pinjaman / nilai awal cicilan"
+    )
+    interest_type: Optional[str] = Field(
+        default=None,
+        max_length=20,
+        description="Skema bunga cicilan: zero, flat, atau effective"
+    )
+    interest_rate: Optional[Decimal] = Field(
+        default=None,
+        sa_column=Column(Numeric(7, 4), nullable=True),
+        description="Persentase bunga cicilan (%)"
+    )
+    interest_rate_period: Optional[str] = Field(
+        default=None,
+        max_length=20,
+        description="Periode bunga: monthly atau annual"
+    )
+    total_tenor: Optional[int] = Field(
+        default=None,
+        ge=1,
+        description="Total tenor cicilan dalam bulan"
+    )
+    paid_installments: int = Field(
+        default=0,
+        ge=0,
+        nullable=False,
+        description="Jumlah angsuran yang sudah terbayar"
     )
     paid_transaction_id: Optional[uuid.UUID] = Field(
         default=None,

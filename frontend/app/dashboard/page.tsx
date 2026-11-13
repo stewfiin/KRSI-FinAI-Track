@@ -332,7 +332,6 @@ export default function DashboardPage() {
             {/* Donut Chart: Pengeluaran per Kategori */}
             <div className="rounded-2xl border border-surface-border bg-surface p-5 shadow-sm">
               <h3 className="text-sm font-bold text-espresso">Komposisi Pengeluaran Bulan Ini</h3>
-              <p className="text-xs text-espresso-muted">Proporsi kategori belanja terbesar</p>
 
               {mounted && categoryChartData.length > 0 ? (
                 <div className="mt-4 flex flex-col items-center sm:flex-row sm:justify-between">
@@ -405,7 +404,6 @@ export default function DashboardPage() {
             {/* Bar Chart: Arus Kas 7 Hari Terakhir */}
             <div className="rounded-2xl border border-surface-border bg-surface p-5 shadow-sm">
               <h3 className="text-sm font-bold text-espresso">Arus Kas 7 Hari Terakhir</h3>
-              <p className="text-xs text-espresso-muted">Pemasukan vs Pengeluaran harian</p>
 
               {mounted && cashflowChartData.length > 0 && hasCashflowActivity ? (
                 <div className="mt-4 h-48 w-full">

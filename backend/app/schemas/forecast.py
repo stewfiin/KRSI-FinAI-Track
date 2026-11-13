@@ -78,16 +78,22 @@ class FinancialPlanResponse(FinancialPlanBase):
 # ==============================================================================
 class FixedExpenseBase(BaseModel):
     name: str = Field(..., max_length=150, description="Nama pengeluaran pasti (cth: iCloud, Pulsa, Token)")
-    amount: Decimal = Field(..., gt=0, description="Nominal tagihan per siklus")
+    amount: Optional[Decimal] = Field(default=None, gt=0, description="Nominal tagihan per siklus (otomatis dihitung jika tipe INSTALLMENT)")
     category_id: Optional[uuid.UUID] = None
     wallet_id: Optional[uuid.UUID] = Field(default=None, description="Dompet pembayar khusus (misal: Subscription / BCA)")
     to_wallet_id: Optional[uuid.UUID] = Field(default=None, description="Dompet tujuan jika siklus transfer tabungan")
-    expense_type: str = Field(default="EXPENSE", description="EXPENSE (biaya keluar) atau SAVINGS_TRANSFER (transfer ke tabungan)")
+    expense_type: str = Field(default="EXPENSE", description="EXPENSE, SAVINGS_TRANSFER, atau INSTALLMENT")
     due_day_of_month: Optional[int] = Field(default=None, ge=1, le=31)
-    frequency: str = Field(default="monthly", description="monthly, weekly, biweekly, every_n_days")
+    frequency: str = Field(default="monthly", description="monthly, daily, weekly, biweekly, every_n_days")
     interval_value: Optional[int] = Field(default=None, ge=1, description="Interval hari jika frequency=every_n_days (cth: 4 hari)")
     anchor_date: Optional[datetime] = Field(default=None, description="Tanggal patokan awal siklus berkala")
     is_paid_this_cycle: bool = Field(default=False)
+    principal_amount: Optional[Decimal] = Field(default=None, gt=0, description="Pokok pinjaman cicilan")
+    interest_type: Optional[str] = Field(default=None, description="zero, flat, atau effective")
+    interest_rate: Optional[Decimal] = Field(default=None, ge=0, description="Persentase bunga cicilan (%)")
+    interest_rate_period: Optional[str] = Field(default=None, description="monthly atau annual")
+    total_tenor: Optional[int] = Field(default=None, ge=1, le=600, description="Total tenor cicilan (bulan)")
+    paid_installments: int = Field(default=0, ge=0, description="Jumlah angsuran yang sudah terbayar")
 
 
 class FixedExpenseCreate(FixedExpenseBase):
@@ -96,7 +102,7 @@ class FixedExpenseCreate(FixedExpenseBase):
 
 class FixedExpenseUpdate(BaseModel):
     name: Optional[str] = None
-    amount: Optional[Decimal] = None
+    amount: Optional[Decimal] = Field(default=None, gt=0)
     category_id: Optional[uuid.UUID] = None
     wallet_id: Optional[uuid.UUID] = None
     to_wallet_id: Optional[uuid.UUID] = None
@@ -106,14 +112,24 @@ class FixedExpenseUpdate(BaseModel):
     interval_value: Optional[int] = None
     anchor_date: Optional[datetime] = None
     is_paid_this_cycle: Optional[bool] = None
+    principal_amount: Optional[Decimal] = Field(default=None, gt=0)
+    interest_type: Optional[str] = None
+    interest_rate: Optional[Decimal] = Field(default=None, ge=0)
+    interest_rate_period: Optional[str] = None
+    total_tenor: Optional[int] = Field(default=None, ge=1, le=600)
+    paid_installments: Optional[int] = Field(default=None, ge=0)
 
 
 class FixedExpenseResponse(FixedExpenseBase):
     id: uuid.UUID
     user_id: uuid.UUID
+    amount: Decimal
     category_name: Optional[str] = None
     wallet_name: Optional[str] = None
     to_wallet_name: Optional[str] = None
+    remaining_installments: Optional[int] = None
+    total_interest_estimate: Optional[Decimal] = None
+    total_payment_estimate: Optional[Decimal] = None
     last_paid_at: Optional[datetime] = None
     created_at: datetime
 

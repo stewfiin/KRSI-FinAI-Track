@@ -18,6 +18,7 @@ from app.models.planned_transaction import PlannedTransaction
 from app.models.transaction import Transaction
 from app.models.wallet import Wallet
 from app.models.wishlist import Wishlist
+from app.services.installment_math import compute_installment_breakdown
 from app.schemas.forecast import (
     CycleInfo,
     DailyLedgerItem,
@@ -156,6 +157,138 @@ class ForecastService:
         return False
 
     @staticmethod
+    def is_installment_completed(expense: FixedExpense) -> bool:
+        """Menentukan apakah kewajiban cicilan sudah lunas seluruh tenornya."""
+        return (
+            getattr(expense, "expense_type", "EXPENSE") == "INSTALLMENT"
+            and getattr(expense, "total_tenor", None) is not None
+            and (getattr(expense, "paid_installments", 0) or 0) >= expense.total_tenor
+        )
+
+    @staticmethod
+    def resolve_installment_fields(
+        expense_type: str,
+        amount: Optional[Decimal],
+        principal_amount: Optional[Decimal],
+        interest_type: Optional[str],
+        interest_rate: Optional[Decimal],
+        interest_rate_period: Optional[str],
+        total_tenor: Optional[int],
+        paid_installments: int,
+    ) -> Tuple[Decimal, Optional[str], Optional[Decimal], Optional[str], Optional[int], int]:
+        """Validasi dan hitung angsuran bulanan otomatis untuk tagihan bertipe INSTALLMENT."""
+        if expense_type != "INSTALLMENT":
+            if amount is None or amount <= 0:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Nominal tagihan per siklus wajib lebih besar dari 0.",
+                )
+            return amount, None, None, None, None, 0
+
+        if principal_amount is None or principal_amount <= 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Pokok pinjaman cicilan wajib lebih besar dari 0.",
+            )
+        if total_tenor is None or total_tenor < 1:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Tenor cicilan minimal 1 bulan.",
+            )
+
+        norm_type = (interest_type or "zero").strip().lower()
+        if norm_type not in ("zero", "flat", "effective"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Skema bunga cicilan harus bernilai 'zero', 'flat', atau 'effective'.",
+            )
+
+        norm_period = (interest_rate_period or "monthly").strip().lower()
+        if norm_period not in ("monthly", "annual"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Periode bunga harus bernilai 'monthly' atau 'annual'.",
+            )
+
+        rate = interest_rate if interest_rate is not None else Decimal("0.00")
+        if rate < 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Persentase bunga tidak boleh negatif.",
+            )
+        if norm_type == "zero" or rate == 0:
+            norm_type = "zero"
+            rate = Decimal("0.00")
+
+        clamped_paid = max(0, min(int(paid_installments or 0), int(total_tenor)))
+        monthly_payment, _, _ = compute_installment_breakdown(
+            principal=principal_amount,
+            tenor_months=total_tenor,
+            interest_type=norm_type,
+            interest_rate=rate,
+            interest_rate_period=norm_period,
+        )
+        return monthly_payment, norm_type, rate, norm_period, total_tenor, clamped_paid
+
+    @staticmethod
+    def build_fixed_expense_response(
+        item: FixedExpense,
+        cat_name: Optional[str] = None,
+        wallet_name: Optional[str] = None,
+        to_wallet_name: Optional[str] = None,
+    ) -> FixedExpenseResponse:
+        """Membentuk DTO FixedExpenseResponse lengkap dengan ringkasan cicilan jika bertipe INSTALLMENT."""
+        exp_type = getattr(item, "expense_type", None) or "EXPENSE"
+        remaining_installments = None
+        total_interest_est = None
+        total_payment_est = None
+
+        if (
+            exp_type == "INSTALLMENT"
+            and getattr(item, "total_tenor", None) is not None
+            and getattr(item, "principal_amount", None) is not None
+        ):
+            paid_cnt = getattr(item, "paid_installments", 0) or 0
+            remaining_installments = max(0, item.total_tenor - paid_cnt)
+            _, total_interest_est, total_payment_est = compute_installment_breakdown(
+                principal=item.principal_amount,
+                tenor_months=item.total_tenor,
+                interest_type=getattr(item, "interest_type", "zero"),
+                interest_rate=getattr(item, "interest_rate", Decimal("0.00")),
+                interest_rate_period=getattr(item, "interest_rate_period", "monthly"),
+            )
+
+        return FixedExpenseResponse(
+            id=item.id,
+            user_id=item.user_id,
+            name=item.name,
+            amount=item.amount,
+            category_id=item.category_id,
+            category_name=cat_name,
+            wallet_id=item.wallet_id,
+            wallet_name=wallet_name,
+            to_wallet_id=item.to_wallet_id,
+            to_wallet_name=to_wallet_name,
+            expense_type=exp_type,
+            due_day_of_month=item.due_day_of_month,
+            frequency=item.frequency,
+            interval_value=item.interval_value,
+            anchor_date=item.anchor_date,
+            is_paid_this_cycle=item.is_paid_this_cycle,
+            principal_amount=getattr(item, "principal_amount", None),
+            interest_type=getattr(item, "interest_type", None),
+            interest_rate=getattr(item, "interest_rate", None),
+            interest_rate_period=getattr(item, "interest_rate_period", None),
+            total_tenor=getattr(item, "total_tenor", None),
+            paid_installments=getattr(item, "paid_installments", 0) or 0,
+            remaining_installments=remaining_installments,
+            total_interest_estimate=total_interest_est,
+            total_payment_estimate=total_payment_est,
+            last_paid_at=item.last_paid_at,
+            created_at=item.created_at,
+        )
+
+    @staticmethod
     def is_fixed_expense_due_on_date(expense: FixedExpense, target_date: date) -> bool:
         """Menentukan apakah tagihan bulanan atau siklus biaya berkala jatuh tempo pada tanggal target tertentu."""
         freq = (expense.frequency or "monthly").lower()
@@ -262,16 +395,17 @@ class ForecastService:
         # Pendapatan efektif: Jika user mendefinisikan income streams, gunakan total setara bulanan; jika tidak, gunakan blueprint lama
         effective_monthly_income = total_stream_equivalent if total_stream_equivalent > 0 else plan.monthly_income
 
-        # 3. Tagihan Pasti Bulanan & Siklus Biaya Hidup Berkala (Cyclical Expenses)
+        # 3. Tagihan Pasti Bulanan, Cicilan Aktif & Siklus Biaya Hidup Berkala (Cyclical Expenses)
         fixed_res = await session.exec(select(FixedExpense).where(FixedExpense.user_id == user_id))
         fixed_items = fixed_res.all()
 
-        monthly_bills = [f for f in fixed_items if (f.frequency or "monthly").lower() == "monthly"]
+        active_fixed_items = [f for f in fixed_items if not ForecastService.is_installment_completed(f)]
+        monthly_bills = [f for f in active_fixed_items if (f.frequency or "monthly").lower() == "monthly"]
         cyclical_expenses = [
-            f for f in fixed_items if (f.frequency or "monthly").lower() in ("weekly", "biweekly", "every_n_days")
+            f for f in active_fixed_items if (f.frequency or "monthly").lower() in ("weekly", "biweekly", "every_n_days")
         ]
 
-        total_monthly_fixed = sum((f.amount for f in fixed_items), Decimal("0.00"))
+        total_monthly_fixed = sum((f.amount for f in active_fixed_items), Decimal("0.00"))
         unpaid_monthly_items = [f for f in monthly_bills if not f.is_paid_this_cycle]
         paid_fixed = total_monthly_fixed - sum((f.amount for f in unpaid_monthly_items), Decimal("0.00"))
 
@@ -443,25 +577,11 @@ class ForecastService:
                 cat_map[f.category_id] = cat_obj.name if cat_obj else None
 
         fixed_responses = [
-            FixedExpenseResponse(
-                id=f.id,
-                user_id=f.user_id,
-                name=f.name,
-                amount=f.amount,
-                category_id=f.category_id,
-                category_name=cat_map.get(f.category_id),
-                wallet_id=f.wallet_id,
+            ForecastService.build_fixed_expense_response(
+                item=f,
+                cat_name=cat_map.get(f.category_id),
                 wallet_name=wallet_map[f.wallet_id].name if f.wallet_id and f.wallet_id in wallet_map else None,
-                to_wallet_id=f.to_wallet_id,
                 to_wallet_name=wallet_map[f.to_wallet_id].name if f.to_wallet_id and f.to_wallet_id in wallet_map else None,
-                expense_type=f.expense_type or "EXPENSE",
-                due_day_of_month=f.due_day_of_month,
-                frequency=f.frequency,
-                interval_value=f.interval_value,
-                anchor_date=f.anchor_date,
-                is_paid_this_cycle=f.is_paid_this_cycle,
-                last_paid_at=f.last_paid_at,
-                created_at=f.created_at,
             )
             for f in fixed_items
         ]
@@ -543,9 +663,12 @@ class ForecastService:
             d = tx.transaction_date
             daily_spent_map[d] = daily_spent_map.get(d, Decimal("0.00")) + tx.amount
 
-        # Hitung fixed dan budget operasional
+        # Hitung fixed aktif dan budget operasional
         fixed_res = await session.exec(select(FixedExpense).where(FixedExpense.user_id == user_id))
-        total_fixed = sum((f.amount for f in fixed_res.all()), Decimal("0.00"))
+        total_fixed = sum(
+            (f.amount for f in fixed_res.all() if not ForecastService.is_installment_completed(f)),
+            Decimal("0.00"),
+        )
 
         total_cycle_days = (end_date - start_date).days + 1
 
@@ -756,6 +879,11 @@ class ForecastService:
 
         if expense.is_paid_this_cycle:
             expense.last_paid_at = datetime.now(timezone.utc)
+            if (getattr(expense, "expense_type", None) == "INSTALLMENT") and getattr(expense, "total_tenor", None):
+                expense.paid_installments = min(
+                    expense.total_tenor,
+                    (getattr(expense, "paid_installments", 0) or 0) + 1,
+                )
             # Jika terikat ke dompet, potong saldo dompet dan catat transaksi pengeluaran
             if target_wallet:
                 target_wallet.balance -= expense.amount
@@ -796,6 +924,8 @@ class ForecastService:
                 expense.paid_transaction_id = tx.id
         else:
             expense.last_paid_at = None
+            if (getattr(expense, "expense_type", None) == "INSTALLMENT") and getattr(expense, "total_tenor", None):
+                expense.paid_installments = max(0, (getattr(expense, "paid_installments", 0) or 0) - 1)
             # Jika sebelumnya ada transaksi otomatis yang tercatat, refund saldo dompet & hapus transaksi
             if expense.paid_transaction_id:
                 tx = await session.get(Transaction, expense.paid_transaction_id)
@@ -822,20 +952,16 @@ class ForecastService:
             w = await session.get(Wallet, expense.wallet_id)
             wallet_name = w.name if w else None
 
-        return FixedExpenseResponse(
-            id=expense.id,
-            user_id=expense.user_id,
-            name=expense.name,
-            amount=expense.amount,
-            category_id=expense.category_id,
-            category_name=cat_name,
-            wallet_id=expense.wallet_id,
+        to_wallet_name = None
+        if expense.to_wallet_id:
+            to_w = await session.get(Wallet, expense.to_wallet_id)
+            to_wallet_name = to_w.name if to_w else None
+
+        return ForecastService.build_fixed_expense_response(
+            item=expense,
+            cat_name=cat_name,
             wallet_name=wallet_name,
-            due_day_of_month=expense.due_day_of_month,
-            frequency=expense.frequency,
-            is_paid_this_cycle=expense.is_paid_this_cycle,
-            last_paid_at=expense.last_paid_at,
-            created_at=expense.created_at,
+            to_wallet_name=to_wallet_name,
         )
 
     @staticmethod
@@ -946,9 +1072,10 @@ class ForecastService:
         )
         active_streams = income_res.all()
 
-        # 4. Ambil Pengeluaran Pasti & Siklus Berkala
+        # 4. Ambil Pengeluaran Pasti, Cicilan & Siklus Berkala
         fixed_res = await session.exec(select(FixedExpense).where(FixedExpense.user_id == user_id))
         fixed_items = fixed_res.all()
+        installment_emitted_counts = {}
 
         # 5. Ambil Rencana Transaksi Belum Selesai dalam rentang
         pt_res = await session.exec(
@@ -1156,21 +1283,37 @@ class ForecastService:
                         )
                     )
 
-            # 2. Tagihan Pasti Bulanan & Siklus Biaya Berkala / Transfer Tabungan Rutin
+            # 2. Tagihan Pasti Bulanan, Cicilan & Siklus Biaya Berkala / Transfer Tabungan Rutin
             for fe in fixed_items:
                 if ForecastService.is_fixed_expense_due_on_date(fe, curr):
                     freq = (fe.frequency or "monthly").lower()
                     if freq == "monthly" and curr == today and fe.is_paid_this_cycle:
                         continue  # Sudah lunas hari ini/sebelumnya pada siklus ini
 
+                    is_installment = getattr(fe, "expense_type", "EXPENSE") == "INSTALLMENT"
+                    installment_label_name = fe.name
+                    if is_installment and getattr(fe, "total_tenor", None) is not None:
+                        if curr < today:
+                            continue  # Jangan memproyeksikan cicilan ke tanggal sebelum hari ini
+                        remaining_tenor = max(0, fe.total_tenor - (getattr(fe, "paid_installments", 0) or 0))
+                        emitted_so_far = installment_emitted_counts.get(fe.id, 0)
+                        if emitted_so_far >= remaining_tenor:
+                            continue  # Cicilan otomatis berhenti setelah tenor berakhir
+                        next_count = emitted_so_far + 1
+                        installment_emitted_counts[fe.id] = next_count
+                        installment_no = (getattr(fe, "paid_installments", 0) or 0) + next_count
+                        installment_label_name = f"{fe.name} ({installment_no}/{fe.total_tenor})"
+
                     from_w = wallet_map.get(fe.wallet_id) if fe.wallet_id else None
                     to_w = wallet_map.get(fe.to_wallet_id) if fe.to_wallet_id else None
 
                     # Smart Auto-Detection untuk siklus tabungan atau transfer antar dompet
                     name_lower = (fe.name or "").lower()
-                    has_savings_keyword = any(kw in name_lower for kw in ["tabung", "saving", "invest", "celengan", "nabung"])
+                    has_savings_keyword = (not is_installment) and any(
+                        kw in name_lower for kw in ["tabung", "saving", "invest", "celengan", "nabung"]
+                    )
 
-                    is_savings_transfer = (
+                    is_savings_transfer = (not is_installment) and (
                         (getattr(fe, "expense_type", "EXPENSE") == "SAVINGS_TRANSFER")
                         or (to_w and getattr(to_w, "purpose", None) == "savings")
                         or has_savings_keyword
@@ -1275,11 +1418,16 @@ class ForecastService:
                         if fe_matches:
                             day_outflow += fe.amount
                             w_name = from_w.name if from_w else None
-                            ev_type = "CYCLICAL" if freq in ("daily", "weekly", "biweekly", "every_n_days") else "FIXED_BILL"
+                            if is_installment:
+                                ev_type = "INSTALLMENT"
+                            elif freq in ("daily", "weekly", "biweekly", "every_n_days"):
+                                ev_type = "CYCLICAL"
+                            else:
+                                ev_type = "FIXED_BILL"
                             events.append(
                                 ProjectedDayEvent(
                                     type=ev_type,
-                                    name=fe.name,
+                                    name=installment_label_name if is_installment else fe.name,
                                     amount=fe.amount,
                                     direction="OUTFLOW",
                                     wallet_id=fe.wallet_id,

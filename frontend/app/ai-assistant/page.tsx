@@ -237,17 +237,12 @@ export default function AIAssistantPage() {
     <div className="space-y-4">
       {/* Header & Tabs Navigation */}
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-[#C8F526] animate-pulse" />
-            <h1 className="text-xl font-black tracking-tight text-espresso flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-espresso" />
-              AI Finance Assistant
-            </h1>
-          </div>
-          <p className="text-xs text-espresso-muted font-medium mt-0.5">
-            Pencatatan cepat via suara/teks & rekomendasi anggaran pintar
-          </p>
+        <div className="flex items-center gap-2">
+          <span className="h-2 w-2 rounded-full bg-[#C8F526] animate-pulse" />
+          <h1 className="text-xl font-black tracking-tight text-espresso flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-espresso" />
+            AI Finance Assistant
+          </h1>
         </div>
 
         {/* Tab Toggle */}
@@ -424,16 +419,10 @@ export default function AIAssistantPage() {
       {activeTab === "budget" && (
         <div className="space-y-6">
           <div className="rounded-3xl border border-surface-border bg-white p-6 shadow-xs space-y-4">
-            <div>
-              <h3 className="text-sm font-black text-espresso flex items-center gap-2">
-                <Sliders className="h-4 w-4 text-espresso" />
-                Parameter Keinginan & Batasan Finansial Anda
-              </h3>
-              <p className="text-xs text-espresso-muted mt-1 leading-relaxed">
-                Tuliskan kondisi pemasukan dan target tabungan Anda dalam bahasa santai. AI akan membaca
-                histori rata-rata pengeluaran Anda dan menghitung rekomendasi plafon per kategori.
-              </p>
-            </div>
+            <h3 className="text-sm font-black text-espresso flex items-center gap-2">
+              <Sliders className="h-4 w-4 text-espresso" />
+              Parameter Keinginan & Batasan Finansial Anda
+            </h3>
 
             <textarea
               rows={3}

@@ -144,25 +144,11 @@ async def list_fixed_expenses(
             cat_name = cat.name if cat else None
 
         results.append(
-            FixedExpenseResponse(
-                id=item.id,
-                user_id=item.user_id,
-                name=item.name,
-                amount=item.amount,
-                category_id=item.category_id,
-                category_name=cat_name,
-                wallet_id=item.wallet_id,
+            ForecastService.build_fixed_expense_response(
+                item=item,
+                cat_name=cat_name,
                 wallet_name=wallet_map.get(item.wallet_id),
-                to_wallet_id=item.to_wallet_id,
                 to_wallet_name=wallet_map.get(item.to_wallet_id) if item.to_wallet_id else None,
-                expense_type=item.expense_type or "EXPENSE",
-                due_day_of_month=item.due_day_of_month,
-                frequency=item.frequency,
-                interval_value=item.interval_value,
-                anchor_date=item.anchor_date,
-                is_paid_this_cycle=item.is_paid_this_cycle,
-                last_paid_at=item.last_paid_at,
-                created_at=item.created_at,
             )
         )
     return results
@@ -178,10 +164,13 @@ async def create_fixed_expense(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
-    exp_type = payload.expense_type or "EXPENSE"
+    exp_type = (payload.expense_type or "EXPENSE").strip().upper()
     to_w_id = payload.to_wallet_id
     name_lower = (payload.name or "").lower()
-    if any(kw in name_lower for kw in ["tabung", "saving", "invest", "celengan", "nabung"]) or exp_type == "SAVINGS_TRANSFER":
+    if exp_type != "INSTALLMENT" and (
+        any(kw in name_lower for kw in ["tabung", "saving", "invest", "celengan", "nabung"])
+        or exp_type == "SAVINGS_TRANSFER"
+    ):
         exp_type = "SAVINGS_TRANSFER"
         if not to_w_id:
             wallets_res = await session.exec(select(Wallet).where(Wallet.user_id == current_user.id))
@@ -189,19 +178,43 @@ async def create_fixed_expense(
             if savings_w:
                 to_w_id = savings_w.id
 
+    (
+        calc_amount,
+        norm_interest_type,
+        norm_interest_rate,
+        norm_interest_period,
+        norm_tenor,
+        norm_paid_cnt,
+    ) = ForecastService.resolve_installment_fields(
+        expense_type=exp_type,
+        amount=payload.amount,
+        principal_amount=payload.principal_amount,
+        interest_type=payload.interest_type,
+        interest_rate=payload.interest_rate,
+        interest_rate_period=payload.interest_rate_period,
+        total_tenor=payload.total_tenor,
+        paid_installments=payload.paid_installments,
+    )
+
     item = FixedExpense(
         user_id=current_user.id,
         name=payload.name,
-        amount=payload.amount,
+        amount=calc_amount,
         category_id=payload.category_id,
         wallet_id=payload.wallet_id,
-        to_wallet_id=to_w_id,
+        to_wallet_id=None if exp_type == "INSTALLMENT" else to_w_id,
         expense_type=exp_type,
-        due_day_of_month=payload.due_day_of_month,
-        frequency=payload.frequency,
-        interval_value=payload.interval_value,
-        anchor_date=payload.anchor_date,
+        due_day_of_month=payload.due_day_of_month or 1,
+        frequency="monthly" if exp_type == "INSTALLMENT" else payload.frequency,
+        interval_value=None if exp_type == "INSTALLMENT" else payload.interval_value,
+        anchor_date=None if exp_type == "INSTALLMENT" else payload.anchor_date,
         is_paid_this_cycle=payload.is_paid_this_cycle,
+        principal_amount=payload.principal_amount if exp_type == "INSTALLMENT" else None,
+        interest_type=norm_interest_type,
+        interest_rate=norm_interest_rate,
+        interest_rate_period=norm_interest_period,
+        total_tenor=norm_tenor,
+        paid_installments=norm_paid_cnt,
     )
     session.add(item)
     await session.commit()
@@ -222,25 +235,11 @@ async def create_fixed_expense(
         to_w = await session.get(Wallet, item.to_wallet_id)
         to_wallet_name = to_w.name if to_w else None
 
-    return FixedExpenseResponse(
-        id=item.id,
-        user_id=item.user_id,
-        name=item.name,
-        amount=item.amount,
-        category_id=item.category_id,
-        category_name=cat_name,
-        wallet_id=item.wallet_id,
+    return ForecastService.build_fixed_expense_response(
+        item=item,
+        cat_name=cat_name,
         wallet_name=wallet_name,
-        to_wallet_id=item.to_wallet_id,
         to_wallet_name=to_wallet_name,
-        expense_type=item.expense_type or "EXPENSE",
-        due_day_of_month=item.due_day_of_month,
-        frequency=item.frequency,
-        interval_value=item.interval_value,
-        anchor_date=item.anchor_date,
-        is_paid_this_cycle=item.is_paid_this_cycle,
-        last_paid_at=item.last_paid_at,
-        created_at=item.created_at,
     )
 
 
@@ -263,14 +262,52 @@ async def update_fixed_expense(
     for key, value in update_data.items():
         setattr(item, key, value)
 
+    exp_type = (item.expense_type or "EXPENSE").strip().upper()
+    item.expense_type = exp_type
     name_lower = (item.name or "").lower()
-    if any(kw in name_lower for kw in ["tabung", "saving", "invest", "celengan", "nabung"]) or item.expense_type == "SAVINGS_TRANSFER":
-        item.expense_type = "SAVINGS_TRANSFER"
+    if exp_type != "INSTALLMENT" and (
+        any(kw in name_lower for kw in ["tabung", "saving", "invest", "celengan", "nabung"])
+        or exp_type == "SAVINGS_TRANSFER"
+    ):
+        exp_type = "SAVINGS_TRANSFER"
+        item.expense_type = exp_type
         if not item.to_wallet_id:
             wallets_res = await session.exec(select(Wallet).where(Wallet.user_id == current_user.id))
             savings_w = next((w for w in wallets_res.all() if getattr(w, "purpose", None) == "savings"), None)
             if savings_w:
                 item.to_wallet_id = savings_w.id
+
+    (
+        calc_amount,
+        norm_interest_type,
+        norm_interest_rate,
+        norm_interest_period,
+        norm_tenor,
+        norm_paid_cnt,
+    ) = ForecastService.resolve_installment_fields(
+        expense_type=exp_type,
+        amount=item.amount,
+        principal_amount=item.principal_amount,
+        interest_type=item.interest_type,
+        interest_rate=item.interest_rate,
+        interest_rate_period=item.interest_rate_period,
+        total_tenor=item.total_tenor,
+        paid_installments=item.paid_installments,
+    )
+
+    item.amount = calc_amount
+    item.interest_type = norm_interest_type
+    item.interest_rate = norm_interest_rate
+    item.interest_rate_period = norm_interest_period
+    item.total_tenor = norm_tenor
+    item.paid_installments = norm_paid_cnt
+    if exp_type == "INSTALLMENT":
+        item.frequency = "monthly"
+        item.to_wallet_id = None
+        if not item.due_day_of_month:
+            item.due_day_of_month = 1
+    else:
+        item.principal_amount = None
 
     session.add(item)
     await session.commit()
@@ -291,25 +328,11 @@ async def update_fixed_expense(
         to_w = await session.get(Wallet, item.to_wallet_id)
         to_wallet_name = to_w.name if to_w else None
 
-    return FixedExpenseResponse(
-        id=item.id,
-        user_id=item.user_id,
-        name=item.name,
-        amount=item.amount,
-        category_id=item.category_id,
-        category_name=cat_name,
-        wallet_id=item.wallet_id,
+    return ForecastService.build_fixed_expense_response(
+        item=item,
+        cat_name=cat_name,
         wallet_name=wallet_name,
-        to_wallet_id=item.to_wallet_id,
         to_wallet_name=to_wallet_name,
-        expense_type=item.expense_type or "EXPENSE",
-        due_day_of_month=item.due_day_of_month,
-        frequency=item.frequency,
-        interval_value=item.interval_value,
-        anchor_date=item.anchor_date,
-        is_paid_this_cycle=item.is_paid_this_cycle,
-        last_paid_at=item.last_paid_at,
-        created_at=item.created_at,
     )
 
 

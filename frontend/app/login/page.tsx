@@ -67,9 +67,6 @@ export default function LoginPage() {
               v2.0 NEO
             </span>
           </div>
-          <p className="mt-1 text-xs text-gray-400 font-medium">
-            Smart Personal Finance & AI Voice/Chat Assistant
-          </p>
         </div>
 
         {/* Auth Card */}

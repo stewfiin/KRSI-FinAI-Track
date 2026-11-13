@@ -1,7 +1,6 @@
-import calendar
 import uuid
 from datetime import date
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal
 from typing import Dict, List, Optional, Tuple
 
 from fastapi import HTTPException, status
@@ -12,7 +11,6 @@ from app.models.planned_transaction import PlannedTransaction
 from app.models.wallet import Wallet
 from app.schemas.forecast import (
     ForecastSummaryResponse,
-    InstallmentAmortizationItem,
     InstallmentApplyRequest,
     InstallmentApplyResponse,
     InstallmentSimulationRequest,
@@ -20,23 +18,12 @@ from app.schemas.forecast import (
     InstallmentTenorComparison,
 )
 from app.services.forecast_service import ForecastService
-
-TWO_PLACES = Decimal("1.00")
-
-
-def _q(val: Decimal) -> Decimal:
-    """Bulatkan nominal ke 2 desimal sesuai presisi Numeric(15, 2)."""
-    return val.quantize(TWO_PLACES, rounding=ROUND_HALF_UP)
-
-
-def _add_months(base_date: date, months: int, due_day: Optional[int] = None) -> date:
-    """Menambahkan N bulan dengan menjaga tanggal jatuh tempo terhadap batas hari tiap bulan."""
-    total_months = (base_date.year * 12 + (base_date.month - 1)) + months
-    target_year = total_months // 12
-    target_month = (total_months % 12) + 1
-    target_day = due_day or base_date.day
-    _, last_day = calendar.monthrange(target_year, target_month)
-    return date(target_year, target_month, min(target_day, last_day))
+from app.services.installment_math import (
+    add_months as _add_months,
+    compute_installment_schedule,
+    get_monthly_rate as _get_monthly_rate,
+    quantize_money as _q,
+)
 
 
 class InstallmentService:
@@ -76,12 +63,7 @@ class InstallmentService:
     @staticmethod
     def get_monthly_rate(interest_type: str, interest_rate: Decimal, rate_period: str) -> Decimal:
         """Konversi suku bunga persen menjadi rasio bunga bulanan."""
-        if interest_type == "zero" or interest_rate <= 0:
-            return Decimal("0")
-        pct = interest_rate / Decimal("100")
-        if rate_period == "annual":
-            return pct / Decimal("12")
-        return pct
+        return _get_monthly_rate(interest_type, interest_rate, rate_period)
 
     @staticmethod
     def compute_schedule(
@@ -94,96 +76,15 @@ class InstallmentService:
         due_day: Optional[int],
     ) -> Dict:
         """Menghitung rincian angsuran & jadwal amortisasi lengkap."""
-        schedule: List[InstallmentAmortizationItem] = []
-        remaining = _q(principal)
-        total_interest = Decimal("0.00")
-        total_fees = Decimal("0.00")
-        total_payments = Decimal("0.00")
-
-        effective_due_day = due_day or start_date.day
-
-        if interest_type == "effective" and monthly_rate > 0:
-            one_plus_r = Decimal("1") + monthly_rate
-            factor = one_plus_r ** tenor_months
-            raw_annuity = principal * monthly_rate * factor / (factor - Decimal("1"))
-            base_annuity = _q(raw_annuity)
-
-            for idx in range(1, tenor_months + 1):
-                due_d = _add_months(start_date, idx, effective_due_day)
-                interest_k = _q(remaining * monthly_rate)
-                if idx < tenor_months:
-                    principal_k = min(remaining, max(Decimal("0.00"), base_annuity - interest_k))
-                else:
-                    principal_k = remaining
-
-                fee_k = _q(monthly_fee)
-                total_k = principal_k + interest_k + fee_k
-                remaining = max(Decimal("0.00"), remaining - principal_k)
-
-                total_interest += interest_k
-                total_fees += fee_k
-                total_payments += total_k
-
-                schedule.append(
-                    InstallmentAmortizationItem(
-                        month_index=idx,
-                        due_date=due_d,
-                        principal_amount=principal_k,
-                        interest_amount=interest_k,
-                        fee_amount=fee_k,
-                        total_payment=total_k,
-                        remaining_principal=remaining,
-                    )
-                )
-        else:
-            # Skema 0% atau Bunga Flat
-            base_principal = _q(principal / Decimal(str(tenor_months)))
-            fixed_interest = (
-                _q(principal * monthly_rate)
-                if (interest_type == "flat" and monthly_rate > 0)
-                else Decimal("0.00")
-            )
-
-            for idx in range(1, tenor_months + 1):
-                due_d = _add_months(start_date, idx, effective_due_day)
-                if idx < tenor_months:
-                    principal_k = min(remaining, base_principal)
-                else:
-                    principal_k = remaining
-
-                fee_k = _q(monthly_fee)
-                total_k = principal_k + fixed_interest + fee_k
-                remaining = max(Decimal("0.00"), remaining - principal_k)
-
-                total_interest += fixed_interest
-                total_fees += fee_k
-                total_payments += total_k
-
-                schedule.append(
-                    InstallmentAmortizationItem(
-                        month_index=idx,
-                        due_date=due_d,
-                        principal_amount=principal_k,
-                        interest_amount=fixed_interest,
-                        fee_amount=fee_k,
-                        total_payment=total_k,
-                        remaining_principal=remaining,
-                    )
-                )
-
-        first_payment = schedule[0].total_payment if schedule else Decimal("0.00")
-        last_payment = schedule[-1].total_payment if schedule else Decimal("0.00")
-        avg_monthly = _q(total_payments / Decimal(str(tenor_months))) if tenor_months > 0 else Decimal("0.00")
-
-        return {
-            "monthly_installment": first_payment if interest_type == "effective" else avg_monthly,
-            "first_month_installment": first_payment,
-            "last_month_installment": last_payment,
-            "total_interest": _q(total_interest),
-            "total_fees": _q(total_fees),
-            "total_installment_payments": _q(total_payments),
-            "schedule": schedule,
-        }
+        return compute_installment_schedule(
+            principal=principal,
+            tenor_months=tenor_months,
+            interest_type=interest_type,
+            monthly_rate=monthly_rate,
+            monthly_fee=monthly_fee,
+            start_date=start_date,
+            due_day=due_day,
+        )
 
     @staticmethod
     def evaluate_affordability(
