@@ -26,6 +26,10 @@ from app.schemas.forecast import (
     IncomeStreamCreate,
     IncomeStreamResponse,
     IncomeStreamUpdate,
+    InstallmentApplyRequest,
+    InstallmentApplyResponse,
+    InstallmentSimulationRequest,
+    InstallmentSimulationResponse,
     PlannedTransactionCreate,
     PlannedTransactionResponse,
     PlannedTransactionUpdate,
@@ -38,6 +42,7 @@ from app.schemas.forecast import (
     WishlistUpdate,
 )
 from app.services.forecast_service import ForecastService
+from app.services.installment_service import InstallmentService
 
 router = APIRouter()
 
@@ -425,6 +430,40 @@ async def simulate_purchase(
     session: AsyncSession = Depends(get_session),
 ):
     return await ForecastService.simulate_purchase(
+        session=session,
+        user_id=current_user.id,
+        req=payload,
+    )
+
+
+@router.post(
+    "/simulate-installment",
+    response_model=InstallmentSimulationResponse,
+    summary="Simulasi Cicilan (0%, Flat, Efektif) & Uji Kelayakan Cashflow",
+)
+async def simulate_installment(
+    payload: InstallmentSimulationRequest,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    return await InstallmentService.simulate_installment(
+        session=session,
+        user_id=current_user.id,
+        req=payload,
+    )
+
+
+@router.post(
+    "/simulate-installment/apply-to-planned",
+    response_model=InstallmentApplyResponse,
+    summary="Jadwalkan Hasil Simulasi Cicilan ke Rencana Transaksi Masa Depan",
+)
+async def apply_installment_to_planned(
+    payload: InstallmentApplyRequest,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    return await InstallmentService.apply_to_planned_transactions(
         session=session,
         user_id=current_user.id,
         req=payload,

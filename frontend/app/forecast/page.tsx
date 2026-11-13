@@ -32,6 +32,7 @@ import {
   Lightbulb,
 } from "lucide-react";
 import { api } from "@/lib/api";
+import { InstallmentSimulator } from "@/components/InstallmentSimulator";
 
 export default function ForecastPage() {
   const [activeTab, setActiveTab] = useState<"ledger" | "fixed" | "simulator">("ledger");
@@ -90,6 +91,8 @@ export default function ForecastPage() {
   const [isSavingWishlist, setIsSavingWishlist] = useState(false);
 
   // What-If Simulation State
+  const [simMode, setSimMode] = useState<"cash" | "installment">("cash");
+  const [installmentPrefill, setInstallmentPrefill] = useState<{ name: string; price: number; nonce: number } | null>(null);
   const [simName, setSimName] = useState("");
   const [simAmount, setSimAmount] = useState("");
   const [simSource, setSimSource] = useState<"savings_pool" | "operational_wallet">("savings_pool");
@@ -534,6 +537,13 @@ export default function ForecastPage() {
   const quickSimulate = (name: string, price: number) => {
     setSimName(name);
     setSimAmount(String(price));
+    setSimMode("cash");
+    setActiveTab("simulator");
+  };
+
+  const quickSimulateInstallment = (name: string, price: number) => {
+    setInstallmentPrefill({ name, price, nonce: Date.now() });
+    setSimMode("installment");
     setActiveTab("simulator");
   };
 
@@ -1471,11 +1481,57 @@ export default function ForecastPage() {
       )}
 
       {/* ===================================================================== */}
-      {/* TAB 3: SIMULASI BELANJA "BISA BELI NGGAK?" (SESUAI SPREADSHEET 3)       */}
+      {/* TAB 3: SIMULASI BELANJA "BISA BELI NGGAK?" & SIMULASI CICILAN        */}
       {/* ===================================================================== */}
       {activeTab === "simulator" && (
         <div className="space-y-4">
-          {/* Simulator Box */}
+          {/* Sub-Mode Switcher: Beli Tunai vs Simulasi Cicilan */}
+          <div className="flex gap-1.5 p-1 rounded-2xl bg-white border border-surface-border text-xs font-bold shadow-xs">
+            <button
+              type="button"
+              onClick={() => setSimMode("cash")}
+              className={`flex-1 py-2 px-2 rounded-xl transition flex items-center justify-center gap-1.5 whitespace-nowrap truncate ${
+                simMode === "cash"
+                  ? "bg-[#0D0F17] text-[#C8F526] shadow-sm"
+                  : "text-espresso-muted hover:text-espresso hover:bg-surface-card"
+              }`}
+            >
+              <Zap className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">Beli Tunai</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSimMode("installment")}
+              className={`flex-1 py-2 px-2 rounded-xl transition flex items-center justify-center gap-1.5 whitespace-nowrap truncate ${
+                simMode === "installment"
+                  ? "bg-[#0D0F17] text-[#C8F526] shadow-sm"
+                  : "text-espresso-muted hover:text-espresso hover:bg-surface-card"
+              }`}
+            >
+              <CreditCard className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">Simulasi Cicilan</span>
+            </button>
+          </div>
+
+          {simMode === "installment" && (
+            <InstallmentSimulator
+              summary={summary}
+              wallets={wallets}
+              prefillItem={installmentPrefill}
+              formatIDR={formatIDR}
+              onAppliedToPlanned={() => {
+                queryClient.invalidateQueries({ queryKey: ["forecast-planned"] });
+                queryClient.invalidateQueries({ queryKey: ["forecast-range-projection"] });
+                refetchSummary();
+              }}
+              onSavedToWishlist={() => {
+                refetchWishlists();
+              }}
+            />
+          )}
+
+          {/* Simulator Box (Beli Tunai) */}
+          {simMode === "cash" && (
           <div className="rounded-3xl border border-surface-border bg-white p-5 sm:p-6 shadow-xs space-y-4">
             <div>
               <h3 className="text-sm font-black text-espresso flex items-center gap-2">
@@ -1609,6 +1665,7 @@ export default function ForecastPage() {
               </div>
             )}
           </div>
+          )}
 
           {/* Wishlist List Sesuai Spreadsheet 3 */}
           <div className="rounded-3xl border border-surface-border bg-white p-5 shadow-xs space-y-3.5">
@@ -1639,13 +1696,20 @@ export default function ForecastPage() {
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
                     <button
                       type="button"
                       onClick={() => quickSimulate(item.item_name, item.estimated_price)}
-                      className="rounded-xl bg-[#0D0F17] px-3 py-1 text-[11px] font-black text-[#C8F526] hover:bg-[#161A26] transition active:scale-95"
+                      className="rounded-xl bg-[#0D0F17] px-2.5 py-1 text-[11px] font-black text-[#C8F526] hover:bg-[#161A26] transition active:scale-95"
                     >
-                      Uji Dampak
+                      Uji Tunai
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => quickSimulateInstallment(item.item_name, item.estimated_price)}
+                      className="rounded-xl border border-[#0D0F17]/20 bg-white px-2.5 py-1 text-[11px] font-black text-espresso hover:border-[#0D0F17] transition active:scale-95"
+                    >
+                      Cicilan
                     </button>
                     <button
                       type="button"
