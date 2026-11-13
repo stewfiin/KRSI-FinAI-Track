@@ -550,14 +550,7 @@ export default function ForecastPage() {
   return (
     <div className="space-y-5 pb-16">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="h-2.5 w-2.5 rounded-full bg-[#C8F526] animate-pulse" />
-          <h1 className="text-xl font-black tracking-tight text-espresso flex items-center gap-2">
-            Proyeksi & Runway
-          </h1>
-        </div>
-
+      <div className="flex items-center justify-end">
         <button
           type="button"
           onClick={() => setIsPlanModalOpen(true)}
@@ -578,38 +571,14 @@ export default function ForecastPage() {
           <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-[#C8F526]/10 blur-3xl" />
           <div className="pointer-events-none absolute -left-16 -bottom-16 h-48 w-48 rounded-full bg-[#10B981]/10 blur-3xl" />
 
-          <div className="flex items-center justify-between">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#C8F526] px-3 py-1 text-[10px] font-black text-black tracking-wider uppercase shadow-sm">
-              <span className="h-1.5 w-1.5 rounded-full bg-black animate-ping" />
-              Batas Belanja Hari Ini
-            </span>
-            <span className="text-xs text-white/60 font-semibold">
-              Sisa {summary.cycle_info.days_remaining} hari siklus
-            </span>
-          </div>
-
           <div>
-            <div className="flex items-baseline gap-2">
-              <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
-                {formatIDR(summary.today_metrics.ideal_spending_today)}
-              </h2>
-              <span className="text-xs text-white/50 font-semibold">/ hari (Ideal)</span>
-            </div>
+            <h2 className="text-3xl sm:text-4xl font-semibold text-white tracking-tight">
+              {formatIDR(summary.today_metrics.ideal_spending_today)}
+            </h2>
 
-            <div className="mt-2.5 flex items-center justify-between text-xs">
+            <div className="mt-2.5 flex items-center text-xs">
               <span className="text-white/70">
                 Terpakai: <strong className="text-white font-bold">{formatIDR(summary.today_metrics.actual_spent_today)}</strong>
-              </span>
-              <span
-                className={`font-black rounded-lg px-2 py-0.5 text-[11px] ${
-                  summary.today_metrics.daily_variance >= 0
-                    ? "bg-[#C8F526]/20 text-[#C8F526] border border-[#C8F526]/30"
-                    : "bg-[#F43F5E]/20 text-[#F43F5E] border border-[#F43F5E]/30"
-                }`}
-              >
-                {summary.today_metrics.daily_variance >= 0
-                  ? `Sisa: +${formatIDR(summary.today_metrics.daily_variance)} (Surplus)`
-                  : `Over: -${formatIDR(Math.abs(summary.today_metrics.daily_variance))} (Defisit)`}
               </span>
             </div>
 
@@ -628,57 +597,7 @@ export default function ForecastPage() {
             </div>
           </div>
 
-          {/* Quick Metrics Grid */}
-          <div className="grid grid-cols-2 gap-2.5 pt-3 border-t border-white/10 text-xs">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-3 flex flex-col justify-between min-h-[82px] backdrop-blur-sm">
-              <div className="flex items-center gap-1.5 text-white/60 text-[11px] h-4">
-                <Clock className="h-3.5 w-3.5 text-[#C8F526] shrink-0" />
-                <span className="truncate font-medium">Kas Bebas</span>
-              </div>
-              <span className="text-base sm:text-lg font-black text-white truncate">
-                {formatIDR(summary.safe_to_spend_total)}
-              </span>
-              <div className="text-[10px] text-white/60 truncate h-4 flex items-center gap-1">
-                <span>Daya tahan: <strong className="text-white">{summary.runway_prediction.predicted_runway_days} Hari</strong></span>
-                {summary.runway_prediction.is_runway_safe ? (
-                  <CheckCircle2 className="h-3 w-3 text-[#10B981] shrink-0" />
-                ) : (
-                  <AlertTriangle className="h-3 w-3 text-amber-400 shrink-0" />
-                )}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-3 flex flex-col justify-between min-h-[82px] backdrop-blur-sm">
-              <div className="flex items-center gap-1.5 text-white/60 text-[11px] h-4">
-                <Sparkles className="h-3.5 w-3.5 text-[#10B981] shrink-0" />
-                <span className="truncate font-medium">Tabungan</span>
-              </div>
-              <span className="text-base sm:text-lg font-black text-[#10B981] truncate">
-                {formatIDR(summary.current_savings_balance ?? summary.savings_pool_balance)}
-              </span>
-              <div className="text-[10px] text-white/60 truncate h-4 flex items-center">
-                <span>Target: {formatIDR(summary.end_of_month_forecast.target_savings)}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Envelope / Pocket Banking Breakdown Strip */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1 text-[11px]">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="inline-flex items-center gap-1.5 rounded-xl bg-white/5 px-2.5 py-1 text-white/80 border border-white/10">
-                <span className="h-2 w-2 rounded-full bg-[#C8F526]" />
-                <span>Operasional: <strong className="text-white">{formatIDR(summary.safe_to_spend_total)}</strong></span>
-              </span>
-              <span className="inline-flex items-center gap-1.5 rounded-xl bg-white/5 px-2.5 py-1 text-white/80 border border-white/10">
-                <span className="h-2 w-2 rounded-full bg-[#10B981]" />
-                <span>Tabungan: <strong className="text-white">{formatIDR(summary.current_savings_balance ?? summary.savings_pool_balance)}</strong></span>
-              </span>
-              <span className="inline-flex items-center gap-1.5 rounded-xl bg-white/5 px-2.5 py-1 text-white/80 border border-white/10">
-                <span className="h-2 w-2 rounded-full bg-amber-400" />
-                <span>Tagihan: <strong className="text-white">{formatIDR(summary.subscription_pool_balance)}</strong></span>
-              </span>
-            </div>
-
+          <div className="flex flex-col sm:flex-row sm:justify-end pt-1 text-[11px]">
             <button
               type="button"
               onClick={() => setIsWalletConfigModalOpen(true)}
@@ -775,11 +694,11 @@ export default function ForecastPage() {
               {/* 1. KONTROL FILTER PROYEKSI & RENCANA */}
               <div className="rounded-3xl border border-surface-border bg-white p-5 shadow-xs space-y-3.5">
                 <div className="flex items-center justify-between pb-2.5 border-b border-surface-border">
-                  <h3 className="text-sm font-black text-espresso">Filter Proyeksi Arus Kas</h3>
+                  <h3 className="text-sm font-semibold text-espresso">Filter Proyeksi Arus Kas</h3>
                   <button
                     type="button"
                     onClick={() => setIsAddPlannedModalOpen(true)}
-                    className="flex items-center gap-1.5 rounded-xl bg-[#0D0F17] px-3 py-1.5 text-xs font-black text-[#C8F526] hover:bg-[#161A26] transition shadow-xs active:scale-95"
+                    className="flex items-center gap-1.5 rounded-xl bg-[#0D0F17] px-3 py-1.5 text-xs font-semibold text-[#C8F526] hover:bg-[#161A26] transition shadow-xs active:scale-95"
                   >
                     <Plus className="h-3.5 w-3.5" />
                     <span>Rencana</span>
@@ -956,21 +875,21 @@ export default function ForecastPage() {
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5 text-xs">
                     <div className="rounded-2xl bg-surface-card p-3 border border-surface-border flex flex-col justify-between min-h-[76px]">
                       <span className="text-[10px] text-espresso-muted uppercase font-bold block truncate">Saldo Kas Awal</span>
-                      <span className="text-sm font-black text-espresso block truncate">
+                      <span className="text-sm font-semibold text-espresso block truncate">
                         {formatIDR(rangeProjection.initial_balance)}
                       </span>
                     </div>
 
                     <div className="rounded-2xl bg-income/10 p-3 border border-income/20 flex flex-col justify-between min-h-[76px]">
                       <span className="text-[10px] text-income uppercase font-bold block truncate">Estimasi Masuk</span>
-                      <span className="text-sm font-black text-income block truncate">
+                      <span className="text-sm font-semibold text-income block truncate">
                         +{formatIDR(rangeProjection.total_inflow)}
                       </span>
                     </div>
 
                     <div className="rounded-2xl bg-expense/10 p-3 border border-expense/20 flex flex-col justify-between min-h-[76px]">
                       <span className="text-[10px] text-expense uppercase font-bold block truncate">Estimasi Keluar</span>
-                      <span className="text-sm font-black text-expense block truncate">
+                      <span className="text-sm font-semibold text-expense block truncate">
                         -{formatIDR(rangeProjection.total_outflow)}
                       </span>
                     </div>
@@ -981,7 +900,7 @@ export default function ForecastPage() {
                         : "bg-expense/15 border-expense/30"
                     }`}>
                       <span className="text-[10px] text-espresso-muted uppercase font-bold block truncate">Sisa Kas Operasional</span>
-                      <span className={`text-sm font-black block truncate ${
+                      <span className={`text-sm font-semibold block truncate ${
                         rangeProjection.final_balance >= 0 ? "text-espresso" : "text-expense"
                       }`}>
                         {formatIDR(rangeProjection.final_balance)}
@@ -997,7 +916,7 @@ export default function ForecastPage() {
                           </span>
                         )}
                       </div>
-                      <span className="text-sm font-black text-emerald-900 block truncate">
+                      <span className="text-sm font-semibold text-emerald-900 block truncate">
                         {formatIDR(rangeProjection.final_savings_balance ?? rangeProjection.initial_savings_balance ?? 0)}
                       </span>
                     </div>
@@ -1049,7 +968,7 @@ export default function ForecastPage() {
               <div className="rounded-3xl border border-surface-border bg-white p-5 shadow-xs space-y-3.5">
                 <div className="flex items-center justify-between pb-2 border-b border-surface-border">
                   <div>
-                    <h4 className="text-sm font-black text-espresso">Buku Kas Masa Depan</h4>
+                    <h4 className="text-sm font-semibold text-espresso">Buku Kas Masa Depan</h4>
                   </div>
                 </div>
 
@@ -1074,7 +993,7 @@ export default function ForecastPage() {
                             <div className="flex items-center gap-1.5 font-bold text-espresso">
                               <span>{day.date}</span>
                               {day.is_today && (
-                                <span className="rounded-full bg-[#0D0F17] text-[#C8F526] px-2 py-0.5 text-[9px] font-black tracking-wider uppercase">
+                                <span className="rounded-full bg-[#0D0F17] text-[#C8F526] px-2 py-0.5 text-[9px] font-semibold tracking-wider uppercase">
                                   Hari Ini
                                 </span>
                               )}
@@ -1095,7 +1014,7 @@ export default function ForecastPage() {
                             <div>
                               <span className="text-[9px] text-espresso-muted block font-medium">Kas Ops</span>
                               <span
-                                className={`text-xs font-black ${
+                                className={`text-xs font-semibold ${
                                   day.closing_balance >= 0 ? "text-espresso" : "text-expense"
                                 }`}
                               >
@@ -1119,12 +1038,12 @@ export default function ForecastPage() {
               <div className="rounded-3xl border border-surface-border bg-surface p-4 shadow-sm space-y-3">
                 <div className="flex items-center justify-between pb-2.5 border-b border-surface-border">
                   <div>
-                    <h4 className="text-sm font-black text-espresso">Rencana Transaksi Terdaftar</h4>
+                    <h4 className="text-sm font-semibold text-espresso">Rencana Transaksi Terdaftar</h4>
                   </div>
                   <button
                     type="button"
                     onClick={() => setIsAddPlannedModalOpen(true)}
-                    className="flex items-center gap-1.5 rounded-xl bg-[#0D0F17] px-3 py-1.5 text-xs font-black text-[#C8F526] hover:bg-[#161A26] transition shadow-xs active:scale-95"
+                    className="flex items-center gap-1.5 rounded-xl bg-[#0D0F17] px-3 py-1.5 text-xs font-semibold text-[#C8F526] hover:bg-[#161A26] transition shadow-xs active:scale-95"
                   >
                     <Plus className="h-3.5 w-3.5" />
                     <span>Tambah</span>
@@ -1186,7 +1105,7 @@ export default function ForecastPage() {
                               type="button"
                               onClick={() => handleExecutePlanned(pt.id, pt.name)}
                               disabled={isExecutingPlanned === pt.id}
-                              className="rounded-xl bg-[#C8F526] px-3 py-1.5 text-[11px] font-black text-black hover:bg-[#b8e51b] transition disabled:opacity-50 flex items-center gap-1 shadow-xs active:scale-95"
+                              className="rounded-xl bg-[#C8F526] px-3 py-1.5 text-[11px] font-semibold text-black hover:bg-[#b8e51b] transition disabled:opacity-50 flex items-center gap-1 shadow-xs active:scale-95"
                               title="Eksekusi menjadi transaksi riil & debit dompet"
                             >
                               <Zap className="h-3 w-3" />
@@ -1221,10 +1140,10 @@ export default function ForecastPage() {
             <div className="rounded-3xl border border-surface-border bg-white p-5 shadow-xs space-y-3.5">
               <div className="flex items-center justify-between pb-2.5 border-b border-surface-border">
                 <div>
-                  <h3 className="text-sm font-black text-espresso">Rekap Realisasi Harian</h3>
+                  <h3 className="text-sm font-semibold text-espresso">Rekap Realisasi Harian</h3>
                 </div>
                 {ledger && (
-                  <span className="rounded-xl bg-surface-card px-2.5 py-1 text-[11px] font-black text-espresso border border-surface-border">
+                  <span className="rounded-xl bg-surface-card px-2.5 py-1 text-[11px] font-semibold text-espresso border border-surface-border">
                     Net: {ledger.net_variance >= 0 ? "+" : ""}{formatIDR(ledger.net_variance)}
                   </span>
                 )}
@@ -1286,7 +1205,7 @@ export default function ForecastPage() {
         <div className="rounded-3xl border border-surface-border bg-white p-5 shadow-xs space-y-4">
           <div className="flex items-center justify-between pb-2.5 border-b border-surface-border">
             <div>
-              <h3 className="text-sm font-black text-espresso">Tagihan & Siklus Hidup Berkala</h3>
+              <h3 className="text-sm font-semibold text-espresso">Tagihan & Siklus Hidup Berkala</h3>
               <p className="text-[11px] text-espresso-muted">
                 Otomatis dicadangkan dari saldo agar jatah makan harian tidak terganggu
               </p>
@@ -1294,7 +1213,7 @@ export default function ForecastPage() {
             <button
               type="button"
               onClick={() => setIsAddFixedModalOpen(true)}
-              className="flex items-center gap-1.5 rounded-xl bg-[#0D0F17] px-3 py-1.5 text-xs font-black text-[#C8F526] hover:bg-[#161A26] transition shadow-xs active:scale-95"
+              className="flex items-center gap-1.5 rounded-xl bg-[#0D0F17] px-3 py-1.5 text-xs font-semibold text-[#C8F526] hover:bg-[#161A26] transition shadow-xs active:scale-95"
             >
               <Plus className="h-3.5 w-3.5" />
               <span>Tambah</span>
@@ -1305,13 +1224,13 @@ export default function ForecastPage() {
             <div className="grid grid-cols-2 gap-2.5 text-xs">
               <div className="rounded-2xl bg-surface-card p-3.5 border border-surface-border">
                 <span className="text-[10px] text-espresso-muted uppercase font-bold">Total Bulanan</span>
-                <span className="mt-0.5 block text-sm font-black text-espresso">
+                <span className="mt-0.5 block text-sm font-semibold text-espresso">
                   {formatIDR(summary.fixed_obligations.total_monthly_fixed)}
                 </span>
               </div>
               <div className="rounded-2xl bg-[#0D0F17]/5 p-3.5 border border-surface-border">
                 <span className="text-[10px] text-espresso-muted uppercase font-bold">Belum Terbayar (Buffer)</span>
-                <span className="mt-0.5 block text-sm font-black text-espresso">
+                <span className="mt-0.5 block text-sm font-semibold text-espresso">
                   {formatIDR(summary.fixed_obligations.unpaid_fixed_buffer)}
                 </span>
               </div>
@@ -1461,7 +1380,7 @@ export default function ForecastPage() {
                     </div>
 
                     <div className="flex items-center gap-3">
-                      <span className="text-xs font-black text-espresso">
+                      <span className="text-xs font-semibold text-espresso">
                         {formatIDR(item.amount)}
                       </span>
                       <button
@@ -1534,7 +1453,7 @@ export default function ForecastPage() {
           {simMode === "cash" && (
           <div className="rounded-3xl border border-surface-border bg-white p-5 sm:p-6 shadow-xs space-y-4">
             <div>
-              <h3 className="text-sm font-black text-espresso flex items-center gap-2">
+              <h3 className="text-sm font-semibold text-espresso flex items-center gap-2">
                 <Zap className="h-4 w-4 text-[#0D0F17]" />
                 Simulasi Belanja ("Bisa Beli Nggak?")
               </h3>
@@ -1611,7 +1530,7 @@ export default function ForecastPage() {
               <button
                 type="submit"
                 disabled={isSimulating}
-                className="w-full rounded-2xl bg-[#C8F526] py-3 text-xs font-black text-black shadow-md hover:bg-[#b8e51b] transition disabled:opacity-50 inline-flex items-center justify-center gap-1.5 active:scale-98"
+                className="w-full rounded-2xl bg-[#C8F526] py-3 text-xs font-semibold text-black shadow-md hover:bg-[#b8e51b] transition disabled:opacity-50 inline-flex items-center justify-center gap-1.5 active:scale-98"
               >
                 {isSimulating ? (
                   <span className="flex items-center justify-center gap-1.5">
@@ -1671,12 +1590,12 @@ export default function ForecastPage() {
           <div className="rounded-3xl border border-surface-border bg-white p-5 shadow-xs space-y-3.5">
             <div className="flex items-center justify-between pb-2 border-b border-surface-border">
               <div>
-                <h3 className="text-sm font-black text-espresso">Daftar Impian Belanja (Wishlist)</h3>
+                <h3 className="text-sm font-semibold text-espresso">Daftar Impian Belanja (Wishlist)</h3>
               </div>
               <button
                 type="button"
                 onClick={() => setIsAddWishlistModalOpen(true)}
-                className="flex items-center gap-1.5 rounded-xl bg-[#0D0F17] px-3 py-1.5 text-xs font-black text-[#C8F526] hover:bg-[#161A26] transition shadow-xs active:scale-95"
+                className="flex items-center gap-1.5 rounded-xl bg-[#0D0F17] px-3 py-1.5 text-xs font-semibold text-[#C8F526] hover:bg-[#161A26] transition shadow-xs active:scale-95"
               >
                 <Plus className="h-3.5 w-3.5" />
                 Tambah
@@ -1700,14 +1619,14 @@ export default function ForecastPage() {
                     <button
                       type="button"
                       onClick={() => quickSimulate(item.item_name, item.estimated_price)}
-                      className="rounded-xl bg-[#0D0F17] px-2.5 py-1 text-[11px] font-black text-[#C8F526] hover:bg-[#161A26] transition active:scale-95"
+                      className="rounded-xl bg-[#0D0F17] px-2.5 py-1 text-[11px] font-semibold text-[#C8F526] hover:bg-[#161A26] transition active:scale-95"
                     >
                       Uji Tunai
                     </button>
                     <button
                       type="button"
                       onClick={() => quickSimulateInstallment(item.item_name, item.estimated_price)}
-                      className="rounded-xl border border-[#0D0F17]/20 bg-white px-2.5 py-1 text-[11px] font-black text-espresso hover:border-[#0D0F17] transition active:scale-95"
+                      className="rounded-xl border border-[#0D0F17]/20 bg-white px-2.5 py-1 text-[11px] font-semibold text-espresso hover:border-[#0D0F17] transition active:scale-95"
                     >
                       Cicilan
                     </button>
@@ -2376,7 +2295,7 @@ export default function ForecastPage() {
                   <button
                     type="submit"
                     disabled={isSavingPlan}
-                    className="flex-1 rounded-2xl bg-[#C8F526] py-2.5 text-xs font-black text-black hover:bg-[#b8e51b] transition disabled:opacity-50 shadow-md active:scale-98"
+                    className="flex-1 rounded-2xl bg-[#C8F526] py-2.5 text-xs font-semibold text-black hover:bg-[#b8e51b] transition disabled:opacity-50 shadow-md active:scale-98"
                   >
                     {isSavingPlan ? "Menyimpan..." : "Simpan Blueprint"}
                   </button>
@@ -2394,7 +2313,7 @@ export default function ForecastPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="w-full max-w-sm rounded-3xl border border-surface-border bg-white p-6 shadow-2xl space-y-4">
             <div>
-              <h3 className="text-base font-black text-espresso">Tambah Tagihan / Siklus Biaya</h3>
+              <h3 className="text-base font-semibold text-espresso">Tambah Tagihan / Siklus Biaya</h3>
               <p className="text-[11px] text-espresso-muted">Dicadangkan otomatis agar tidak memotong jatah harian</p>
             </div>
             <form onSubmit={handleCreateFixed} className="space-y-3">
@@ -2596,7 +2515,7 @@ export default function ForecastPage() {
                 <button
                   type="submit"
                   disabled={isSavingFixed}
-                  className="flex-1 rounded-2xl bg-[#C8F526] py-2.5 text-xs font-black text-black hover:bg-[#b8e51b] transition disabled:opacity-50 shadow-md active:scale-98"
+                  className="flex-1 rounded-2xl bg-[#C8F526] py-2.5 text-xs font-semibold text-black hover:bg-[#b8e51b] transition disabled:opacity-50 shadow-md active:scale-98"
                 >
                   {isSavingFixed ? "Menyimpan..." : "Simpan"}
                 </button>
@@ -2613,7 +2532,7 @@ export default function ForecastPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="w-full max-w-sm rounded-3xl border border-surface-border bg-white p-6 shadow-2xl space-y-4">
             <div>
-              <h3 className="text-base font-black text-espresso">Tambah Barang Wishlist</h3>
+              <h3 className="text-base font-semibold text-espresso">Tambah Barang Wishlist</h3>
               <p className="text-[11px] text-espresso-muted">Simpan barang impian untuk uji dampak anggaran</p>
             </div>
             <form onSubmit={handleCreateWishlist} className="space-y-3">
@@ -2653,7 +2572,7 @@ export default function ForecastPage() {
                 <button
                   type="submit"
                   disabled={isSavingWishlist}
-                  className="flex-1 rounded-2xl bg-[#C8F526] py-2.5 text-xs font-black text-black hover:bg-[#b8e51b] transition disabled:opacity-50 shadow-md active:scale-98"
+                  className="flex-1 rounded-2xl bg-[#C8F526] py-2.5 text-xs font-semibold text-black hover:bg-[#b8e51b] transition disabled:opacity-50 shadow-md active:scale-98"
                 >
                   {isSavingWishlist ? "Menyimpan..." : "Simpan ke Wishlist"}
                 </button>
@@ -2670,7 +2589,7 @@ export default function ForecastPage() {
           <div className="w-full max-w-sm rounded-3xl border border-surface-border bg-white p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-surface-border pb-3">
               <div>
-                <h3 className="text-base font-black text-espresso">Atur Peruntukan Dompet</h3>
+                <h3 className="text-base font-semibold text-espresso">Atur Peruntukan Dompet</h3>
                 <p className="text-[11px] text-espresso-muted">Pilih alokasi operasional, tabungan, atau tagihan</p>
               </div>
               <button
@@ -2693,7 +2612,7 @@ export default function ForecastPage() {
                       <span className="text-xs font-bold text-espresso block">{w.name}</span>
                       <span className="text-[10px] text-espresso-muted uppercase font-bold">{w.type}</span>
                     </div>
-                    <span className="text-xs font-black text-espresso">
+                    <span className="text-xs font-semibold text-espresso">
                       {formatIDR(w.balance)}
                     </span>
                   </div>
@@ -2765,7 +2684,7 @@ export default function ForecastPage() {
               <button
                 type="button"
                 onClick={() => setIsWalletConfigModalOpen(false)}
-                className="w-full rounded-2xl bg-[#0D0F17] py-2.5 text-xs font-black text-[#C8F526] hover:bg-[#161A26] transition shadow-xs active:scale-98"
+                className="w-full rounded-2xl bg-[#0D0F17] py-2.5 text-xs font-semibold text-[#C8F526] hover:bg-[#161A26] transition shadow-xs active:scale-98"
               >
                 Selesai
               </button>
@@ -2926,7 +2845,7 @@ export default function ForecastPage() {
                 <button
                   type="submit"
                   disabled={isSavingPlanned}
-                  className="flex-1 rounded-2xl bg-[#C8F526] py-2.5 text-xs font-black text-black hover:bg-[#b8e51b] transition disabled:opacity-50 shadow-md active:scale-98"
+                  className="flex-1 rounded-2xl bg-[#C8F526] py-2.5 text-xs font-semibold text-black hover:bg-[#b8e51b] transition disabled:opacity-50 shadow-md active:scale-98"
                 >
                   {isSavingPlanned ? "Menyimpan..." : "Simpan Rencana"}
                 </button>
@@ -2946,10 +2865,10 @@ export default function ForecastPage() {
             <div className="flex items-center justify-between border-b border-surface-border pb-3 shrink-0">
               <div className="flex items-center gap-2">
                 <Calendar className="h-5 w-5 text-espresso shrink-0" />
-                <h3 className="text-base font-black text-espresso flex items-center gap-2">
+                <h3 className="text-base font-semibold text-espresso flex items-center gap-2">
                   <span>{selectedDayDetail.date}</span>
                   {selectedDayDetail.is_today && (
-                    <span className="rounded-full bg-[#0D0F17] text-[#C8F526] px-2 py-0.5 text-[9px] font-black tracking-wider uppercase">
+                    <span className="rounded-full bg-[#0D0F17] text-[#C8F526] px-2 py-0.5 text-[9px] font-semibold tracking-wider uppercase">
                       Hari Ini
                     </span>
                   )}
@@ -2970,7 +2889,7 @@ export default function ForecastPage() {
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="rounded-2xl border border-surface-border bg-surface-card p-2.5 flex flex-col justify-between">
                   <span className="text-[10px] text-espresso-muted uppercase font-bold">Kas Ops Awal</span>
-                  <span className="text-sm font-black text-espresso">
+                  <span className="text-sm font-semibold text-espresso">
                     {formatIDR(selectedDayDetail.initial_balance)}
                   </span>
                 </div>
@@ -2981,7 +2900,7 @@ export default function ForecastPage() {
                     : "border-expense/30 bg-expense/10"
                 }`}>
                   <span className="text-[10px] text-espresso-muted uppercase font-bold">Kas Ops Akhir</span>
-                  <span className={`text-sm font-black ${
+                  <span className={`text-sm font-semibold ${
                     selectedDayDetail.closing_balance >= 0 ? "text-espresso" : "text-expense"
                   }`}>
                     {formatIDR(selectedDayDetail.closing_balance)}
@@ -2990,14 +2909,14 @@ export default function ForecastPage() {
 
                 <div className="rounded-2xl border border-income/20 bg-income/10 p-2.5 flex flex-col justify-between">
                   <span className="text-[10px] text-income uppercase font-bold">Pemasukan</span>
-                  <span className="text-sm font-black text-income">
+                  <span className="text-sm font-semibold text-income">
                     +{formatIDR(selectedDayDetail.total_inflow)}
                   </span>
                 </div>
 
                 <div className="rounded-2xl border border-expense/20 bg-expense/10 p-2.5 flex flex-col justify-between">
                   <span className="text-[10px] text-expense uppercase font-bold">Pengeluaran</span>
-                  <span className="text-sm font-black text-expense">
+                  <span className="text-sm font-semibold text-expense">
                     -{formatIDR(selectedDayDetail.total_outflow)}
                   </span>
                 </div>
@@ -3011,19 +2930,19 @@ export default function ForecastPage() {
                     <span>Tabungan Tersimpan</span>
                   </div>
                   {Number(selectedDayDetail.day_saved) > 0 && (
-                    <span className="text-[9px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300">
+                    <span className="text-[9px] font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300">
                       +{formatIDR(selectedDayDetail.day_saved)} disisihkan
                     </span>
                   )}
                 </div>
-                <div className="text-base font-black text-emerald-900">
+                <div className="text-base font-semibold text-emerald-900">
                   {formatIDR(selectedDayDetail.running_savings_balance ?? 0)}
                 </div>
               </div>
 
               {/* Rincian Transaksi & Mutasi Hari Ini */}
               <div className="space-y-2">
-                <div className="text-xs font-black text-espresso">
+                <div className="text-xs font-semibold text-espresso">
                   Rincian Transaksi Terjadwal
                 </div>
 
@@ -3078,7 +2997,7 @@ export default function ForecastPage() {
                               )}
                             </div>
                           </div>
-                          <span className={`font-black ${
+                          <span className={`font-semibold ${
                             ev.direction === "INFLOW" ? "text-income" : "text-expense"
                           }`}>
                             {ev.direction === "INFLOW" ? "+" : "-"}{formatIDR(ev.amount)}
@@ -3100,7 +3019,7 @@ export default function ForecastPage() {
               <button
                 type="button"
                 onClick={() => setSelectedDayDetail(null)}
-                className="w-full rounded-2xl bg-[#0D0F17] py-2.5 text-xs font-black text-[#C8F526] hover:bg-[#161A26] transition shadow-xs active:scale-98"
+                className="w-full rounded-2xl bg-[#0D0F17] py-2.5 text-xs font-semibold text-[#C8F526] hover:bg-[#161A26] transition shadow-xs active:scale-98"
               >
                 Tutup
               </button>

@@ -203,7 +203,7 @@ export default function DashboardPage() {
                 {isBalanceHidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
-            <h2 className="mt-2 text-3xl font-black tracking-tight text-white sm:text-4xl">
+            <h2 className="mt-2 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
               {formatIDR(summary?.total_balance)}
             </h2>
           </div>
@@ -215,7 +215,7 @@ export default function DashboardPage() {
                 <TrendingUp className="h-3.5 w-3.5" />
                 <span>Pemasukan Bln Ini</span>
               </div>
-              <span className="mt-1 block text-sm font-black text-white">
+              <span className="mt-1 block text-sm font-semibold text-white">
                 {formatIDR(summary?.monthly_income)}
               </span>
             </div>
@@ -225,7 +225,7 @@ export default function DashboardPage() {
                 <TrendingDown className="h-3.5 w-3.5" />
                 <span>Pengeluaran Bln Ini</span>
               </div>
-              <span className="mt-1 block text-sm font-black text-white">
+              <span className="mt-1 block text-sm font-semibold text-white">
                 {formatIDR(summary?.monthly_expense)}
               </span>
             </div>
@@ -247,7 +247,7 @@ export default function DashboardPage() {
           <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-black text-[#C8F526] group-hover:scale-110 transition-transform">
             <Plus className="h-4 w-4 stroke-[3]" />
           </div>
-          <span className="text-xs sm:text-sm font-black">Masuk</span>
+          <span className="text-xs sm:text-sm font-semibold">Masuk</span>
         </button>
 
         <button
@@ -316,7 +316,7 @@ export default function DashboardPage() {
               <span className="mt-3 block text-xs font-semibold text-espresso-muted truncate">
                 {wallet.name}
               </span>
-              <span className="mt-0.5 block text-sm font-black text-espresso">
+              <span className="mt-0.5 block text-sm font-semibold text-espresso">
                 {formatIDR(wallet.balance)}
               </span>
             </div>
@@ -536,7 +536,7 @@ export default function DashboardPage() {
               <div key={tx.id} className="flex items-center justify-between py-3 group">
                 <div className="flex items-center gap-3">
                   <div
-                    className={`flex h-10 w-10 items-center justify-center rounded-2xl font-black text-xs border ${
+                    className={`flex h-10 w-10 items-center justify-center rounded-2xl font-semibold text-xs border ${
                       tx.type === "income"
                         ? "bg-emerald-50 text-emerald-600 border-emerald-200/60"
                         : tx.type === "expense"
@@ -564,7 +564,7 @@ export default function DashboardPage() {
                 </div>
 
                 <span
-                  className={`text-sm font-black ${
+                  className={`text-sm font-semibold ${
                     tx.type === "income"
                       ? "text-income"
                       : tx.type === "expense"
